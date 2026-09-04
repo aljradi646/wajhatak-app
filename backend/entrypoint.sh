@@ -42,6 +42,29 @@ case "$DB_CONNECTION" in
         ;;
 esac
 
+# If DB_HOST holds a full mysql:// URL (e.g. someone pasted MYSQL_URL into it),
+# split it into host/port/database/user/password so Laravel connects correctly.
+case "$DB_HOST" in
+    mysql://*|mariadb://*)
+        echo "==> [Wajhatak] DB_HOST contains a full URL - splitting it into DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD."
+        _u="$DB_HOST"
+        _creds="${_u#*://}"
+        _auth="${_creds%%@*}"
+        _rest="${_creds#*@}"
+        _hostport="${_rest%%/*}"
+        _db="${_rest#*/}"
+        _db="${_db%%\?*}"
+        _user="${_auth%%:*}"
+        _pass="${_auth#*:}"
+        case "$_hostport" in
+            *:*) _host="${_hostport%%:*}"; _port="${_hostport##*:}" ;;
+            *) _host="$_hostport"; _port="${DB_PORT:-3306}" ;;
+        esac
+        export DB_HOST="$_host" DB_PORT="$_port" DB_DATABASE="$_db" DB_USERNAME="$_user" DB_PASSWORD="$_pass"
+        unset _u _creds _auth _rest _hostport _db _user _pass _host _port
+        ;;
+esac
+
 DB_HOST_VALUE="${DB_HOST:-$MYSQLHOST}"
 case "$DB_HOST_VALUE" in
     ''|*\$\{\{*|*\$\{*)
