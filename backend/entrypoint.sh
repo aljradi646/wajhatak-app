@@ -59,6 +59,12 @@ MAIL_MAILER=log
 CURRENCY_DEFAULT=YER
 LUX_ALLOW_DEMO_SEED=true
 ENV
+    # If running on Railway, APP_URL should point to the public domain so that
+    # absolute links (queue jobs, notifications, emails) use the real https URL.
+    if [ -n "${RAILWAY_PUBLIC_DOMAIN:-}" ]; then
+        sed -i "s#^APP_URL=.*#APP_URL=https://${RAILWAY_PUBLIC_DOMAIN}#" .env
+        echo "==> [Wajhatak] APP_URL set to https://${RAILWAY_PUBLIC_DOMAIN}"
+    fi
 fi
 
 # Demo (trial) dataset: on by default unless explicitly disabled.
