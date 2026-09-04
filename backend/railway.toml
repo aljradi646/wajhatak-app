@@ -1,42 +1,26 @@
 # =============================================================================
-# Railway configuration - Wajhatak Laravel backend service
+# Railway configuration - Wajhatak backend service (backend/ as Root Directory)
 #
-# This file configures the main "app" service on Railway. It builds a real
-# Docker image from the Dockerfile in this directory (multi-stage:
-# Node assets -> Composer deps -> PHP 8.2-FPM runtime + Caddy), then runs the
-# entrypoint which performs migrations, seeds roles/permissions/locations and
-# the control-panel admin account, and finally serves the app behind Caddy.
+# ALTERNATIVE to the repository-root railway.toml. Use this one only if you set
+# the Railway service "Root Directory" to `backend`; otherwise the root
+# railway.toml + root Dockerfile are used.
 #
-# Related services (optional, same image, different RAILWAY_SERVICE_TYPE):
-#   - Queue worker   : RAILWAY_SERVICE_TYPE=worker   -> php artisan queue:work
-#   - Scheduler      : RAILWAY_SERVICE_TYPE=scheduler-> schedule:run loop
-#
-# To deploy, set the service Root Directory to `backend` (the folder that
-# contains this file and the Dockerfile), then attach a MySQL service to the
-# same project. Railway injects the MySQL connection variables used below.
-#
-# Control panel is served at   /admin
-#   login: ADMIN_EMAIL / ADMIN_PASSWORD   (env vars, default admin@wajhatak.app / admin123)
+# The image ENTRYPOINT validates MySQL, migrates, seeds roles/permissions/
+# locations + demo data + the admin account, then serves the app on $PORT with
+# `php artisan serve` while running the queue worker in the background.
+# Control panel is served at /admin.
 # =============================================================================
 
-# Use the project's real Dockerfile for an explicit, reproducible build.
+# Use the project's Dockerfile (backend/ is the build context here).
 [build]
 builder = "DOCKERFILE"
-
-# RECOMMENDED: set the Railway service "Root Directory" to `backend` (the
-# folder containing this file and the Dockerfile). Railway then uses `backend`
-# as the build context, auto-detects backend/Dockerfile, and applies
-# backend/.dockerignore - so only the server code is copied into the image.
-#
-# Only if you instead deploy from the repository root, point explicitly:
 dockerfilePath = "Dockerfile"
 
 # -----------------------------------------------------------------------------
 # Deploy / runtime behavior for the app service
 # -----------------------------------------------------------------------------
 [deploy]
-# The image's ENTRYPOINT runs the bootstrap then starts Caddy (which binds to
-# $PORT). No override needed; kept explicit for clarity.
+# The image ENTRYPOINT runs the bootstrap then starts the Laravel server.
 startCommand = ""
 
 # Health check so Railway knows the app is up. /up is Laravel's built-in
@@ -49,54 +33,24 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
 
 # -----------------------------------------------------------------------------
-# Laravel environment (constants). Database values are pulled from the MySQL
-# service and may be overridden per-service or per-environment.
+# IMPORTANT - Environment variables
 # -----------------------------------------------------------------------------
-[deploy.variables]
-APP_ENV = "production"
-APP_DEBUG = "false"
-APP_LOCALE = "ar"
-APP_FALLBACK_LOCALE = "en"
-APP_FAKER_LOCALE = "ar"
-LOG_CHANNEL = "stack"
-LOG_LEVEL = "warning"
-SESSION_DRIVER = "database"
-QUEUE_CONNECTION = "database"
-CACHE_STORE = "database"
-FILESYSTEM_DISK = "local"
-BROADCAST_CONNECTION = "log"
-MAIL_MAILER = "log"
-CURRENCY_DEFAULT = "YER"
-
-# The private Railway domain is used as the canonical app URL (override with
-# your own domain after the public URL is generated).
-APP_URL = "https://${{RAILWAY_PUBLIC_DOMAIN}}"
-
-# Control-panel admin bootstrap. CHANGE THESE before going live.
-ADMIN_NAME = "مدير النظام"
-ADMIN_EMAIL = "admin@wajhatak.app"
-ADMIN_PASSWORD = "admin123"
-
-# Seed the demo/trial dataset on every boot (properties, agents, clients,
-# chat, viewing requests, demo images). Set to "false" for a clean production
-# database with only the base roles/permissions/locations + admin account.
-LUX_ALLOW_DEMO_SEED = "true"
-
-# APP_KEY is generated automatically on first boot by the entrypoint if empty,
-# but you may set it explicitly for stable encrypted sessions/cookies:
-# APP_KEY = "base64:..."
-
-# -----------------------------------------------------------------------------
-# MySQL service connection (Railway's managed MySQL service exposes these).
+# Railway's config-as-code (railway.toml) does NOT support variables. Add them
+# in the dashboard instead: Project -> Variables (or the app service), e.g.:
 #
-# DB_URL is preferred: Laravel parses the full mysql:// URL that Railway
-# provides (MYSQL_URL) into host/port/database/user/password itself. Setting
-# DB_URL also wins over any stray DB_HOST value in dashboard variables.
-# -----------------------------------------------------------------------------
-DB_CONNECTION = "mysql"
-DB_URL = "${{MySQL.MYSQL_URL}}"
-DB_HOST = "${{MySQL.MYSQLHOST}}"
-DB_PORT = "${{MySQL.MYSQLPORT}}"
-DB_DATABASE = "${{MySQL.MYSQLDATABASE}}"
-DB_USERNAME = "${{MySQL.MYSQLUSER}}"
-DB_PASSWORD = "${{MySQL.MYSQLPASSWORD}}"
+#   LUX_ALLOW_DEMO_SEED = true     (demo/trial dataset; entrypoint defaults to true)
+#   APP_KEY             = base64:...  (stable key across redeploys)
+#   ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD  (control-panel login)
+#   APP_URL             = https://${{RAILWAY_PUBLIC_DOMAIN}}
+#
+# MySQL connection - attach a Railway MySQL service (name "MySQL"); its
+# variables are exported into this service automatically. For example:
+#   DB_CONNECTION = mysql
+#   DB_URL        = ${{MySQL.MYSQL_URL}}     <- preferred, Laravel parses it
+#   DB_HOST = ${{MySQL.MYSQLHOST}}  DB_PORT = ${{MySQL.MYSQLPORT}}
+#   DB_DATABASE = ${{MySQL.MYSQLDATABASE}}  DB_USERNAME = ${{MySQL.MYSQLUSER}}
+#   DB_PASSWORD = ${{MySQL.MYSQLPASSWORD}}
+#
+# The entrypoint is defensive: it also splits a mysql:// URL out of DB_HOST and
+# will not start unless MySQL is reachable.
+# =============================================================================
