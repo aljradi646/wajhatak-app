@@ -88,9 +88,13 @@ LUX_ALLOW_DEMO_SEED = "true"
 
 # -----------------------------------------------------------------------------
 # MySQL service connection (Railway's managed MySQL service exposes these).
-# The entrypoint supports MySQL (default) via these variables.
+#
+# DB_URL is preferred: Laravel parses the full mysql:// URL that Railway
+# provides (MYSQL_URL) into host/port/database/user/password itself. Setting
+# DB_URL also wins over any stray DB_HOST value in dashboard variables.
 # -----------------------------------------------------------------------------
 DB_CONNECTION = "mysql"
+DB_URL = "${{MySQL.MYSQL_URL}}"
 DB_HOST = "${{MySQL.MYSQLHOST}}"
 DB_PORT = "${{MySQL.MYSQLPORT}}"
 DB_DATABASE = "${{MySQL.MYSQLDATABASE}}"
