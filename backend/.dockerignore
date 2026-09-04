@@ -1,0 +1,52 @@
+# Dependencies (rebuilt inside the image)
+vendor/
+node_modules/
+
+# Local environment - secrets must not be baked into the image
+.env
+.env.*
+!.env.example
+
+# Build outputs (regenerated during the Docker build)
+public/build/
+public/hot
+
+# Framework caches / temporary
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/testing/*
+storage/app/*
+storage/debugbar/*
+bootstrap/cache/*.php
+
+# Database local files
+database/*.sqlite
+database/*.sqlite-journal
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Diagnostic / debug scratch files (not needed in production image)
+debug_api.php
+deploy_fix.php
+diag2.php
+status.php
+luxs
+
+# Local test artifacts
+test_push.txt
+
+# Composer/NPM temp
+composer.phar
+*.zip
+*.tar.gz

@@ -1,0 +1,79 @@
+# =============================================================================
+# Wajhatak local development / full-stack run
+#
+#   docker compose up --build
+#
+# This brings up a real MySQL 8 database, runs all Laravel migrations and
+# seeds the control-panel admin account automatically, then serves the app at
+# http://localhost:8080 with Caddy + PHP-FPM.
+#
+# Control panel:  http://localhost:8080/admin
+#   login         admin@wajhatak.app  /  admin123   (override via .env)
+#
+# Note: On Railway the database is provisioned as its own managed service
+# (MySQL or Postgres), and only the "app" service below is deployed - see the
+# Dockerfile, entrypoint.sh and railway.toml for the platform configuration.
+# =============================================================================
+services:
+  # ---------------------------------------------------------------------------
+  # Database (local stand-in for Railway's managed MySQL service)
+  # ---------------------------------------------------------------------------
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-wajhatak}
+      MYSQL_USER: ${DB_USERNAME:-wajhatak}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${DB_PASSWORD:-secret}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Laravel application (PHP-FPM + Caddy)
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY:-}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_NAME: "وجهتك"
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-wajhatak}
+      DB_USERNAME: ${DB_USERNAME:-wajhatak}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      FILESYSTEM_DISK: local
+      RAILWAY_SERVICE_TYPE: app
+      PORT: ${PORT:-8080}
+      # Control-panel admin account
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@wajhatak.app}
+      ADMIN_NAME: ${ADMIN_NAME:-مدير النظام}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - app_storage:/var/www/html/storage
+
+volumes:
+  db_data:
+  app_storage:

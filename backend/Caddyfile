@@ -1,0 +1,36 @@
+# Caddy configuration for the Wajhatak Laravel backend.
+#
+# On Railway, the platform terminates TLS at its edge and forwards plain
+# HTTP to the app on the port injected via the $PORT environment variable.
+# Caddy therefore listens on HTTP on that port (default 8080 locally) and
+# reverse-proxies dynamic requests to PHP-FPM on port 9000 while serving the
+# static assets from public/ directly.
+
+{
+	# Keep logs compact
+	# By default Caddy logs to stderr for Railway/Buildpack log ingestion.
+}
+
+:{$PORT:8080} {
+	root * /var/www/html/public
+
+	# Standard Laravel fastcgi setup: .php goes to php-fpm, everything else
+	# falls through to the file server with clean URLs handled by Laravel.
+	php_fastcgi 127.0.0.1:9000
+
+	# Serve built assets & static files from the public dir
+	file_server
+
+	# Common headers
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	encode gzip zstd
+
+	# Do not cache PHP routes
+	@php path *.php
+	header @php Cache-Control "no-cache"
+}

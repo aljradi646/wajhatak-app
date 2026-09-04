@@ -1,0 +1,93 @@
+# =============================================================================
+# Railway configuration - Wajhatak Laravel backend service
+#
+# This file configures the main "app" service on Railway. It builds a real
+# Docker image from the Dockerfile in this directory (multi-stage:
+# Node assets -> Composer deps -> PHP 8.2-FPM runtime + Caddy), then runs the
+# entrypoint which performs migrations, seeds roles/permissions/locations and
+# the control-panel admin account, and finally serves the app behind Caddy.
+#
+# Related services (optional, same image, different RAILWAY_SERVICE_TYPE):
+#   - Queue worker   : RAILWAY_SERVICE_TYPE=worker   -> php artisan queue:work
+#   - Scheduler      : RAILWAY_SERVICE_TYPE=scheduler-> schedule:run loop
+#
+# To deploy, set the service Root Directory to `backend` (the folder that
+# contains this file and the Dockerfile), then attach a MySQL service to the
+# same project. Railway injects the MySQL connection variables used below.
+#
+# Control panel is served at   /admin
+#   login: ADMIN_EMAIL / ADMIN_PASSWORD   (env vars, default admin@wajhatak.app / admin123)
+# =============================================================================
+
+# Use the project's real Dockerfile for an explicit, reproducible build.
+[build]
+builder = "DOCKERFILE"
+
+# RECOMMENDED: set the Railway service "Root Directory" to `backend` (the
+# folder containing this file and the Dockerfile). Railway then uses `backend`
+# as the build context, auto-detects backend/Dockerfile, and applies
+# backend/.dockerignore - so only the server code is copied into the image.
+#
+# Only if you instead deploy from the repository root, point explicitly:
+dockerfilePath = "Dockerfile"
+
+# -----------------------------------------------------------------------------
+# Deploy / runtime behavior for the app service
+# -----------------------------------------------------------------------------
+[deploy]
+# The image's ENTRYPOINT runs the bootstrap then starts Caddy (which binds to
+# $PORT). No override needed; kept explicit for clarity.
+startCommand = ""
+
+# Health check so Railway knows the app is up. /up is Laravel's built-in
+# health endpoint.
+healthcheckPath = "/up"
+healthcheckTimeout = 300
+
+# Restart on failure so transient issues self-heal.
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+
+# -----------------------------------------------------------------------------
+# Laravel environment (constants). Database values are pulled from the MySQL
+# service and may be overridden per-service or per-environment.
+# -----------------------------------------------------------------------------
+[deploy.variables]
+APP_ENV = "production"
+APP_DEBUG = "false"
+APP_LOCALE = "ar"
+APP_FALLBACK_LOCALE = "en"
+APP_FAKER_LOCALE = "ar"
+LOG_CHANNEL = "stack"
+LOG_LEVEL = "warning"
+SESSION_DRIVER = "database"
+QUEUE_CONNECTION = "database"
+CACHE_STORE = "database"
+FILESYSTEM_DISK = "local"
+BROADCAST_CONNECTION = "log"
+MAIL_MAILER = "log"
+CURRENCY_DEFAULT = "YER"
+
+# The private Railway domain is used as the canonical app URL (override with
+# your own domain after the public URL is generated).
+APP_URL = "https://${{RAILWAY_PUBLIC_DOMAIN}}"
+
+# Control-panel admin bootstrap. CHANGE THESE before going live.
+ADMIN_NAME = "مدير النظام"
+ADMIN_EMAIL = "admin@wajhatak.app"
+ADMIN_PASSWORD = "admin123"
+
+# APP_KEY is generated automatically on first boot by the entrypoint if empty,
+# but you may set it explicitly for stable encrypted sessions/cookies:
+# APP_KEY = "base64:..."
+
+# -----------------------------------------------------------------------------
+# MySQL service connection (Railway's managed MySQL service exposes these).
+# The entrypoint supports MySQL (default) via these variables.
+# -----------------------------------------------------------------------------
+DB_CONNECTION = "mysql"
+DB_HOST = "${{MySQL.MYSQLHOST}}"
+DB_PORT = "${{MySQL.MYSQLPORT}}"
+DB_DATABASE = "${{MySQL.MYSQLDATABASE}}"
+DB_USERNAME = "${{MySQL.MYSQLUSER}}"
+DB_PASSWORD = "${{MySQL.MYSQLPASSWORD}}"
