@@ -1,0 +1,31 @@
+# Wajhatak monorepo - keep the Docker build context to the essential files.
+# The app is built from backend/; mobile/ and docs are excluded here, and the
+# root Dockerfile copies sources with a backend/ prefix.
+
+mobile/
+documentation/
+.git/
+.gitignore
+.gitattributes
+
+README.md
+
+*.py
+*.ps1
+
+# Local env/secrets - never baked into the image
+.env
+backend/.env
+
+# Deployment & debug leftovers that must not ship in the image
+backend/luxs
+backend/debug_api.php
+backend/deploy_fix.php
+backend/diag2.php
+backend/status.php
+
+# Local build artifacts & caches (rebuilt inside the Docker image)
+backend/node_modules/
+backend/vendor/
+backend/public/build/
+backend/storage/
