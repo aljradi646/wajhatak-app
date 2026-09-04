@@ -1,27 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
-# Stage 1: Frontend assets (Vite + Tailwind)
-# =============================================================================
-FROM node:22-alpine AS frontend
-
-WORKDIR /app
-
-# Install JS dependencies (only lockfile first for layer caching)
-COPY package.json package-lock.json ./
-RUN npm ci
-
-# Copy config + templates + Tailwind content sources.
-# resources/views & the Laravel pagination view are scanned by Tailwind so the
-# generated CSS contains every utility class actually used by the blades.
-COPY vite.config.js tailwind.config.js postcss.config.js ./
-COPY resources ./resources
-COPY --from=composer_stage /app/vendor ./vendor
-RUN mkdir -p storage/framework/views
-RUN npm run build
-
-# =============================================================================
-# Stage 2: PHP dependencies (Composer)
+# Stage 1: PHP dependencies (Composer)
 # =============================================================================
 FROM composer:2 AS composer_stage
 
@@ -41,14 +21,32 @@ RUN composer install \
         --ignore-platform-reqs
 
 # =============================================================================
+# Stage 2: Frontend assets (Vite + Tailwind)
+# =============================================================================
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+
+# Install JS dependencies (only lockfile first for layer caching)
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy config + templates + Tailwind content sources.
+# resources/views & the Laravel pagination view are scanned by Tailwind so the
+# generated CSS contains every utility class actually used by the blades.
+COPY vite.config.js tailwind.config.js postcss.config.js ./
+COPY resources ./resources
+COPY --from=composer_stage /app/vendor ./vendor
+RUN mkdir -p storage/framework/views
+RUN npm run build
+
+# =============================================================================
 # Stage 3: Final runtime image
 # =============================================================================
 FROM php:8.2-fpm-alpine AS runtime
 
 # Install runtime PHP extensions and the Caddy web server.
 # - Caddy serves as a reverse proxy to php-fpm and provides automatic HTTPS.
-# - install-php-extensions is the easiest way to add all required extensions
-#   in one shot on Alpine.
 RUN apk add --no-cache \
         curl \
         unzip \
@@ -86,10 +84,10 @@ WORKDIR /var/www/html
 # Copy application source (respecting .dockerignore)
 COPY . .
 
-# Copy the built frontend assets from Stage 1
+# Copy the built frontend assets from Stage 2
 COPY --from=frontend /app/public/build ./public/build
 
-# Copy Composer dependencies from Stage 2 (into the same path)
+# Copy Composer dependencies from Stage 1 (into the same path)
 COPY --from=composer_stage /app/vendor ./vendor
 
 # Configuration files for the web server and bootstrap
