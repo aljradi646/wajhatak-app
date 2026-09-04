@@ -7,29 +7,13 @@
 # .dockerignore, and every source path below is prefixed with `backend/`.
 # Railway uses this file via the root railway.toml (builder = DOCKERFILE).
 #
-# Stages:
-#   1. Frontend  : node:22-alpine -> Vite + Tailwind build into public/build
-#   2. Deps      : composer:2     -> PHP deps (--no-scripts; booted at runtime)
+# Stages (ordered so each COPY --from only references earlier stages):
+#   1. Deps      : composer:2     -> PHP deps (--no-scripts; booted at runtime)
+#   2. Frontend  : node:22-alpine -> Vite + Tailwind build into public/build
 #   3. Runtime   : php:8.2-fpm-alpine + Caddy -> serves Laravel on $PORT
 # =============================================================================
 
-# --- Stage 1: Frontend assets (Vite + Tailwind) ---------------------------
-FROM node:22-alpine AS frontend
-
-WORKDIR /app
-
-COPY backend/package.json backend/package-lock.json ./
-RUN npm ci
-
-# Tailwind scans resources/views and the Laravel pagination view so the
-# generated CSS contains every utility class actually used by the blades.
-COPY backend/vite.config.js backend/tailwind.config.js backend/postcss.config.js ./
-COPY backend/resources ./resources
-COPY --from=composer_stage /app/vendor ./vendor
-RUN mkdir -p storage/framework/views
-RUN npm run build
-
-# --- Stage 2: PHP dependencies (Composer) ---------------------------------
+# --- Stage 1: PHP dependencies (Composer) ---------------------------------
 FROM composer:2 AS composer_stage
 
 WORKDIR /app
@@ -45,6 +29,22 @@ RUN composer install \
         --no-progress \
         --prefer-dist \
         --ignore-platform-reqs
+
+# --- Stage 2: Frontend assets (Vite + Tailwind) ---------------------------
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+
+COPY backend/package.json backend/package-lock.json ./
+RUN npm ci
+
+# Tailwind scans resources/views and the Laravel pagination view so the
+# generated CSS contains every utility class actually used by the blades.
+COPY backend/vite.config.js backend/tailwind.config.js backend/postcss.config.js ./
+COPY backend/resources ./resources
+COPY --from=composer_stage /app/vendor ./vendor
+RUN mkdir -p storage/framework/views
+RUN npm run build
 
 # --- Stage 3: Final runtime image -----------------------------------------
 FROM php:8.2-fpm-alpine AS runtime
