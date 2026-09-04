@@ -96,15 +96,15 @@ COPY --from=composer_stage /app/vendor ./vendor
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY entrypoint.sh /usr/local/bin/entrypoint
 
-# Regenerate the optimized autoloader against the real PHP runtime and let
-# Laravel discover package service providers (writes bootstrap/cache/packages.php).
-RUN composer dump-autoload --optimize --no-dev --no-interaction \
-    && php artisan package:discover --ansi || true
-
+# Prepare writable directories first, then regenerate the optimized autoloader
+# and let Laravel discover package service providers.
 RUN chmod +x /usr/local/bin/entrypoint \
     && mkdir -p bootstrap/cache storage/framework/{cache,sessions,views} storage/app/public storage/logs \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R ug+rwX storage bootstrap/cache
+
+RUN composer dump-autoload --optimize --no-dev --no-interaction \
+    && php artisan package:discover --ansi || true
 
 # Production PHP configuration
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
