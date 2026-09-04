@@ -57,15 +57,50 @@ case "$DB_HOST_VALUE" in
 esac
 echo "==> [Wajhatak] Using MySQL at ${DB_HOST_VALUE}."
 
+# Drop any stale cached config so the fresh environment variables win.
+php artisan config:clear >/dev/null 2>&1 || true
+
+# Print the exact target we are connecting to (password hidden).
+echo "==> [Wajhatak] DB target: host=${DB_HOST_VALUE}, port=${DB_PORT:-3306}, database=${DB_DATABASE:-<unset>}, user=${DB_USERNAME:-<unset>}."
+
 # ---------------------------------------------------------------------------
-# 2. Wait for the database
+# 2. Wait for the database (with real diagnostics)
 # ---------------------------------------------------------------------------
 MAX_RETRIES=60
 RETRY=0
-until php artisan migrate:status >/dev/null 2>&1; do
+FIRST_ERR=""
+until OUT=$(php artisan migrate:status 2>&1); do
     RETRY=$((RETRY + 1))
+    if [ -n "$OUT" ]; then
+        FIRST_ERR="$OUT"
+    fi
+    if [ "$RETRY" -eq 1 ]; then
+        echo "    migrate:status failed - first diagnostic output:"
+        printf '%s\n' "$OUT" | tail -n 8 | sed 's/^/      | /'
+    fi
     if [ "$RETRY" -ge "$MAX_RETRIES" ]; then
         echo "!! [Wajhatak] Database not reachable after $MAX_RETRIES attempts." >&2
+        case "$FIRST_ERR" in
+            *1045*|*"Access denied"*)
+                echo "   Likely cause: wrong MySQL credentials (MYSQLUSER / MYSQLPASSWORD) or the user lacks rights on this database." >&2
+                ;;
+            *1049*|*"Unknown database"*)
+                echo "   Likely cause: the database name (MYSQLDATABASE / DB_DATABASE) is wrong or not provisioned yet by the MySQL service." >&2
+                ;;
+            *2002*|*2003*|*"Connection refused"*|*"Connection timed out"*|*"Operation timed out"*)
+                echo "   Likely cause: the MySQL service is unreachable from this container." >&2
+                echo "   - Is it provisioned and deployed in the SAME Railway project as this app?" >&2
+                echo "   - Has it finished provisioning? (check the MySQL service logs / status)" >&2
+                echo "   - Are this service's variables linked to that MySQL service?" >&2
+                ;;
+            *2005*|*"Unknown server host"*|*"getaddrinfo"|*"Name or service not known"*)
+                echo "   Likely cause: DB_HOST does not resolve - the variable references a service that may not exist or is misspelled." >&2
+                ;;
+            *)
+                echo "   Unexpected error - full message:" >&2
+                printf '%s\n' "$FIRST_ERR" | tail -n 12 | sed 's/^/     | /' >&2
+                ;;
+        esac
         exit 1
     fi
     echo "    Database not ready (attempt $RETRY/$MAX_RETRIES), retrying in 3s..."
