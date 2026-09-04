@@ -65,6 +65,11 @@ ADMIN_NAME = "مدير النظام"
 ADMIN_EMAIL = "admin@wajhatak.app"
 ADMIN_PASSWORD = "admin123"
 
+# Seed the demo/trial dataset on every boot (properties, agents, clients,
+# chat, viewing requests, demo images). Set to "false" for a clean production
+# database with only the base roles/permissions/locations + admin account.
+LUX_ALLOW_DEMO_SEED = "true"
+
 # APP_KEY is generated automatically on first boot by the entrypoint if empty,
 # but set it explicitly for stable encrypted sessions/cookies across redeploys:
 # APP_KEY = "base64:..."

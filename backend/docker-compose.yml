@@ -69,6 +69,8 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@wajhatak.app}
       ADMIN_NAME: ${ADMIN_NAME:-مدير النظام}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      # Demo/trial dataset (properties, agents, clients, chat, viewings)
+      LUX_ALLOW_DEMO_SEED: "true"
     ports:
       - "${PORT:-8080}:8080"
     volumes:
