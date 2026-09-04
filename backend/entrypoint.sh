@@ -3,20 +3,25 @@
 # Wajhatak Laravel entrypoint
 #
 # Runs every time a container starts. It:
-#   1. Validates that a real MySQL connection is configured (never silently
-#      falls back to SQLite).
-#   2. Waits for the database to accept connections.
-#   3. Generates an APP_KEY on first boot when missing.
-#   4. Prepares storage and creates the public storage symlink.
-#   5. Runs `php artisan migrate --seed --force` (creates all tables + seeds
+#   1. Bootstraps a default .env when none exists (production defaults), so the
+#      app never depends on dashboard variables being present.
+#   2. Validates that a real MySQL connection is configured (never silently
+#      falls back to SQLite) and splits a mysql:// URL out of DB_HOST if needed.
+#   3. Waits for the database (via `db:show`, which works on a fresh DB).
+#   4. Generates an APP_KEY on first boot when missing.
+#   5. Prepares storage and creates the public storage symlink.
+#   6. Runs `php artisan migrate --seed --force` (creates all tables + seeds
 #      roles/permissions/locations), then seeds the demo (trial) data and the
-#      control-panel admin account. Every seeder is idempotent, so this is
-#      safe on every boot.
-#   6. Caches config/routes/views.
-#   7. Starts the process for the requested service type.
+#      control-panel admin account. Every seeder is idempotent.
+#   7. Caches config/routes/views.
+#   8. For the "app" service: starts the queue worker (deferred notifications)
+#      in the background and serves the app with `php artisan serve` on $PORT.
 #
-# The same image backs three Railway services - app, worker, scheduler -
-# selected via the RAILWAY_SERVICE_TYPE environment variable (default: app).
+# The same image backs three Railway services selected via
+# RAILWAY_SERVICE_TYPE (default: app):
+#   - app       : queue worker (background) + `php artisan serve` on $PORT
+#   - worker    : `php artisan queue:work` (foreground daemon)
+#   - scheduler : `php artisan schedule:run` loop
 # =============================================================================
 set -e
 
@@ -29,7 +34,40 @@ echo "==> [Wajhatak] Container starting (type: ${SERVICE_TYPE})"
 cd /var/www/html
 
 # ---------------------------------------------------------------------------
-# 1. MySQL must be configured - never silently use SQLite in production.
+# 1. Default .env (production). Only written when missing; real environment
+#    variables (from Railway) always take precedence over this file, so a
+#    dashboard variable like DB_URL overrides these defaults automatically.
+# ---------------------------------------------------------------------------
+if [ ! -f .env ]; then
+    echo "==> [Wajhatak] No .env found - writing production defaults..."
+    cat > .env <<'ENV'
+APP_ENV=production
+APP_DEBUG=false
+APP_LOCALE=ar
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=ar
+APP_URL=http://localhost:8080
+LOG_CHANNEL=stack
+LOG_LEVEL=warning
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+QUEUE_CONNECTION=database
+CACHE_STORE=database
+FILESYSTEM_DISK=local
+BROADCAST_CONNECTION=log
+MAIL_MAILER=log
+CURRENCY_DEFAULT=YER
+LUX_ALLOW_DEMO_SEED=true
+ENV
+fi
+
+# Demo (trial) dataset: on by default unless explicitly disabled.
+if [ -z "${LUX_ALLOW_DEMO_SEED:-}" ]; then
+    export LUX_ALLOW_DEMO_SEED=true
+fi
+
+# ---------------------------------------------------------------------------
+# 2. MySQL must be configured - never silently use SQLite in production.
 # ---------------------------------------------------------------------------
 if [ -z "${DB_CONNECTION:-}" ]; then
     export DB_CONNECTION=mysql
@@ -72,7 +110,7 @@ case "$DB_HOST_VALUE" in
         echo '   To fix on Railway:' >&2
         echo '     1. Add a MySQL service to this project (default name is "MySQL"), then wait for it to provision.' >&2
         echo '     2. Redeploy this service - railway.toml injects DB_* from ${{MySQL.MYSQLHOST}} etc.' >&2
-        echo "   Or set DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD (or MYSQL*) manually." >&2
+        echo '   Or set DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD (or MYSQL*) manually.' >&2
         echo "   Current values: DB_CONNECTION=$DB_CONNECTION, DB_HOST='$DB_HOST', DB_PORT='${DB_PORT:-}'," >&2
         echo "                    DB_DATABASE='$DB_DATABASE', DB_USERNAME='$DB_USERNAME'." >&2
         exit 1
@@ -87,7 +125,7 @@ php artisan config:clear >/dev/null 2>&1 || true
 echo "==> [Wajhatak] DB target: host=${DB_HOST_VALUE}, port=${DB_PORT:-3306}, database=${DB_DATABASE:-<unset>}, user=${DB_USERNAME:-<unset>}."
 
 # ---------------------------------------------------------------------------
-# 2. Wait for the database (with real diagnostics)
+# 3. Wait for the database (with real diagnostics)
 #
 # Probe with `db:show`: it only needs a reachable database and does NOT fail
 # on a fresh/empty database (unlike `migrate:status`, which errors with
@@ -136,7 +174,7 @@ done
 echo "==> [Wajhatak] Database is reachable."
 
 # ---------------------------------------------------------------------------
-# 3. Application key (generate on first boot if missing)
+# 4. Application key (generate on first boot if missing)
 # ---------------------------------------------------------------------------
 if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:" ]; then
     echo "==> [Wajhatak] APP_KEY missing, generating one for this runtime..."
@@ -147,7 +185,7 @@ if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Storage dirs + public storage symlink
+# 5. Storage dirs + public storage symlink
 # ---------------------------------------------------------------------------
 echo "==> [Wajhatak] Preparing storage..."
 mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs
@@ -158,21 +196,21 @@ php artisan storage:link >/dev/null 2>&1 || echo "    storage:link unavailable (
 # Only services that own the database (app + worker) run migrations/seeds.
 # ---------------------------------------------------------------------------
 if [ "$SERVICE_TYPE" != "static" ]; then
-    # 5a. Create all tables + run the base seeder (roles/permissions/locations).
+    # 6a. Create all tables + run the base seeder (roles/permissions/locations).
     #     --force so production never prompts for confirmation.
     echo "==> [Wajhatak] Running 'php artisan migrate --seed --force'..."
     php artisan migrate --seed --force
 
-    # 5b. Demo/trial dataset (properties, agents, clients, chat, viewing
-    #     requests, property images). Only runs when LUX_ALLOW_DEMO_SEED=true.
+    # 6b. Demo/trial dataset (properties, agents, clients, chat, viewing
+    #     requests, property images). Enabled by default (LUX_ALLOW_DEMO_SEED).
     echo "==> [Wajhatak] Seeding demo data (LUX_ALLOW_DEMO_SEED=$LUX_ALLOW_DEMO_SEED)..."
     php artisan db:seed --class=DemoDataSeeder --force || echo "    Demo data skipped (set LUX_ALLOW_DEMO_SEED=true to enable)."
 
-    # 5c. Control-panel admin account (ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD)
+    # 6c. Control-panel admin account (ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD)
     echo "==> [Wajhatak] Ensuring control-panel admin account..."
     php artisan db:seed --class=AdminUserSeeder --force
 
-    # 6. Cache config/routes/views (recomputed from current env each boot)
+    # 7. Cache config/routes/views (recomputed from current env each boot)
     echo "==> [Wajhatak] Caching config, routes and views..."
     php artisan optimize:clear >/dev/null 2>&1 || true
     php artisan config:cache || true
@@ -181,12 +219,12 @@ if [ "$SERVICE_TYPE" != "static" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Start the requested process
+# 8. Start the requested process
 # ---------------------------------------------------------------------------
 case "$SERVICE_TYPE" in
     worker)
-        echo "==> [Wajhatak] Starting queue worker..."
-        exec php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+        echo "==> [Wajhatak] Starting queue worker (foreground)..."
+        exec php artisan queue:work --sleep=3 --tries=3 --timeout=60
         ;;
     scheduler)
         echo "==> [Wajhatak] Starting scheduler..."
@@ -200,11 +238,17 @@ case "$SERVICE_TYPE" in
         exec tail -f /dev/null
         ;;
     *)
-        echo "==> [Wajhatak] Starting PHP-FPM (background)..."
-        php-fpm &
-        # Give FPM a moment to bind on 9000 before Caddy starts proxying.
-        sleep 2
-        echo "==> [Wajhatak] Starting Caddy (listening on :\${PORT:-8080})..."
-        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+        # App service: queue worker (background, self-healing) + artisan serve.
+        echo "==> [Wajhatak] Starting queue worker (background) for deferred notifications..."
+        (
+            while :; do
+                php artisan queue:work --sleep=3 --tries=3 --timeout=60 --max-time=3500 || true
+                sleep 2
+            done
+        ) &
+
+        export PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}"
+        echo "==> [Wajhatak] Starting Laravel server: php artisan serve on :${PORT:-8080}"
+        exec php artisan serve --host=0.0.0.0 --port="${PORT:-8080}" --no-reload
         ;;
 esac
