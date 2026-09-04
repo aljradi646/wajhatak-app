@@ -88,17 +88,21 @@ echo "==> [Wajhatak] DB target: host=${DB_HOST_VALUE}, port=${DB_PORT:-3306}, da
 
 # ---------------------------------------------------------------------------
 # 2. Wait for the database (with real diagnostics)
+#
+# Probe with `db:show`: it only needs a reachable database and does NOT fail
+# on a fresh/empty database (unlike `migrate:status`, which errors with
+# "Migration table not found" until the migrations repository exists).
 # ---------------------------------------------------------------------------
 MAX_RETRIES=60
 RETRY=0
 FIRST_ERR=""
-until OUT=$(php artisan migrate:status 2>&1); do
+until OUT=$(php artisan db:show 2>&1); do
     RETRY=$((RETRY + 1))
     if [ -n "$OUT" ]; then
         FIRST_ERR="$OUT"
     fi
     if [ "$RETRY" -eq 1 ]; then
-        echo "    migrate:status failed - first diagnostic output:"
+        echo "    db:show failed - first diagnostic output:"
         printf '%s\n' "$OUT" | tail -n 8 | sed 's/^/      | /'
     fi
     if [ "$RETRY" -ge "$MAX_RETRIES" ]; then
