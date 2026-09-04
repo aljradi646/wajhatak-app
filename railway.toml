@@ -4,15 +4,11 @@
 # This file makes Railway build a real Docker image from the repository-root
 # Dockerfile (repo root is the default service root, no "Root Directory"
 # setting needed). The image builds: Vite/Tailwind assets -> Composer deps ->
-# PHP 8.2-FPM runtime + Caddy, then the entrypoint migrates, seeds roles/
-# permissions/locations plus the control-panel admin account, and serves the
-# app at /admin behind Caddy on $PORT.
+# PHP runtime, then the entrypoint validates MySQL, migrates, seeds roles/
+# permissions/locations + demo data + the admin account, and serves the app on
+# $PORT with `php artisan serve` while running the queue worker in the
+# background. Control panel is served at /admin.
 #
-# Related services (optional, same image, different RAILWAY_SERVICE_TYPE):
-#   - Queue worker : RAILWAY_SERVICE_TYPE=worker    -> php artisan queue:work
-#   - Scheduler    : RAILWAY_SERVICE_TYPE=scheduler -> schedule:run loop
-#
-# Control panel login: ADMIN_EMAIL / ADMIN_PASSWORD (defaults below; change!).
 # =============================================================================
 
 # Build a real Docker image from the repo-root Dockerfile. The build context
@@ -25,7 +21,7 @@ dockerfilePath = "Dockerfile"
 # Deploy / runtime behavior for the app service
 # -----------------------------------------------------------------------------
 [deploy]
-# The image ENTRYPOINT runs the bootstrap then starts Caddy (binds to $PORT).
+# The image ENTRYPOINT runs the bootstrap then starts the Laravel server.
 startCommand = ""
 
 # Health check so Railway knows the app is up. /up is Laravel's built-in
@@ -38,53 +34,24 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
 
 # -----------------------------------------------------------------------------
-# Laravel environment (constants). Database values come from the MySQL service.
+# IMPORTANT - Environment variables
 # -----------------------------------------------------------------------------
-[deploy.variables]
-APP_ENV = "production"
-APP_DEBUG = "false"
-APP_LOCALE = "ar"
-APP_FALLBACK_LOCALE = "en"
-APP_FAKER_LOCALE = "ar"
-LOG_CHANNEL = "stack"
-LOG_LEVEL = "warning"
-SESSION_DRIVER = "database"
-QUEUE_CONNECTION = "database"
-CACHE_STORE = "database"
-FILESYSTEM_DISK = "local"
-BROADCAST_CONNECTION = "log"
-MAIL_MAILER = "log"
-CURRENCY_DEFAULT = "YER"
-
-# The private Railway domain is used as the canonical app URL (override after
-# a public domain is attached).
-APP_URL = "https://${{RAILWAY_PUBLIC_DOMAIN}}"
-
-# Control-panel admin bootstrap. CHANGE THESE before going live.
-ADMIN_NAME = "مدير النظام"
-ADMIN_EMAIL = "admin@wajhatak.app"
-ADMIN_PASSWORD = "admin123"
-
-# Seed the demo/trial dataset on every boot (properties, agents, clients,
-# chat, viewing requests, demo images). Set to "false" for a clean production
-# database with only the base roles/permissions/locations + admin account.
-LUX_ALLOW_DEMO_SEED = "true"
-
-# APP_KEY is generated automatically on first boot by the entrypoint if empty,
-# but set it explicitly for stable encrypted sessions/cookies across redeploys:
-# APP_KEY = "base64:..."
-
-# -----------------------------------------------------------------------------
-# MySQL service connection (Railway's managed MySQL service exposes these).
+# Railway's config-as-code (railway.toml) does NOT support variables. Add them
+# in the dashboard instead: Project -> Variables (or the app service), e.g.:
 #
-# DB_URL is preferred: Laravel parses the full mysql:// URL that Railway
-# provides (MYSQL_URL) into host/port/database/user/password itself. Setting
-# DB_URL also wins over any stray DB_HOST value in dashboard variables.
-# -----------------------------------------------------------------------------
-DB_CONNECTION = "mysql"
-DB_URL = "${{MySQL.MYSQL_URL}}"
-DB_HOST = "${{MySQL.MYSQLHOST}}"
-DB_PORT = "${{MySQL.MYSQLPORT}}"
-DB_DATABASE = "${{MySQL.MYSQLDATABASE}}"
-DB_USERNAME = "${{MySQL.MYSQLUSER}}"
-DB_PASSWORD = "${{MySQL.MYSQLPASSWORD}}"
+#   LUX_ALLOW_DEMO_SEED = true     (demo/trial dataset; entrypoint defaults to true)
+#   APP_KEY             = base64:...  (stable key across redeploys)
+#   ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD  (control-panel login)
+#   APP_URL             = https://${{RAILWAY_PUBLIC_DOMAIN}}
+#
+# MySQL connection - attach a Railway MySQL service (name "MySQL"); its
+# variables are exported into this service automatically. For example:
+#   DB_CONNECTION = mysql
+#   DB_URL        = ${{MySQL.MYSQL_URL}}     <- preferred, Laravel parses it
+#   DB_HOST = ${{MySQL.MYSQLHOST}}  DB_PORT = ${{MySQL.MYSQLPORT}}
+#   DB_DATABASE = ${{MySQL.MYSQLDATABASE}}  DB_USERNAME = ${{MySQL.MYSQLUSER}}
+#   DB_PASSWORD = ${{MySQL.MYSQLPASSWORD}}
+#
+# The entrypoint is defensive: it also splits a mysql:// URL out of DB_HOST and
+# will not start unless MySQL is reachable.
+# =============================================================================
