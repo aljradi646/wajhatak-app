@@ -66,6 +66,36 @@
         @case('favorites')
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
             @break
+        @case('reports')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            @break
+        @case('check')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            @break
+        @case('x-circle')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            @break
+        @case('clock')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            @break
+        @case('back')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l-4-4m0 0l4-4m-4 4h18"/>
+            @break
+        @case('print')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+            @break
+        @case('file-pdf')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 6a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V9a3 3 0 00-3-3M9 14l1.5-1.5m0 0l1.5 1.5M10.5 12.5L12 11l1.5 1.5M12 11v4"/>
+            @break
+        @case('file-excel')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15l-2-2m0 0l-2 2m2-2v6m6-13V5a2 2 0 00-2-2H9a2 2 0 00-2 2v1m9 0H8a1 1 0 00-1 1v3m8 0V8m-8 4h8m-8 0v8m8-8h2a1 1 0 011 1v7a1 1 0 01-1 1h-2"/>
+            @break
+        @case('file-csv')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 0v4m0-4h.01M6 8a2 2 0 00-2 2v4a2 2 0 002 2h9a2 2 0 002-2v-4a2 2 0 00-2-2H6zm13-3V5a2 2 0 00-2-2H9a2 2 0 00-2 2v1m9 0H8a1 1 0 00-1 1v3m8 0V8m-8 4h8m-8 0v8m8-8h2a1 1 0 011 1v7a1 1 0 01-1 1h-2"/>
+            @break
+        @case('file-json')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m-4 6l-2 2 2 2m8-4l2 2-2 2M8 16l-4 4m4-16l-4 4"/>
+            @break
         @default
             <circle cx="12" cy="12" r="9" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v4m0 4h.01"/>
             @break
