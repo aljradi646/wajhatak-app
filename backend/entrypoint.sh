@@ -10,9 +10,12 @@
 #   3. Waits for the database (via `db:show`, which works on a fresh DB).
 #   4. Generates an APP_KEY on first boot when missing.
 #   5. Prepares storage and creates the public storage symlink.
-#   6. Runs `php artisan migrate --seed --force` (creates all tables + seeds
-#      roles/permissions/locations), then seeds the demo (trial) data and the
-#      control-panel admin account. Every seeder is idempotent.
+#   6. ONE-TIME provisioning (guarded by the Setting 'system_initialized'):
+#      creates all tables, seeds roles/permissions/locations, then the REAL
+#      Sana'a dataset (agents عبدالرحمن & مهند + real property listings with
+#      photos downloaded from the internet) and the control-panel admin.
+#      After that flag is set, EVERY later boot skips migrations and seeds so
+#      redeploys or restarts can never modify the database again.
 #   7. Caches config/routes/views.
 #   8. For the "app" service: starts the queue worker (deferred notifications)
 #      in the background and serves the app with `php artisan serve` on $PORT.
@@ -57,7 +60,7 @@ FILESYSTEM_DISK=local
 BROADCAST_CONNECTION=log
 MAIL_MAILER=log
 CURRENCY_DEFAULT=YER
-LUX_ALLOW_DEMO_SEED=true
+LUX_ALLOW_DEMO_SEED=false
 ENV
     # If running on Railway, APP_URL should point to the public domain so that
     # absolute links (queue jobs, notifications, emails) use the real https URL.
@@ -67,10 +70,8 @@ ENV
     fi
 fi
 
-# Demo (trial) dataset: on by default unless explicitly disabled.
-if [ -z "${LUX_ALLOW_DEMO_SEED:-}" ]; then
-    export LUX_ALLOW_DEMO_SEED=true
-fi
+# The LUX_ALLOW_DEMO_SEED flag is no longer used: the demo (trial) dataset is
+# disabled for production. Real data comes from RealDataSeeder only.
 
 # ---------------------------------------------------------------------------
 # 2. MySQL must be configured - never silently use SQLite in production.
@@ -199,22 +200,28 @@ chmod -R ug+rwX storage bootstrap/cache 2>/dev/null || true
 php artisan storage:link >/dev/null 2>&1 || echo "    storage:link unavailable (fallback route serves /storage)."
 
 # ---------------------------------------------------------------------------
-# Only services that own the database (app + worker) run migrations/seeds.
+# Only "app" and "worker" services provision the database. Provisioning runs
+# exactly ONCE: RealDataSeeder finishes by writing Setting 'system_initialized'
+# = 1, and every later boot (redeploy or restart) skips migrations AND seeds so
+# the existing data is never touched.
 # ---------------------------------------------------------------------------
 if [ "$SERVICE_TYPE" != "static" ]; then
-    # 6a. Create all tables + run the base seeder (roles/permissions/locations).
-    #     --force so production never prompts for confirmation.
-    echo "==> [Wajhatak] Running 'php artisan migrate --seed --force'..."
-    php artisan migrate --seed --force
+    SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
-    # 6b. Demo/trial dataset (properties, agents, clients, chat, viewing
-    #     requests, property images). Enabled by default (LUX_ALLOW_DEMO_SEED).
-    echo "==> [Wajhatak] Seeding demo data (LUX_ALLOW_DEMO_SEED=$LUX_ALLOW_DEMO_SEED)..."
-    php artisan db:seed --class=DemoDataSeeder --force || echo "    Demo data skipped (set LUX_ALLOW_DEMO_SEED=true to enable)."
-
-    # 6c. Control-panel admin account (ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD)
-    echo "==> [Wajhatak] Ensuring control-panel admin account..."
-    php artisan db:seed --class=AdminUserSeeder --force
+    case "$SEEDED_FLAG" in
+        *SEEDED*)
+            echo "==> [Wajhatak] Database already provisioned (system_initialized=1)."
+            echo "    Skipping ALL migrations and seeds to protect your existing data."
+            ;;
+        *)
+            echo "==> [Wajhatak] First-time provisioning: creating schema, then seeding"
+            echo "    roles/permissions/locations, the real Sana'a dataset and the admin account..."
+            php artisan migrate --force
+            php artisan db:seed --class=DatabaseSeeder --force
+            php artisan db:seed --class=RealDataSeeder --force
+            php artisan db:seed --class=AdminUserSeeder --force
+            ;;
+    esac
 
     # 7. Cache config/routes/views (recomputed from current env each boot)
     echo "==> [Wajhatak] Caching config, routes and views..."
