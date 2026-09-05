@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\PropertyController;
 use App\Http\Controllers\Admin\PropertyFeatureController;
 use App\Http\Controllers\Admin\PropertyTypeController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ViewingRequestController;
@@ -48,6 +49,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('properties/{property}/restore', [PropertyController::class, 'restore'])->name('properties.restore');
     Route::delete('properties/{property}/force', [PropertyController::class, 'forceDelete'])->name('properties.force-delete');
     Route::post('properties/bulk', [PropertyController::class, 'bulk'])->name('properties.bulk');
+
+    // Unapproved (pending) properties + approve/reject actions
+    Route::get('properties/pending', [PropertyController::class, 'pending'])->name('properties.pending');
+    Route::post('properties/{property}/approve', [PropertyController::class, 'approve'])->name('properties.approve');
+    Route::post('properties/{property}/reject', [PropertyController::class, 'reject'])->name('properties.reject');
+
     Route::resource('properties', PropertyController::class)->whereNumber('property');
 
     // Viewing Requests
@@ -62,6 +69,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('settings/quick', [SettingController::class, 'quickUpdate'])->name('settings.quick');
+    Route::post('settings/identity', [SettingController::class, 'updateIdentity'])->name('settings.identity');
     Route::patch('settings/{setting}', [SettingController::class, 'update'])->name('settings.update');
     Route::delete('settings/{setting}', [SettingController::class, 'destroy'])->name('settings.destroy');
+
+    // Reports
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('reports/{type}', [ReportController::class, 'show'])
+        ->name('reports.show')
+        ->whereIn('type', ['agents', 'properties', 'requests', 'users']);
 });
