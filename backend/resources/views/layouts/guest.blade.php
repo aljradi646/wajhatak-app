@@ -17,6 +17,11 @@
         <style>
             body { font-family: 'Cairo', ui-sans-serif, system-ui, sans-serif; }
 
+            .brand-mark {
+                background: linear-gradient(135deg, #075E4A, #0E8A6D, #35C39E);
+                box-shadow: 0 4px 14px rgba(14, 138, 109, 0.3);
+            }
+
             .auth-backdrop {
                 background:
                     radial-gradient(1200px 800px at 90% -10%, rgba(14, 138, 109, 0.18), transparent 60%),
@@ -43,17 +48,26 @@
         </style>
     </head>
     <body class="font-sans text-gray-900 antialiased">
+        @php
+            $siteName = \App\Models\Setting::get('site_name', 'وجهتك');
+            $siteTagline = \App\Models\Setting::get('site_tagline', 'وجهتك إلى العقار المناسب.');
+            $siteLogo = public_path('storage/branding/logo.png');
+        @endphp
         <div class="min-h-screen flex flex-col sm:justify-center items-center px-4 py-10 auth-backdrop">
             <div>
                 <a href="/" class="flex flex-col items-center">
                     <div class="relative flex h-24 w-24 items-center justify-center">
-                        <img src="{{ asset('storage/branding/logo.png') }}" alt="شعار وجهتك" class="h-24 w-24 rounded-3xl object-contain drop-shadow-xl" />
+                        @if (file_exists($siteLogo))
+                            <img src="{{ asset('storage/branding/logo.png') }}" alt="شعار {{ $siteName }}" class="h-24 w-24 rounded-3xl object-contain drop-shadow-xl" />
+                        @else
+                            <span class="brand-mark flex h-20 w-20 items-center justify-center rounded-3xl text-4xl font-black text-white">و</span>
+                        @endif
                     </div>
                     <div class="mt-4 text-center leading-tight">
                         <div class="text-sm font-extrabold tracking-[0.25em]" style="color: #B97D1B;">WAJHATAK</div>
-                        <div class="text-2xl font-extrabold text-gray-900 dark:text-gray-100">وجهتك</div>
+                        <div class="text-2xl font-extrabold text-gray-900 dark:text-gray-100">{{ $siteName }}</div>
                     </div>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">وجهتك إلى العقار المناسب.</p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $siteTagline }}</p>
                 </a>
             </div>
 
@@ -61,7 +75,7 @@
                 {{ $slot }}
             </div>
 
-            <p class="mt-6 text-xs text-gray-400 dark:text-gray-500">© {{ date('Y') }} وجهتك — لوحة تحكم الإدارة</p>
+            <p class="mt-6 text-xs text-gray-400 dark:text-gray-500">© {{ date('Y') }} {{ $siteName }} — لوحة تحكم الإدارة</p>
         </div>
     </body>
 </html>
