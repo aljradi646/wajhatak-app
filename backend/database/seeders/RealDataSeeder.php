@@ -231,7 +231,7 @@ class RealDataSeeder extends Seeder
         foreach ($features as $ar => $slug) {
             PropertyFeature::query()->firstOrCreate(
                 ['name_ar' => $ar],
-                ['name_en' => $slug, 'icon' => $slug],
+                ['name_en' => $slug, 'slug' => $slug, 'icon' => $slug, 'is_active' => true],
             );
         }
     }
