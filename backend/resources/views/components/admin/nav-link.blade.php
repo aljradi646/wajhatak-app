@@ -1,4 +1,4 @@
-@props(['active' => false, 'href' => '#'])
+@props(['active' => false, 'href' => '#', 'badge' => null])
 
 @php
     $classes = $active
@@ -10,5 +10,8 @@
     @isset($icon)
         <span class="shrink-0">{{ $icon }}</span>
     @endisset
-    <span x-show="!collapsed">{{ $slot }}</span>
+    <span class="flex-1 text-right" x-show="!collapsed">{{ $slot }}</span>
+    @if (! is_null($badge) && $badge !== '' && $badge > 0)
+        <span x-show="!collapsed" class="shrink-0 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">{{ $badge }}</span>
+    @endif
 </a>
