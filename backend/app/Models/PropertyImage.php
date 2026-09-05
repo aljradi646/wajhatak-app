@@ -27,7 +27,7 @@ class PropertyImage extends Model
      */
     public function getImageUrlAttribute(): string
     {
-        if ($this->path && str_starts_with_any($this->path, ['http://', 'https://'])) {
+        if ($this->path && \Illuminate\Support\Str::startsWith($this->path, ['http://', 'https://'])) {
             return $this->path;
         }
         return $this->path ? asset('storage/' . $this->path) : '';
