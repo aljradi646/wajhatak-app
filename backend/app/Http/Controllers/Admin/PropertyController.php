@@ -18,8 +18,16 @@ class PropertyController extends Controller
 {
     public function index(Request $request)
     {
+        // The "العقارات" section shows ONLY approved properties (published,
+        // or archived ones that were previously approved). Everything awaiting
+        // review lives in the dedicated "العقارات غير المعتمدة" section.
+        $status = $request->input('status', 'published');
+        if (! in_array($status, ['published', 'archived'], true)) {
+            $status = 'published';
+        }
+
         $query = Property::query()->with(['agent.user', 'type', 'location'])
-            ->when($request->input('status'), fn ($q, $s) => $q->where('status', $s))
+            ->where('status', $status)
             ->when($request->input('transaction'), fn ($q, $t) => $q->where('transaction_type', $t));
 
         if ($search = $request->input('search')) {
@@ -43,8 +51,61 @@ class PropertyController extends Controller
         return view('admin.properties.index', [
             'properties' => $query->withCount('images')->paginate(15)->withQueryString(),
             'search' => $search,
-            'status' => $request->input('status'),
+            'status' => $status,
+            'pendingCount' => Property::query()->where('status', PropertyStatus::Pending)->count(),
         ]);
+    }
+
+    /**
+     * Properties submitted by agents that were not approved yet:
+     * pending (awaiting review), rejected and drafts.
+     */
+    public function pending(Request $request)
+    {
+        $status = $request->input('status', 'pending');
+        if (! in_array($status, ['pending', 'rejected', 'draft'], true)) {
+            $status = 'pending';
+        }
+
+        $query = Property::query()->with(['agent.user', 'type', 'location'])
+            ->where('status', $status)
+            ->when($request->input('transaction'), fn ($q, $t) => $q->where('transaction_type', $t));
+
+        $search = $request->input('search');
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('reference_code', 'like', "%{$search}%")
+                    ->orWhereHas('agent.user', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        $query->latest('updated_at');
+
+        return view('admin.properties.pending', [
+            'properties' => $query->withCount('images')->paginate(15)->withQueryString(),
+            'search' => $search,
+            'status' => $status,
+            'counts' => [
+                'pending' => Property::query()->where('status', PropertyStatus::Pending)->count(),
+                'rejected' => Property::query()->where('status', PropertyStatus::Rejected)->count(),
+                'draft' => Property::query()->where('status', PropertyStatus::Draft)->count(),
+            ],
+        ]);
+    }
+
+    public function approve(Property $property)
+    {
+        $property->update(['status' => PropertyStatus::Published, 'published_at' => now()]);
+        ActivityLog::record('property', "تمت الموافقة على العقار «{$property->title}» ({$property->reference_code}) ونشره", $property);
+        return back()->with('status', 'تم اعتماد العقار ونشره.');
+    }
+
+    public function reject(Property $property)
+    {
+        $property->update(['status' => PropertyStatus::Rejected]);
+        ActivityLog::record('property', "تم رفض العقار «{$property->title}» ({$property->reference_code})", $property);
+        return back()->with('status', 'تم رفض العقار.');
     }
 
     public function trash(Request $request)
