@@ -1,5 +1,68 @@
 <x-admin.layouts.admin heading="الإعدادات" title="الإعدادات" :breadcrumbs="[['label' => 'لوحة التحكم', 'url' => route('admin.dashboard')]]">
 
+    <div class="space-y-6">
+        {{-- ====================== Platform identity ====================== --}}
+        <x-admin.card title="هوية المنصة" description="اسم المنصة وشعارها ومعلومات التواصل التي تظهر في لوحة التحكم وشاشة الدخول والتقارير.">
+            <form method="POST" action="{{ route('admin.settings.identity') }}" enctype="multipart/form-data">
+                @csrf
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    @php($identityLogo = public_path('storage/branding/logo.png'))
+                    <div class="md:col-span-3 flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 dark:bg-gray-800/50">
+                        <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl overflow-hidden bg-white ring-1 ring-gray-200 dark:bg-gray-700 dark:ring-gray-600">
+                            @if (file_exists($identityLogo))
+                                <img id="identity-logo-preview" src="{{ asset('storage/branding/logo.png') }}" alt="الشعار الحالي" class="h-full w-full object-contain p-1">
+                            @else
+                                <span id="identity-logo-preview" class="flex items-center justify-center text-gray-300">
+                                    <x-admin.icon name="settings" class="h-8 w-8" />
+                                </span>
+                            @endif
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-1">شعار المنصة</label>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">PNG أو JPG أو WebP بحجم أقصى 2MB، ويُستخدم الشعار في لوحة التحكم وشاشات الدخول ورؤوس التقارير.</p>
+                            <input
+                                type="file"
+                                name="logo"
+                                accept="image/png,image/jpeg,image/webp"
+                                class="block w-full text-sm text-gray-500 file:mr-3 file:rounded-lg file:border-0 file:bg-wajhatak-600 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:bg-wajhatak-700 dark:text-gray-400"
+                                onchange="const f=this.files[0]; if(f){const r=new FileReader(); r.onload=e=>{const p=document.getElementById('identity-logo-preview'); p.outerHTML='<img id=\"identity-logo-preview\" src=\"'+e.target.result+'\" class=\"h-full w-full object-contain p-1\">'}; r.readAsDataURL(f);}"
+                            >
+                            @error('logo')
+                                <p class="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div>
+                        <x-admin.input label="اسم المنصة" name="site_name" :value="old('site_name', \App\Models\Setting::get('site_name', 'وجهتك'))" required placeholder="وجهتك" />
+                    </div>
+                    <div>
+                        <x-admin.input label="الشعار النصي (الوصف المختصر)" name="site_tagline" :value="old('site_tagline', \App\Models\Setting::get('site_tagline', 'وجهتك إلى العقار المناسب.'))" placeholder="وجهتك إلى العقار المناسب." />
+                    </div>
+                    <div>
+                        <x-admin.input label="العنوان" name="address" :value="old('address', \App\Models\Setting::get('address', ''))" placeholder="صنعاء — اليمن" />
+                    </div>
+                    <div>
+                        <x-admin.input label="هاتف الدعم" name="support_phone" :value="old('support_phone', \App\Models\Setting::get('support_phone', ''))" placeholder="+967 ..." />
+                    </div>
+                    <div>
+                        <x-admin.input label="بريد الدعم" name="support_email" type="email" :value="old('support_email', \App\Models\Setting::get('support_email', ''))" placeholder="support@example.com" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-1">العملة الافتراضية</label>
+                        <select name="default_currency" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:border-wajhatak-400 focus:ring-2 focus:ring-wajhatak-300/50 dark:bg-gray-800 dark:border-gray-600">
+                            @foreach(['YER' => 'ريال يمني', 'SAR' => 'ريال سعودي', 'USD' => 'دولار أمريكي', 'AED' => 'درهم إماراتي'] as $code => $label)
+                                <option value="{{ $code }}" @selected(\App\Models\Setting::get('default_currency', 'YER') === $code)>{{ $label }} ({{ $code }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="md:col-span-3 flex justify-end">
+                        <x-admin.button type="submit">حفظ هوية المنصة</x-admin.button>
+                    </div>
+                </div>
+            </form>
+        </x-admin.card>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {{-- ====================== Settings list ====================== --}}
         <div class="lg:col-span-2">
@@ -121,5 +184,6 @@
                 </form>
             </x-admin.card>
         </div>
+    </div>
     </div>
 </x-admin.layouts.admin>
