@@ -5,10 +5,10 @@
                 <x-admin.input name="search" value="{{ $search }}" placeholder="بحث بالعنوان أو المرجع..." />
             </div>
             <select name="status" class="rounded-lg border-gray-300 shadow-sm text-sm">
-                <option value="">كل الحالات</option>
-                @foreach(['draft','pending','published','rejected','archived'] as $s)
+                <option value="" @selected(request('status') === null || request('status') === '')>منشورة فقط</option>
+                @foreach(['published','archived'] as $s)
                     <option value="{{ $s }}" @selected(request('status') === $s)>
-                        {{ match($s) { 'draft'=>'مسودة', 'pending'=>'قيد المراجعة', 'published'=>'منشور', 'rejected'=>'مرفوض', 'archived'=>'مؤرشف' } }}
+                        {{ match($s) { 'published'=>'منشور', 'archived'=>'مؤرشف' } }}
                     </option>
                 @endforeach
             </select>
@@ -21,6 +21,12 @@
             <a href="{{ route('admin.properties.index') }}" class="inline-flex items-center px-3 py-2 text-sm text-gray-500 hover:text-gray-700">مسح</a>
         </form>
         <div class="flex items-center gap-2">
+            @if ($pendingCount > 0)
+                <a href="{{ route('admin.properties.pending') }}" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-amber-50 text-amber-700 ring-1 ring-amber-200 rounded-lg hover:bg-amber-100">
+                    <x-admin.icon name="clock" class="h-4 w-4" />
+                    غير معتمدة ({{ $pendingCount }})
+                </a>
+            @endif
             <a href="{{ route('admin.properties.trash') }}" class="inline-flex items-center px-4 py-2 text-sm font-semibold bg-white text-gray-700 ring-1 ring-gray-300 rounded-lg hover:bg-gray-50">
                 سلة المحذوفات
             </a>
@@ -29,6 +35,13 @@
             </a>
         </div>
     </div>
+
+    @if ($pendingCount > 0)
+        <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
+            يوجد {{ $pendingCount }} عقار {{ $pendingCount > 1 ? 'غير معتمد بانتظار المراجعة' : 'غير معتمد بانتظار المراجعة' }}.
+            <a href="{{ route('admin.properties.pending') }}" class="ms-1 font-bold underline">مراجعتها الآن</a>
+        </div>
+    @endif
 
     <x-admin.card :padding="false">
         <form method="POST" action="{{ route('admin.properties.bulk') }}" data-bulk-form>
