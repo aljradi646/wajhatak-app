@@ -195,7 +195,7 @@ fi
 # 5. Storage dirs + public storage symlink
 # ---------------------------------------------------------------------------
 echo "==> [Wajhatak] Preparing storage..."
-mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs
+mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs storage/fonts/cache
 chmod -R ug+rwX storage bootstrap/cache 2>/dev/null || true
 php artisan storage:link >/dev/null 2>&1 || echo "    storage:link unavailable (fallback route serves /storage)."
 
