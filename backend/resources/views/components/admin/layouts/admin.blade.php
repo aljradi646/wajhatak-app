@@ -1,5 +1,12 @@
 @props(['heading' => 'لوحة التحكم', 'title' => 'لوحة تحكم وجهتك'])
 
+@php
+    $siteName = \App\Models\Setting::get('site_name', 'وجهتك');
+    $siteTagline = \App\Models\Setting::get('site_tagline', 'وجهتك إلى العقار المناسب.');
+    $siteLogo = public_path('storage/branding/logo.png');
+    $pendingPropertiesCount = \App\Models\Property::query()->where('status', 'pending')->count();
+@endphp
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
     <head>
@@ -50,18 +57,23 @@
             {{-- Sidebar (RTL: appears on the right) --}}
             <aside
                 :class="sidebarOpen ? 'translate-x-0' : 'translate-x-full'"
-                class="fixed lg:static inset-y-0 right-0 z-50 lg:z-auto transition-all duration-300 ease-in-out flex flex-col lg:translate-x-0
-                       bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 lg:border-l-0
+                class="fixed inset-y-0 right-0 z-50 lg:z-auto transition-all duration-300 ease-in-out
+                       lg:sticky lg:top-0 lg:h-screen lg:translate-x-0
+                       flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 lg:border-l-0
                        shadow-2xl lg:shadow-none"
             >
-                <div class="flex flex-col h-full w-72"
+                <div class="flex flex-col h-full min-h-0 w-72"
                      :class="collapsed ? 'lg:w-20' : 'lg:w-72'">
                     {{-- Brand row --}}
                     <div class="flex items-center gap-3 h-16 px-5 border-b border-gray-200 dark:border-gray-700 shrink-0 min-w-0">
-                        <img src="{{ asset('storage/branding/logo.png') }}" alt="شعار وجهتك" class="h-9 w-9 shrink-0 rounded-xl object-contain bg-white shadow-sm" />
+                        @if (file_exists($siteLogo))
+                            <img src="{{ asset('storage/branding/logo.png') }}" alt="شعار {{ $siteName }}" class="h-9 w-9 shrink-0 rounded-xl object-contain bg-white shadow-sm" />
+                        @else
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg font-black text-white brand-mark">و</span>
+                        @endif
                         <div class="min-w-0 flex-1" x-show="!collapsed" x-cloak>
                             <div class="font-extrabold tracking-[0.2em] text-[10px] leading-none" style="color: #B97D1B;">WAJHATAK</div>
-                            <div class="font-extrabold text-gray-900 dark:text-gray-100 leading-tight text-lg">وجهتك</div>
+                            <div class="font-extrabold text-gray-900 dark:text-gray-100 leading-tight text-lg truncate">{{ $siteName }}</div>
                         </div>
                         <button @click="sidebarOpen = false" class="lg:hidden text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                             <x-admin.icon name="close" class="h-6 w-6" />
@@ -69,7 +81,7 @@
                     </div>
 
                     {{-- Nav --}}
-                    <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+                    <nav class="flex-1 min-h-0 overflow-y-auto overscroll-contain py-4 px-3 space-y-1">
                         <x-admin.nav-link href="{{ route('admin.dashboard') }}" :active="request()->routeIs('admin.dashboard')">
                             <x-slot name="icon"><x-admin.icon name="dashboard" /></x-slot>
                             لوحة التحكم
@@ -97,14 +109,24 @@
                             الوكلاء
                         </x-admin.nav-link>
 
-                        <x-admin.nav-link href="{{ route('admin.properties.index') }}" :active="request()->routeIs('admin.properties.*')">
+                        <x-admin.nav-link href="{{ route('admin.properties.index') }}" :active="request()->routeIs('admin.properties.index', 'admin.properties.show', 'admin.properties.edit', 'admin.properties.create', 'admin.properties.trash')">
                             <x-slot name="icon"><x-admin.icon name="properties" /></x-slot>
                             العقارات
+                        </x-admin.nav-link>
+
+                        <x-admin.nav-link href="{{ route('admin.properties.pending') }}" :active="request()->routeIs('admin.properties.pending')" :badge="$pendingPropertiesCount">
+                            <x-slot name="icon"><x-admin.icon name="clock" /></x-slot>
+                            العقارات غير المعتمدة
                         </x-admin.nav-link>
 
                         <x-admin.nav-link href="{{ route('admin.viewing-requests.index') }}" :active="request()->routeIs('admin.viewing-requests.*')">
                             <x-slot name="icon"><x-admin.icon name="viewing-requests" /></x-slot>
                             طلبات المعاينة
+                        </x-admin.nav-link>
+
+                        <x-admin.nav-link href="{{ route('admin.reports.index') }}" :active="request()->routeIs('admin.reports.*')">
+                            <x-slot name="icon"><x-admin.icon name="reports" /></x-slot>
+                            التقارير
                         </x-admin.nav-link>
 
                         <div x-show="!collapsed" class="pt-4 text-[11px] font-bold uppercase tracking-wider text-gray-400 px-3 dark:text-gray-500" x-cloak>المحتوى</div>
@@ -127,7 +149,7 @@
 
                     {{-- Sidebar footer: brand tagline --}}
                     <div class="px-5 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
-                        <p class="text-xs text-gray-400 leading-snug dark:text-gray-500" x-show="!collapsed" x-cloak>وجهتك إلى العقار المناسب.</p>
+                        <p class="text-xs text-gray-400 leading-snug dark:text-gray-500" x-show="!collapsed" x-cloak>{{ $siteTagline }}</p>
                         <div class="text-[10px] text-gray-300 dark:text-gray-600">لوحة تحكم المشرف</div>
                     </div>
                 </div>
