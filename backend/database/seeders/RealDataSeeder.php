@@ -208,30 +208,36 @@ class RealDataSeeder extends Seeder
 
     private function ensureTaxonomy(): void
     {
-        foreach (['فيلا', 'شقة', 'تاون هاوس', 'دور'] as $i => $name) {
-            PropertyType::query()->firstOrCreate(
-                ['name_ar' => $name],
-                [
-                    'name_en' => ['Villa', 'Apartment', 'Townhouse', 'Floor'][$i],
-                    'slug' => ['villa', 'apartment', 'townhouse', 'floor'][$i],
-                ],
+        // Keyed on the unique slug (not the Arabic name) so any existing rows
+        // from the old demo dataset are safely updated in place - never a
+        // duplicate slug error.
+        $types = [
+            'villa' => 'فيلا',
+            'apartment' => 'شقة',
+            'townhouse' => 'تاون هاوس',
+            'floor' => 'دور',
+        ];
+        foreach ($types as $slug => $name) {
+            PropertyType::query()->updateOrCreate(
+                ['slug' => $slug],
+                ['name_ar' => $name, 'name_en' => ucfirst($slug), 'is_active' => true],
             );
         }
 
         $features = [
-            'حمام سباحة' => 'pool',
-            'مصعد' => 'elevator',
-            'موقف سيارات' => 'parking',
-            'حديقة خاصة' => 'garden',
-            'كاميرات أمنية' => 'security',
-            'خزان ماء مستقل' => 'water-tank',
-            'سطح خاص' => 'rooftop',
-            'غرفة حارس' => 'guard-room',
+            'pool' => 'حمام سباحة',
+            'elevator' => 'مصعد',
+            'parking' => 'موقف سيارات',
+            'garden' => 'حديقة خاصة',
+            'security' => 'كاميرات أمنية',
+            'water-tank' => 'خزان ماء مستقل',
+            'rooftop' => 'سطح خاص',
+            'guard-room' => 'غرفة حارس',
         ];
-        foreach ($features as $ar => $slug) {
-            PropertyFeature::query()->firstOrCreate(
-                ['name_ar' => $ar],
-                ['name_en' => $slug, 'slug' => $slug, 'icon' => $slug, 'is_active' => true],
+        foreach ($features as $slug => $name) {
+            PropertyFeature::query()->updateOrCreate(
+                ['slug' => $slug],
+                ['name_ar' => $name, 'name_en' => $slug, 'icon' => $slug, 'is_active' => true],
             );
         }
     }
