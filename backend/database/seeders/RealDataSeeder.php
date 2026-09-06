@@ -76,8 +76,8 @@ class RealDataSeeder extends Seeder
         // ------------------------------------------------------------------
         // 1. Real agents: عبدالرحمن and مهند (all properties belong to them).
         // ------------------------------------------------------------------
-        $abdulrahman = $this->ensureAgent('agent.demo@lux.local', 'عبدالرحمن الغليسي', '0777000101', 'YE-AMA-1001');
-        $mohannad = $this->ensureAgent('client.demo@lux.local', 'مهند الحمادي', '0777000202', 'YE-AMA-1002');
+        $abdulrahman = $this->ensureAgent('agent.demo@lux.local', 'عبدالرحمن ', '0777000101', 'YE-AMA-1001');
+        $mohannad = $this->ensureAgent('client.demo@lux.local', 'مهند', '0777000202', 'YE-AMA-1002');
 
         $mohannad->user->syncRoles(['agent', 'user']);
         $abdulrahman->user->syncRoles(['agent', 'user']);
