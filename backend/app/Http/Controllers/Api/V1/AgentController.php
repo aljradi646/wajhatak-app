@@ -19,9 +19,27 @@ class AgentController extends Controller
     {
         abort_unless($agent->is_active, 404);
         $agent->load('user')->loadCount('properties');
-        $properties = Property::query()->with(['type', 'location', 'agent.user', 'images'])
-            ->where('agent_id', $agent->id)->where('status', 'published')->latest('published_at')->paginate(15);
+
+        $properties = $this->publishedProperties($agent)->paginate($this->perPage());
 
         return response()->json(['data' => ['agent' => new AgentResource($agent), 'properties' => PropertyResource::collection($properties)->response()->getData(true)]]);
+    }
+
+    public function properties(Agent $agent)
+    {
+        abort_unless($agent->is_active, 404);
+
+        return PropertyResource::collection($this->publishedProperties($agent)->paginate($this->perPage()));
+    }
+
+    private function publishedProperties(Agent $agent)
+    {
+        return Property::query()->with(['type', 'location', 'agent.user', 'images'])
+            ->where('agent_id', $agent->id)->where('status', 'published')->latest('published_at');
+    }
+
+    private function perPage(): int
+    {
+        return min(max((int) request()->query('per_page', 24), 1), 100);
     }
 }
