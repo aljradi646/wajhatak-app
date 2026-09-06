@@ -23,6 +23,7 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
     Route::get('properties/{property}', [PropertyController::class, 'show'])->name('properties.show');
     Route::get('agents', [AgentController::class, 'index'])->name('agents.index');
     Route::get('agents/{agent}', [AgentController::class, 'show'])->name('agents.show');
+    Route::get('agents/{agent}/properties', [AgentController::class, 'properties'])->name('agents.properties');
     Route::get('property-types', [TaxonomyController::class, 'propertyTypes'])->name('property-types.index');
     Route::get('features', [TaxonomyController::class, 'features'])->name('features.index');
     Route::get('countries', [TaxonomyController::class, 'countries'])->name('countries.index');
