@@ -25,7 +25,7 @@
                                 name="logo"
                                 accept="image/png,image/jpeg,image/webp"
                                 class="block w-full text-sm text-gray-500 file:mr-3 file:rounded-lg file:border-0 file:bg-wajhatak-600 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:bg-wajhatak-700 dark:text-gray-400"
-                                onchange="const f=this.files[0]; if(f){const r=new FileReader(); r.onload=e=>{const p=document.getElementById('identity-logo-preview'); p.outerHTML='<img id=\"identity-logo-preview\" src=\"'+e.target.result+'\" class=\"h-full w-full object-contain p-1\">'}; r.readAsDataURL(f);}"
+                                onchange="previewLogo(this)"
                             >
                             @error('logo')
                                 <p class="mt-1 text-xs font-semibold text-red-600 dark:text-red-400">{{ $message }}</p>
@@ -186,4 +186,19 @@
         </div>
     </div>
     </div>
+    @push('scripts')
+    <script>
+        function previewLogo(input) {
+            const f = input.files && input.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = e => {
+                const preview = document.getElementById('identity-logo-preview');
+                if (!preview) return;
+                preview.outerHTML = '<img id="identity-logo-preview" src="' + e.target.result + '" class="h-full w-full object-contain p-1" alt="الشعار">';
+            };
+            r.readAsDataURL(f);
+        }
+    </script>
+    @endpush
 </x-admin.layouts.admin>
