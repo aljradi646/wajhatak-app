@@ -19,8 +19,8 @@ class CreateLuxAdmin extends Command
         $email = $this->option('email') ?: $this->ask('البريد الإلكتروني');
         $password = $this->option('password') ?: $this->secret('كلمة المرور');
 
-        if (! $name || ! filter_var($email, FILTER_VALIDATE_EMAIL) || ! $password || mb_strlen($password) < 10) {
-            $this->error('أدخل اسمًا وبريدًا صحيحًا وكلمة مرور لا تقل عن 10 أحرف.');
+        if (! $name || ! filter_var($email, FILTER_VALIDATE_EMAIL) || ! $password || mb_strlen($password) < 8) {
+            $this->error('أدخل اسمًا وبريدًا صحيحًا وكلمة مرور لا تقل عن 8 أحرف.');
 
             return self::FAILURE;
         }
