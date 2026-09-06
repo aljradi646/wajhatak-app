@@ -229,6 +229,18 @@ if [ "$SERVICE_TYPE" != "static" ]; then
     php artisan config:cache || true
     php artisan route:cache || true
     php artisan view:cache || true
+
+    # 7b. Optional property-image self-healing. Railway's disk is ephemeral, so
+    #     seeder images can be wiped on redeploy while DB rows survive. When
+    #     WJ_RUN_IMAGE_FIX=1 we re-check every property's images on boot and
+    #     re-download/re-bind anything missing. Idempotent and non-fatal; for a
+    #     persistent copy, enable a Railway volume on storage/app/public.
+    case "${WJ_RUN_IMAGE_FIX:-0}" in
+        1|true|yes)
+            echo "==> [Wajhatak] Self-healing property images (WJ_RUN_IMAGE_FIX=1)..."
+            php scripts/fix_property_images.php --quiet || echo "    image fixer exited non-zero (non-fatal)."
+            ;;
+    esac
 fi
 
 # ---------------------------------------------------------------------------
