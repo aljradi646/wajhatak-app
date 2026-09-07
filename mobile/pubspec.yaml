@@ -1,0 +1,102 @@
+name: wajhatak
+description: "وجهتك (Wajhatak) — وجهتك إلى العقار المناسب. Arabic-first premium real-estate platform."
+publish_to: 'none'
+version: 1.0.0+5
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  flutter_localizations:
+    sdk: flutter
+
+  cached_network_image: ^3.4.1
+  dio: ^5.8.0+1
+  encrypt: ^5.0.3
+  flutter_local_notifications: ^18.0.1
+  flutter_map: ^8.1.1
+  flutter_riverpod: ^3.0.3
+  flutter_secure_storage: ^10.0.0
+  image: ^4.5.4
+  image_picker: ^1.2.1
+  intl: ^0.20.2
+  latlong2: ^0.9.1
+  shared_preferences: ^2.5.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
+
+dependency_overrides:
+  path_provider_android: 2.2.23
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/fixtures/
+
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo-Variable.ttf
+
+
+# ============================================================
+# APP LAUNCHER ICON
+# ============================================================
+
+# ============================================================
+# APP LAUNCHER ICON
+# ============================================================
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+
+  image_path: "assets/images/app_icon.png"
+
+  min_sdk_android: 21
+
+  web:
+    generate: true
+    image_path: "assets/images/app_icon.png"
+    background_color: "#086A55"
+    theme_color: "#086A55"
+
+  windows:
+    generate: true
+    image_path: "assets/images/app_icon.png"
+
+
+# ============================================================
+# NATIVE SPLASH SCREEN
+# ============================================================
+
+flutter_native_splash:
+  color: "#F5F8F7"
+  image: "assets/images/wajhatak_splash_icon.png"
+  color_dark: "#0A1512"
+  image_dark: "assets/images/wajhatak_splash_icon.png"
+
+  android: true
+  ios: true
+  web: false
+
+  fullscreen: true
+
+  android_12:
+    color: "#F5F8F7"
+    image: "assets/images/wajhatak_splash_android12.png"
+    icon_background_color: "#0D523F"
+    color_dark: "#0A1512"
+    image_dark: "assets/images/wajhatak_splash_android12.png"
+    icon_background_color_dark: "#0D523F"

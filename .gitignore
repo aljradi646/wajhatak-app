@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+vendor/
+.dart_tool/
+.pub-cache/
+Pods/
+
+# Build outputs
+build/
+dist/
+out/
+release/
+bin/
+obj/
+.vscode/
+.idea/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Logs & temporary files
+*.hprof
+*.log
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Laravel
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+
+# Flutter
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub/
+.flutter-plugins-dependencies
+
+# Android
+*.hprof
+.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/local.properties
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner/GeneratedPluginRegistrant.*
+
+# macOS
+macos/Pods/
+macos/Flutter/GeneratedPluginRegistrant.*
+
+# Windows
+mobile/windows/flutter/ephemeral/
+mobile/linux/flutter/ephemeral/
+
+# IDE
+*.iml
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Misc
+*.pyc
+__pycache__/
