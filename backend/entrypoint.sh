@@ -87,39 +87,94 @@ case "$DB_CONNECTION" in
         ;;
 esac
 
-# If DB_HOST holds a full mysql:// URL (e.g. someone pasted MYSQL_URL into it),
-# split it into host/port/database/user/password so Laravel connects correctly.
-case "$DB_HOST" in
+# Railway injects several MySQL env vars. Prefer the explicit Laravel vars and
+# fall back to Railway's MYSQL_* names so the application does not rely on a
+# stale .env file.
+if [ -n "${DB_URL:-}" ] || [ -n "${DATABASE_URL:-}" ] || [ -n "${MYSQL_URL:-}" ]; then
+    _db_url="${DB_URL:-${DATABASE_URL:-${MYSQL_URL:-}}}"
+    case "$_db_url" in
+        mysql://*|mariadb://*)
+            echo "==> [Wajhatak] Parsing DB_URL / DATABASE_URL / MYSQL_URL into Laravel DB_* variables."
+            _u="$_db_url"
+            _creds="${_u#*://}"
+            _auth="${_creds%%@*}"
+            _rest="${_creds#*@}"
+            _hostport="${_rest%%/*}"
+            _db="${_rest#*/}"
+            _db="${_db%%\?*}"
+            _db="${_db%%#*}"
+            _user="${_auth%%:*}"
+            _pass="${_auth#*:}"
+            case "$_hostport" in
+                *:*) _host="${_hostport%%:*}"; _port="${_hostport##*:}" ;;
+                *) _host="$_hostport"; _port="${DB_PORT:-3306}" ;;
+            esac
+            export DB_HOST="${DB_HOST:-$_host}"
+            export DB_PORT="${DB_PORT:-$_port}"
+            export DB_DATABASE="${DB_DATABASE:-$_db}"
+            export DB_USERNAME="${DB_USERNAME:-$_user}"
+            export DB_PASSWORD="${DB_PASSWORD:-$_pass}"
+            unset _u _creds _auth _rest _hostport _db _user _pass _host _port
+            ;;
+    esac
+fi
+
+# Fallbacks for Railway MySQL service naming.
+if [ -z "${DB_HOST:-}" ] && [ -n "${MYSQLHOST:-}" ]; then
+    export DB_HOST="${MYSQLHOST}"
+fi
+if [ -z "${DB_PORT:-}" ] && [ -n "${MYSQLPORT:-}" ]; then
+    export DB_PORT="${MYSQLPORT}"
+fi
+if [ -z "${DB_DATABASE:-}" ] && [ -n "${MYSQLDATABASE:-}" ]; then
+    export DB_DATABASE="${MYSQLDATABASE}"
+fi
+if [ -z "${DB_USERNAME:-}" ] && [ -n "${MYSQLUSER:-}" ]; then
+    export DB_USERNAME="${MYSQLUSER}"
+fi
+if [ -z "${DB_PASSWORD:-}" ] && [ -n "${MYSQLPASSWORD:-}" ]; then
+    export DB_PASSWORD="${MYSQLPASSWORD}"
+fi
+
+case "${DB_HOST:-}" in
     mysql://*|mariadb://*)
         echo "==> [Wajhatak] DB_HOST contains a full URL - splitting it into DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD."
-        _u="$DB_HOST"
+        _u="${DB_HOST}"
         _creds="${_u#*://}"
         _auth="${_creds%%@*}"
         _rest="${_creds#*@}"
         _hostport="${_rest%%/*}"
         _db="${_rest#*/}"
         _db="${_db%%\?*}"
+        _db="${_db%%#*}"
         _user="${_auth%%:*}"
         _pass="${_auth#*:}"
         case "$_hostport" in
             *:*) _host="${_hostport%%:*}"; _port="${_hostport##*:}" ;;
             *) _host="$_hostport"; _port="${DB_PORT:-3306}" ;;
         esac
-        export DB_HOST="$_host" DB_PORT="$_port" DB_DATABASE="$_db" DB_USERNAME="$_user" DB_PASSWORD="$_pass"
+        export DB_HOST="$_host" DB_PORT="${DB_PORT:-$_port}" DB_DATABASE="${DB_DATABASE:-$_db}" DB_USERNAME="${DB_USERNAME:-$_user}" DB_PASSWORD="${DB_PASSWORD:-$_pass}"
         unset _u _creds _auth _rest _hostport _db _user _pass _host _port
         ;;
 esac
 
-DB_HOST_VALUE="${DB_HOST:-$MYSQLHOST}"
+if [ -n "${DB_HOST:-}" ] && [ -n "${DB_DATABASE:-}" ] && [ -n "${DB_USERNAME:-}" ]; then
+    export DB_URL="mysql://${DB_USERNAME}@${DB_HOST}:${DB_PORT:-3306}/${DB_DATABASE}"
+    if [ -n "${DB_PASSWORD:-}" ]; then
+        export DB_URL="mysql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-3306}/${DB_DATABASE}"
+    fi
+fi
+
+DB_HOST_VALUE="${DB_HOST:-${MYSQLHOST:-}}"
 case "$DB_HOST_VALUE" in
     ''|*\$\{\{*|*\$\{*)
         echo '!! [Wajhatak] MySQL connection is NOT configured (DB_HOST is empty or an unresolved ${{...}} reference).' >&2
         echo '   To fix on Railway:' >&2
         echo '     1. Add a MySQL service to this project (default name is "MySQL"), then wait for it to provision.' >&2
-        echo '     2. Redeploy this service - railway.toml injects DB_* from ${{MySQL.MYSQLHOST}} etc.' >&2
+        echo '     2. Redeploy this service - Railway injects DB_* / MYSQL* variables automatically.' >&2
         echo '   Or set DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD (or MYSQL*) manually.' >&2
-        echo "   Current values: DB_CONNECTION=$DB_CONNECTION, DB_HOST='$DB_HOST', DB_PORT='${DB_PORT:-}'," >&2
-        echo "                    DB_DATABASE='$DB_DATABASE', DB_USERNAME='$DB_USERNAME'." >&2
+        echo "   Current values: DB_CONNECTION=$DB_CONNECTION, DB_HOST='${DB_HOST:-}', DB_PORT='${DB_PORT:-}'," >&2
+        echo "                    DB_DATABASE='${DB_DATABASE:-}', DB_USERNAME='${DB_USERNAME:-}'." >&2
         exit 1
         ;;
 esac
