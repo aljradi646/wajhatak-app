@@ -62,12 +62,14 @@
                 <p class="text-sm text-gray-400">لا توجد صور.</p>
             @else
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    @foreach($property->images as $image)
+                    @foreach($property->images()->orderBy('sort_order')->orderBy('id')->get() as $image)
                         <div class="group relative aspect-video overflow-hidden rounded-lg bg-gray-100">
-                            @if($image->is_primary)
+                            @if($image->is_cover)
                                 <span class="absolute top-2 right-2 z-10 rounded px-2 py-0.5 text-[10px] font-bold text-white" style="background: linear-gradient(135deg, #075E4A, #0E8A6D);">غلاف</span>
                             @endif
-                            <img src="{{ $image->image_url }}" alt="{{ $property->title }}" class="h-full w-full object-cover" loading="lazy">
+                            <span class="absolute bottom-2 right-2 z-10 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white">{{ $loop->iteration }}</span>
+                            <img src="{{ $image->image_url }}" alt="{{ $property->title }} — صورة {{ $loop->iteration }}" class="h-full w-full object-cover" loading="lazy"
+                                onerror="this.onerror=null; if(!this.dataset.fb){this.dataset.fb=1; this.src='{{ \App\Models\PropertyImage::missingPlaceholder() }}';}">
                         </div>
                     @endforeach
                 </div>
