@@ -189,7 +189,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                       ),
                     ],
                     const SizedBox(height: 24),
-                    _AgentPanel(agent: item.agent),
+                    _AgentPanel(agent: item.agent, propertyId: item.id),
                   ],
                 ),
               ),
@@ -582,8 +582,9 @@ class _FeatureChip extends StatelessWidget {
 }
 
 class _AgentPanel extends StatelessWidget {
-  const _AgentPanel({this.agent});
+  const _AgentPanel({this.agent, this.propertyId});
   final PropertyAgent? agent;
+  final int? propertyId;
 
   @override
   Widget build(BuildContext context) {
@@ -598,6 +599,7 @@ class _AgentPanel extends StatelessWidget {
                   builder: (_) => AgentProfileScreen(
                     agentId: agent!.id,
                     initialAgent: agent,
+                    propertyId: propertyId,
                   ),
                 ),
               ),
