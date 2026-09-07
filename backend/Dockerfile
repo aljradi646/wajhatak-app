@@ -44,7 +44,7 @@ RUN npm run build
 # =============================================================================
 # Stage 3: Final runtime image
 # =============================================================================
-FROM php:8.2-fpm-alpine AS runtime
+FROM php:8.4-fpm-alpine AS runtime
 
 # Install runtime PHP extensions and the Caddy web server.
 # - Caddy serves as a reverse proxy to php-fpm and provides automatic HTTPS.
