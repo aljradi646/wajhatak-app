@@ -46,6 +46,7 @@ class ReportController extends Controller
             'properties' => $this->propertiesReport(),
             'requests' => $this->requestsReport(),
             'users' => $this->usersReport(),
+            default => abort(404, 'تقرير غير معروف.'),
         };
 
         $data['type'] = $type;
@@ -170,7 +171,7 @@ class ReportController extends Controller
             ->values()
             ->all();
 
-        $counts = array_count_values(array_column($rows, 'status') ?: []);
+        $counts = array_count_values(array_filter(array_column($rows, 'status') ?: []));
         $total = count($rows);
         $prices = array_column($rows, 'price');
         $avgPrice = $prices ? round(array_sum($prices) / count($prices), 2) : 0;
@@ -244,7 +245,7 @@ class ReportController extends Controller
             ->values()
             ->all();
 
-        $counts = array_count_values(array_column($rows, 'status') ?: []);
+        $counts = array_count_values(array_filter(array_column($rows, 'status') ?: []));
 
         return [
             'heading' => 'تقرير طلبات المعاينة',
@@ -311,7 +312,7 @@ class ReportController extends Controller
             ->values()
             ->all();
 
-        $counts = array_count_values(array_column($rows, 'role') ?: []);
+        $counts = array_count_values(array_filter(array_column($rows, 'role') ?: []));
 
         return [
             'heading' => 'تقرير المستخدمين',
