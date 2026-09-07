@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
 {
@@ -14,6 +15,13 @@ class Setting extends Model
     protected $casts = [
         'value' => 'string',
     ];
+
+    /** قيم الطلب الحالي فقط — تمنع تكرار استعلامات القاعدة داخل نفس الطلب. */
+    private static array $bag = [];
+
+    private const CACHE_PREFIX = 'setting:';
+
+    private const CACHE_TTL_SECONDS = 86400;
 
     public const TYPES = [
         'string' => 'نص',
@@ -43,21 +51,25 @@ class Setting extends Model
 
     /**
      * Get a setting value by key with fallback default.
+     *
+     * Reads from a per-request bag then the shared cache, and only falls back
+     * to the database on a cold miss — so repeated calls within a request and
+     * across page loads never hammer the ``settings`` table.
      */
     public static function get(string $key, mixed $default = null): mixed
     {
-        $setting = static::where('key', $key)->first();
-        if (! $setting || $setting->value === null || $setting->value === '') {
-            return $default;
+        if (array_key_exists($key, static::$bag)) {
+            return static::$bag[$key] ?? $default;
         }
-        if ($setting->type === 'boolean') {
-            return filter_var($setting->value, FILTER_VALIDATE_BOOLEAN);
-        }
-        return $setting->value;
+
+        $value = static::cachedValue($key);
+        static::$bag[$key] = $value;
+
+        return $value ?? $default;
     }
 
     /**
-     * Set / update a setting value.
+     * Set / update a setting value, invalidating its cached copy.
      */
     public static function put(string $key, mixed $value, string $type = 'string'): self
     {
@@ -65,10 +77,44 @@ class Setting extends Model
             $value = $value ? '1' : '0';
             $type = 'boolean';
         }
-        return static::updateOrCreate(
+        $setting = static::updateOrCreate(
             ['key' => $key],
             ['value' => is_string($value) || is_numeric($value) ? (string) $value : json_encode($value), 'type' => $type]
         );
+        static::forget($key);
+
+        return $setting;
+    }
+
+    /**
+     * Invalidate the cached copy of a setting (also clears the request bag).
+     * Call this after any direct write/delete outside of put().
+     */
+    public static function forget(string $key): void
+    {
+        unset(static::$bag[$key]);
+        Cache::forget(static::CACHE_PREFIX.$key);
+    }
+
+    private static function cachedValue(string $key): mixed
+    {
+        $cacheKey = static::CACHE_PREFIX.$key;
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
+        $setting = static::where('key', $key)->first();
+        if (! $setting || $setting->value === null || $setting->value === '') {
+            return null;
+        }
+
+        $value = $setting->type === 'boolean'
+            ? filter_var($setting->value, FILTER_VALIDATE_BOOLEAN)
+            : $setting->value;
+
+        Cache::put($cacheKey, $value, static::CACHE_TTL_SECONDS);
+
+        return $value;
     }
 
     /**
