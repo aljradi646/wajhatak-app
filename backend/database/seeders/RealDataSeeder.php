@@ -243,25 +243,37 @@ class RealDataSeeder extends Seeder
     }
 
     /**
-     * Download one real photo from the internet, resize it with GD and store a
-     * fast-to-serve JPEG locally. Falls back gracefully (never fails).
+     * Store a real photo locally: prefer the committed image-bundle (deterministic,
+     * offline-safe) and fall back to downloading one from the internet. If both
+     * fail, a branded GD placeholder is written so the property never has a
+     * broken image record.
      */
     private function seedImages(Property $property, string $title): void
     {
         $dir = 'properties/real/' . $property->reference_code;
         Storage::disk('public')->deleteDirectory($dir);
         $sources = $this->imageUrlsFor($property->reference_code);
+        $bundleDir = base_path('image-bundle/' . $dir);
 
         foreach ($sources as $n => $url) {
             $path = $dir . '/' . $n . '.jpg';
+            $dest = Storage::disk('public')->path($path);
             $ok = false;
 
-            if (! app()->environment('testing')) {
-                $ok = $this->downloadAndResize($url, Storage::disk('public')->path($path));
+            // 1) Committed bundle first (never needs the network).
+            $bundled = $bundleDir . '/' . $n . '.jpg';
+            if (is_file($bundled) && filesize($bundled) > 0) {
+                $ok = @copy($bundled, $dest);
             }
 
+            // 2) Network download fallback.
+            if (! $ok && ! app()->environment('testing')) {
+                $ok = $this->downloadAndResize($url, $dest);
+            }
+
+            // 3) Offline placeholder (always succeeds).
             if (! $ok) {
-                $this->placeholder(Storage::disk('public')->path($path));
+                $this->placeholder($dest);
             }
 
             PropertyImage::query()->create([
