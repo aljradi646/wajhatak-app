@@ -199,6 +199,18 @@ mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessi
 chmod -R ug+rwX storage bootstrap/cache 2>/dev/null || true
 php artisan storage:link >/dev/null 2>&1 || echo "    storage:link unavailable (fallback route serves /storage)."
 
+# Restore the committed real property photos into the runtime disk. Railway's
+# disk is ephemeral, so the image-bundle (kept out of storage/ so the Docker
+# build keeps it) is copied here on EVERY boot. This guarantees the exact
+# relative paths stored in property_images.path resolve to a real JPEG and no
+# property ever renders a broken or placeholder image.
+if [ -d image-bundle/properties ]; then
+    echo "==> [Wajhatak] Restoring property photos from image-bundle..."
+    mkdir -p storage/app/public/properties
+    cp -rf image-bundle/properties/. storage/app/public/properties/ 2>/dev/null || true
+    echo "==> [Wajhatak] Property photos restored."
+fi
+
 # ---------------------------------------------------------------------------
 # Only "app" and "worker" services provision the database. Provisioning runs
 # exactly ONCE: RealDataSeeder finishes by writing Setting 'system_initialized'
