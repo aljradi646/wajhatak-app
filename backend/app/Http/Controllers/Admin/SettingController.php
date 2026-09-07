@@ -51,8 +51,11 @@ class SettingController extends Controller
 
     public function update(Request $request, Setting $setting)
     {
+        $oldKey = $setting->getOriginal('key');
         $data = $this->validateData($request, $setting);
         $setting->update($data);
+        Setting::forget($oldKey);
+        Setting::forget($data['key']);
         ActivityLog::record('setting', "تم تحديث الإعداد «{$setting->key}»", $setting);
         return redirect()->route('admin.settings.index')->with('status', "تم تحديث الإعداد «{$setting->key}» بنجاح.");
     }
@@ -61,6 +64,7 @@ class SettingController extends Controller
     {
         $key = $setting->key;
         $setting->delete();
+        Setting::forget($key);
         ActivityLog::record('setting', "تم حذف الإعداد «{$key}»", $setting);
         return redirect()->route('admin.settings.index')->with('status', "تم حذف الإعداد «{$key}» بنجاح.");
     }
