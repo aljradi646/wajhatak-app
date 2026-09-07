@@ -74,6 +74,17 @@ fi
 # disabled for production. Real data comes from RealDataSeeder only.
 
 # ---------------------------------------------------------------------------
+# 1.5. Refresh stale vendor/autoload when the image was rebuilt from a stale cache
+#      or when an older Docker layer still contains the removed Pail package.
+# ---------------------------------------------------------------------------
+if [ ! -f vendor/autoload.php ] || [ -d vendor/laravel/pail ]; then
+    echo "==> [Wajhatak] Installing Laravel dependencies for a clean runtime bootstrap..."
+    composer install --no-interaction --no-progress --prefer-dist --no-dev --no-scripts --no-ansi || true
+    rm -rf vendor/laravel/pail 2>/dev/null || true
+    composer dump-autoload --optimize --no-dev --no-interaction --no-ansi >/dev/null 2>&1 || true
+fi
+
+# ---------------------------------------------------------------------------
 # 2. MySQL must be configured - never silently use SQLite in production.
 # ---------------------------------------------------------------------------
 if [ -z "${DB_CONNECTION:-}" ]; then

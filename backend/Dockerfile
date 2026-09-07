@@ -79,6 +79,10 @@ RUN curl -fsSL "https://caddyserver.com/api/download?os=linux&arch=amd64" -o /us
     && chmod +x /usr/local/bin/caddy \
     && caddy version
 
+# Composer is needed at runtime only to refresh vendor on first boot if the image
+# was rebuilt from an old cache or if vendor was pruned from the image.
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
 # Working directory
 WORKDIR /var/www/html
 
