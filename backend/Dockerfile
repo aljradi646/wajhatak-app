@@ -114,7 +114,7 @@ RUN echo "memory_limit=256M" >> "$PHP_INI_DIR/conf.d/99-app.ini" \
     && echo "max_execution_time=120" >> "$PHP_INI_DIR/conf.d/99-app.ini"
 
 # OPCache tuned for production
-ADD ./php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+COPY php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
 
 # Caddy listens on the port injected by Railway ($PORT, default 8080 locally)
 EXPOSE 8080
