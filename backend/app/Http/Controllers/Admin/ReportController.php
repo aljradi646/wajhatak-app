@@ -51,7 +51,6 @@ class ReportController extends Controller
         $data['type'] = $type;
         $data['site'] = $this->siteInfo();
         $data['generated_at'] = now();
-        $data['route'] = route('admin.reports.show', array_merge(['type' => $type], request()->except(['format'])));
 
         $fmt = $this->formatter($data['currency'] ?? 'YER');
 
