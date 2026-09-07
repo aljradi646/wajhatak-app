@@ -276,6 +276,22 @@ function propertyLabel(\App\Models\Property $property): string
     return $property->reference_code ?: ('ID '.$property->id);
 }
 
+/**
+ * Absolute path of a bundled (committed) photo for the given relative target,
+ * or null when the bundle has nothing for that path. The bundle lives OUTSIDE
+ * storage/ (so the Docker build keeps it) and is also copied to the runtime
+ * disk by entrypoint.sh, but using it directly here protects against the case
+ * where the entrypoint was skipped or overridden.
+ */
+function bundledSource(string $targetPath): ?string
+{
+    if (str_contains($targetPath, '..')) {
+        return null;
+    }
+    $candidate = dirname(__DIR__).'/image-bundle/'.ltrim($targetPath, '/');
+    return is_file($candidate) && filesize($candidate) > 0 ? $candidate : null;
+}
+
 /*
  |------------------------------------------------------------------------------
  | Main
@@ -376,26 +392,43 @@ foreach ($properties as $property) {
         } else {
             $thisSlot = $index;
             $bytes = null;
-            foreach (candidateSources($propKey, $thisSlot, $COVERS, $INTERIORS) as $url) {
-                logLine("    fetch #{$thisSlot}: {$url}", $quiet);
-                $fetched = httpGet($url);
-                if ($fetched !== null) {
-                    $tmp = tempnam(sys_get_temp_dir(), 'wjimg');
-                    if ($tmp !== false && renderJpeg($fetched, $tmp, IMAGE_MAX_WIDTH, IMAGE_QUALITY)) {
-                        $bytes = file_get_contents($tmp);
-                        @unlink($tmp);
-                        if ($bytes !== null && strlen($bytes) > 0) {
-                            break;
-                        }
-                    }
+
+            // Preferred source: the committed image-bundle. A bundled copy is
+            // deterministic, always present after a fresh deploy (Docker build
+            // keeps it) and never depends on outbound network access.
+            $bundled = bundledSource($targetPath);
+            if ($bundled !== null) {
+                $bytes = @file_get_contents($bundled);
+                if ($bytes === false || strlen($bytes) < 1000) {
                     $bytes = null;
-                    @unlink((string) $tmp);
+                } else {
+                    logLine("    {$targetPath} <- image-bundle ({$bundled})", $quiet);
+                }
+            }
+
+            // Fall back to remote sources (Unsplash/picsum/loremflickr).
+            if ($bytes === null) {
+                foreach (candidateSources($propKey, $thisSlot, $COVERS, $INTERIORS) as $url) {
+                    logLine("    fetch #{$thisSlot}: {$url}", $quiet);
+                    $fetched = httpGet($url);
+                    if ($fetched !== null) {
+                        $tmp = tempnam(sys_get_temp_dir(), 'wjimg');
+                        if ($tmp !== false && renderJpeg($fetched, $tmp, IMAGE_MAX_WIDTH, IMAGE_QUALITY)) {
+                            $bytes = file_get_contents($tmp);
+                            @unlink($tmp);
+                            if ($bytes !== null && strlen($bytes) > 0) {
+                                break;
+                            }
+                        }
+                        $bytes = null;
+                        @unlink((string) $tmp);
+                    }
                 }
             }
 
             if ($bytes !== null && ! $dryRun && $disk->put($targetPath, $bytes)) {
                 $stats['images_downloaded']++;
-                logLine("    {$targetPath} downloaded", $quiet);
+                logLine("    {$targetPath} written ({strlen($bytes)} bytes)", $quiet);
             } elseif ($bytes !== null && $dryRun) {
                 $stats['images_downloaded']++;
                 logLine("    {$targetPath} would be downloaded", $quiet);
