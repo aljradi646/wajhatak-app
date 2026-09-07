@@ -18,7 +18,8 @@ RUN composer install \
         --no-interaction \
         --no-progress \
         --prefer-dist \
-        --ignore-platform-reqs
+        --ignore-platform-reqs \
+    && if [ -d vendor/laravel/pail ]; then rm -rf vendor/laravel/pail; fi
 
 # =============================================================================
 # Stage 2: Frontend assets (Vite + Tailwind)
@@ -101,7 +102,8 @@ RUN chmod +x /usr/local/bin/entrypoint \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R ug+rwX storage bootstrap/cache
 
-RUN composer dump-autoload --optimize --no-dev --no-interaction \
+RUN rm -rf vendor/laravel/pail 2>/dev/null || true \
+    && composer dump-autoload --optimize --no-dev --no-interaction \
     && php artisan package:discover --ansi || true
 
 # Production PHP configuration
