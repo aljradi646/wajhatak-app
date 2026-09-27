@@ -61,7 +61,12 @@ class AiAssistantService
                     ? $this->outOfScopeReply()
                     : 'عذرًا، لا أستطيع المساعدة في هذا الطلب.';
 
-                $this->finish($conversation, $user, 'blocked', $intent, $filters, $toolCalls, 0, $started, 0, 'guard_'.$guard['reason'], $reply, []);
+                $this->logging->record(
+                    $conversation, $user?->id, 'blocked', [], [], 0, 'blocked',
+                    (int) (microtime(true) * 1000) - $started, 0, 0, 'guard_'.$guard['reason'],
+                );
+                $this->conversations->addUserMessage($conversation, $message, []);
+                $this->conversations->addAssistantMessage($conversation, $reply, [], 'blocked');
 
                 return $this->payload($conversation, $reply, 'blocked', [], $guard['reason']);
             }
@@ -90,8 +95,14 @@ class AiAssistantService
                 return $this->payload($conversation, $reply, 'ok', [], null, $filters);
             }
 
-            // 5) توليد الرد من النموذج المحلي مع قطع DATA موثوقة فقط.
-            $modelReply = $this->generateReply($message, $history, $results['items']);
+            // 5) توليد الرد — النموذج المحلي إن توفّر، وإلا رد محلي مبني على
+            //    نتائج البحث الحقيقية (لا يُعرض خطأ تقني أبدًا).
+            try {
+                $modelReply = $this->generateReply($message, $history, $results['items']);
+            } catch (Throwable $modelError) {
+                report($modelError);
+                $modelReply = $this->localSummaryReply($results['items']);
+            }
 
             // 6) التحقق الأرضي — إلزامي دائمًا.
             $grounded = $this->grounding->validate($modelReply, $results['items']);
@@ -117,11 +128,22 @@ class AiAssistantService
 
             // Fallback لطيف — التطبيق يبقى صالحًا بدون AI.
             try {
-                $this->finish($conversation, $user, AiRequestStatus::Error->value, $intent, $filters, $toolCalls, 0, $started, $searchMs, class_basename($e), self::UNAVAILABLE_REPLY, []);
+                $this->logging->record(
+                    $conversation, $user?->id, $intent, $filters, $toolCalls, 0,
+                    AiRequestStatus::Error->value, (int) (microtime(true) * 1000) - $started, $searchMs, 0, class_basename($e),
+                );
 
                 return $this->payload($conversation, self::UNAVAILABLE_REPLY, 'error', [], 'ai_unavailable', $filters);
             } catch (Throwable) {
-                return $this->payload(null, self::UNAVAILABLE_REPLY, 'error', [], 'ai_unavailable', $filters);
+                return [
+                    'reply' => self::UNAVAILABLE_REPLY,
+                    'status' => 'error',
+                    'error' => 'ai_unavailable',
+                    'conversation_id' => null,
+                    'session_token' => null,
+                    'properties' => [],
+                    'filters' => $filters,
+                ];
             }
         }
     }
@@ -191,6 +213,24 @@ class AiAssistantService
         return trim($response->content);
     }
 
+    /** رد محلي من نتائج البحث الحقيقية — يُستخدم عند تعذر النموذج (fallback). */
+    private function localSummaryReply(array $candidates): string
+    {
+        $lines = ['وجدت لك هذه العقارات المطابقة:'];
+        foreach (array_slice($candidates, 0, 4) as $property) {
+            $lines[] = sprintf(
+                '• %s — %s %s في %s (المعرف %d)',
+                $property['title'],
+                number_format((float) $property['price']),
+                $property['currency'] ?? '',
+                collect([$property['city'], $property['district']])->filter()->implode(' - '),
+                $property['property_id'],
+            );
+        }
+
+        return implode("\n", $lines);
+    }
+
     private function noResultsReply(array $filters, AiConversation $conversation): string
     {
         $maxFollowups = (int) config('ai.limits.max_followups', 3);
@@ -234,17 +274,16 @@ class AiAssistantService
             $conversation, $user?->id, $intent, $filters, $toolCalls, $results,
             $status, $latency, $searchMs, 0, $errorCode,
         );
-
-        // حفظ رد المساعد في المحادثة (ما عدا الرسائل المحجوبة).
     }
 
-    private function payload(?AiConversation $conversation, string $reply, string $status, array $properties, ?string $errorCode, array $filters = []): array
+    private function payload(AiConversation $conversation, string $reply, string $status, array $properties, ?string $errorCode, array $filters = []): array
     {
         return [
             'reply' => $reply,
             'status' => $status,
             'error' => $errorCode,
-            'conversation_id' => $conversation?->exists ? $conversation->id : null,
+            'conversation_id' => $conversation->id,
+            'session_token' => $conversation->session_token,
             'properties' => $properties,
             'filters' => $filters,
         ];

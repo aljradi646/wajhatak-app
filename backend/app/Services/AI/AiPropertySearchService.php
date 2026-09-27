@@ -92,7 +92,7 @@ class AiPropertySearchService
         $scored = array_slice($scored, 0, $limit);
 
         return [
-            'items' => array_map(fn ($entry) => $this->present($entry['row'], $entry['score']), $scored),
+            'items' => array_map(fn ($entry) => $this->present($entry['row'], $entry['score'], detailed: true), $scored),
             'total' => $total,
         ];
     }
@@ -213,14 +213,15 @@ class AiPropertySearchService
         return round($score, 3);
     }
 
-    /** شكل القطعة الموثوقة التي تُمرر للنموذج (بلا بيانات حساسة). */
+    /** شكل القطعة الموثوقة التي تُمرر للنموذج وللواجهة (بلا بيانات حساسة). */
     private function present(AiSearchIndex $row, float $score, bool $detailed = false): array
     {
         $data = [
             'property_id' => $row->property_id,
             'title' => $row->title,
             'type' => $row->type_name_ar,
-            'transaction_type' => $row->transaction_type === 'rent' ? 'للإيجار' : 'للبيع',
+            'type_slug' => $row->type_slug,
+            'transaction_type' => $row->transaction_type,
             'city' => $row->city,
             'district' => $row->district,
             'neighborhood' => $row->neighborhood,
@@ -230,12 +231,20 @@ class AiPropertySearchService
             'bedrooms' => $row->bedrooms,
             'bathrooms' => $row->bathrooms,
             'is_furnished' => (bool) $row->is_furnished,
-            'status' => 'متاح للعرض',
+            'is_new' => (bool) $row->is_new,
+            'is_featured' => (bool) $row->is_featured,
+            'available' => $row->status === 'published',
             'match_score' => $score,
         ];
 
         if ($detailed) {
             $data['description'] = $row->description;
+            // رابط صورة الغلاف الحقيقية من جدول property_images (إن وجدت).
+            $image = \App\Models\PropertyImage::query()
+                ->where('property_id', $row->property_id)
+                ->orderByDesc('is_cover')->orderBy('sort_order')
+                ->first(['path']);
+            $data['image_url'] = $image ? asset('storage/'.$image->path) : null;
         }
 
         return $data;

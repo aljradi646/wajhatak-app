@@ -100,6 +100,8 @@ class AiAssistantTest extends TestCase
         $response->assertOk();
         $data = $response->json('data');
         $this->assertSame('blocked', $data['status']);
+        // الرد المحجوب لا يكشف شيئًا عن التعليمات الداخلية.
+        $this->assertStringNotContainsString('DATA', $data['reply']);
     }
 
     /** و) الخصوصية: طلب بيانات مستخدم آخر يُرفض. */
@@ -119,10 +121,12 @@ class AiAssistantTest extends TestCase
         $first = $this->postJson('/api/v1/ai/chat', ['message' => 'أريد شقة غرفتين']);
         $first->assertOk();
         $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
 
         $second = $this->postJson('/api/v1/ai/chat', [
             'message' => 'في صنعاء',
             'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
         ]);
         $second->assertOk();
 
@@ -181,16 +185,22 @@ class AiAssistantTest extends TestCase
             ->assertOk();
     }
 
-    /** ك) fallback: النموذج غير متاح → رد لطيف والتطبيق يعمل. */
+    /** ك) fallback: النموذج غير متاح → رد محلي مبني على نتائج حقيقية. */
     public function test_model_unavailable_returns_graceful_fallback(): void
     {
+        // محاكاة تعذر الوصول لخادم الاستدلال (بلا أي استجابة ناجحة).
         Http::fake(['*' => Http::response(null, 500)]);
 
-        // رسالة تحتاج النموذج (صيغة غير قابلة للقواعد) لكن البحث الهيكلي يظل يعمل.
         $response = $this->postJson('/api/v1/ai/chat', ['message' => 'شقة في صنعاء']);
         $response->assertOk();
-        $this->assertContains($response->json('data.status'), ['ok', 'error']);
-        $this->assertNotEmpty($response->json('data.reply'));
+        $data = $response->json('data');
+        $this->assertNotEmpty($data['reply']);
+
+        // النتائج إن وُجدت فهي حقيقية من القاعدة، والرد لا يحوي أخطاء تقنية.
+        foreach ($data['properties'] as $property) {
+            $this->assertDatabaseHas('properties', ['id' => $property['property_id']]);
+        }
+        $this->assertStringNotContainsString('Exception', $data['reply']);
     }
 
     /** ل) bootstrap: إعدادات الواجهة تصل للعميل بلا أسرار. */

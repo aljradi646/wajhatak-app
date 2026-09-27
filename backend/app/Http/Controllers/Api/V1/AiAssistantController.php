@@ -35,20 +35,31 @@ class AiAssistantController extends Controller
 
         // Rate limiting خاص بالمساعد (أضيق من المعدل العام).
         $key = 'ai-chat:'.($user?->id ?? $request->ip());
-        if (! RateLimiter::attempt($key, $perMinute = (int) config('ai.limits.rate_limit_per_min', 10), fn () => true, 60)) {
+        if (! RateLimiter::attempt($key, (int) config('ai.limits.rate_limit_per_min', 10), fn () => true, 60)) {
             return response()->json([
                 'message' => 'طلبات كثيرة على المساعد. انتظر قليلًا ثم أعد المحاولة.',
                 'status' => 'rate_limited',
             ], 429);
         }
 
+        $sessionToken = (string) $request->input('session_token', '');
         $conversation = null;
         if ($id = $request->integer('conversation_id')) {
             $conversation = AiConversation::query()->find($id);
-            // حماية الملكية: لا يمكن لمستخدم متابعة محادثة غيره.
-            if ($conversation && $user && $conversation->user_id !== null && $conversation->user_id !== $user->id) {
-                return response()->json(['message' => 'غير مصرح للوصول لهذه المحادثة.'], 403);
+            if ($conversation) {
+                // حماية الملكية: محادثة المستخدم أو محادثة زائر بمفتاحه الصحيح فقط.
+                if ($user && $conversation->user_id !== null && $conversation->user_id !== $user->id) {
+                    return response()->json(['message' => 'غير مصرح للوصول لهذه المحادثة.'], 403);
+                }
+                if ($conversation->user_id === null
+                    && ($user !== null || $sessionToken === '' || ! hash_equals((string) $conversation->session_token, $sessionToken))) {
+                    $conversation = null; // تُنشأ محادثة جديدة بدل كشف محادثات الغير.
+                }
             }
+        }
+
+        if ($conversation === null) {
+            $conversation = $this->conversations->currentFor($user, (string) $request->input('locale', 'ar'), $sessionToken ?: null);
         }
 
         $result = $this->assistant->handleChat(
