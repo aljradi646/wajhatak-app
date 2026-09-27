@@ -17,11 +17,11 @@ return [
     'default_provider' => env('AI_PROVIDER', 'local_glm'),
 
     // نقطة النهاية للنموذج المحلي (OpenAI-compatible API).
-    // vLLM:     http://<ai-server>:8000/v1
-    // Ollama:   http://<ai-server>:11434/v1
-    // llama.cpp server: http://<ai-server>:8081/v1
+    // 1) داخل الحاوية (الافتراضي الإنتاجي): llama-server الذي يشغّله
+    //    scripts/ai_inference_service.sh على 127.0.0.1:8018 — نفس نمط عامل الطابور.
+    // 2) خادم خارجي: vLLM http://<ai-server>:8000/v1 · Ollama :11434/v1
     'inference' => [
-        'base_url'         => env('AI_INFERENCE_BASE_URL', 'http://127.0.0.1:8000/v1'),
+        'base_url'         => env('AI_INFERENCE_BASE_URL', 'http://127.0.0.1:8018/v1'),
         'model'            => env('AI_MODEL', 'glm-4.6'),
         // مفتاح اختياري لخادم الاستدلال الخاص بك (يبقى داخل الشبكة ولا يُرسل للعميل أبدًا).
         'api_key'          => env('AI_INFERENCE_API_KEY'),

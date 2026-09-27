@@ -22,9 +22,19 @@
 #
 # The same image backs three Railway services selected via
 # RAILWAY_SERVICE_TYPE (default: app):
-#   - app       : queue worker (background) + `php artisan serve` on $PORT
+#   - app       : queue worker (background) + AI inference service (background,
+#                 self-healing, 127.0.0.1:8018) + `php artisan serve` on $PORT
 #   - worker    : `php artisan queue:work` (foreground daemon)
 #   - scheduler : `php artisan schedule:run` loop
+#
+# خدمة الاستدلال المحلي للمساعد الذكي (AI inference):
+#   - تعمل داخل خدمة "app" افتراضيًا (AI_LOCAL_ENABLED=1) بنفس نمط عامل
+#     الطابور: تحميل نموذج GGUF متوافق مع CPU مرة واحدة (~1.9GB إلى
+#     storage/app/ai/models ثم volume دائم) + llama-server + watchdog.
+#   - يتطلب ~3GB ذاكرة متاحة فوق استهلاك PHP — ارفع ذاكرة الخدمة في
+#     لوحة Railway وفقًا لذلك.
+#   - للتحويل لخادم AI خارجي: AI_LOCAL_ENABLED=0 و
+#     AI_INFERENCE_BASE_URL=http://<ai-server>:8000/v1
 # =============================================================================
 set -e
 
@@ -284,6 +294,10 @@ fi
 # the existing data is never touched.
 # ---------------------------------------------------------------------------
 if [ "$SERVICE_TYPE" != "static" ]; then
+    # -------------------------------------------------------------------------
+    # 6.5. AI inference models directory (وحدة التخزين الدائمة للنموذج المحلي).
+    # -------------------------------------------------------------------------
+    mkdir -p storage/app/ai/models 2>/dev/null || true
     SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
     case "$SEEDED_FLAG" in
@@ -352,6 +366,19 @@ case "$SERVICE_TYPE" in
                 sleep 2
             done
         ) &
+
+        # -------------------------------------------------------------------
+        # خدمة الاستدلال المحلي للمساعد الذكي — نفس النمط تمامًا: عملية
+        # خلفية ذاتية الالتئام (تحميل النموذج مرة + تشغيل llama-server +
+        # مراقبة وإعادة تشغيل عند الفشل). داخل الحاوية فقط (127.0.0.1).
+        # تعطيلها: AI_LOCAL_ENABLED=0 (المساعد يتحول لوضع fallback تلقائيًا).
+        # -------------------------------------------------------------------
+        if [ "${AI_LOCAL_ENABLED:-1}" = "1" ] && [ -x /usr/local/bin/llama-server ]; then
+            echo "==> [Wajhatak] Starting local AI inference service (background, self-healing)..."
+            nohup sh /var/www/html/scripts/ai_inference_service.sh >> storage/logs/ai-inference.log 2>&1 &
+        else
+            echo "==> [Wajhatak] Local AI inference disabled (AI_LOCAL_ENABLED=0 or missing binary)."
+        fi
 
         export PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}"
         echo "==> [Wajhatak] Starting Laravel server: php artisan serve on :${PORT:-8080}"

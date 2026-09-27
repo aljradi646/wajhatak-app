@@ -109,6 +109,12 @@ class LocalGlmProvider implements AiProviderInterface
             $latency = (int) (microtime(true) * 1000) - $started;
 
             if (! $response->successful()) {
+                // HTTP 503 من llama-server = النموذج ما زال يُحمَّل في الذاكرة.
+                if ($response->status() === 503) {
+                    return new AiHealthStatus(false, 'local_glm', $this->model, $latency,
+                        'النموذج قيد التحميل إلى الذاكرة (أول تشغيل). أعد المحاولة بعد قليل.');
+                }
+
                 return new AiHealthStatus(false, 'local_glm', $this->model, $latency,
                     'استجابة غير ناجحة من خادم الاستدلال (HTTP '.$response->status().').');
             }
@@ -121,9 +127,25 @@ class LocalGlmProvider implements AiProviderInterface
             return new AiHealthStatus(true, 'local_glm', $this->model, $latency,
                 'خادم الاستدلال يعمل.', ['available_models' => $models]);
         } catch (Throwable $e) {
+            $hint = $this->localServiceHint();
+
             return new AiHealthStatus(false, 'local_glm', $this->model, null,
-                'لا يمكن الوصول إلى خادم الاستدلال: '.class_basename($e));
+                'لا يمكن الوصول إلى خادم الاستدلال: '.class_basename($e).$hint);
         }
+    }
+
+    /** تلميح تشخيصي عند استخدام الخدمة الداخلية داخل الحاوية. */
+    private function localServiceHint(): string
+    {
+        if (! str_contains((string) $this->baseUrl, '127.0.0.1')) {
+            return '';
+        }
+
+        $logPath = storage_path('logs/ai-inference.log');
+        $modelLog = storage_path('app/ai/models/llama-server.log');
+
+        return ' — افحص: '.basename($logPath).' و'.basename($modelLog)
+            .' أو شغّل: php artisan ai:status';
     }
 
     // ------------------------------------------------------------------
