@@ -141,11 +141,18 @@ class LocalGlmProvider implements AiProviderInterface
             return '';
         }
 
-        $logPath = storage_path('logs/ai-inference.log');
-        $modelLog = storage_path('app/ai/models/llama-server.log');
+        $engineReady = is_file('/usr/local/bin/llama-server')
+            || is_file(storage_path('app/ai/models/llama-server'));
+        $modelReady = is_file(storage_path('app/ai/models/current.ready'));
 
-        return ' — افحص: '.basename($logPath).' و'.basename($modelLog)
-            .' أو شغّل: php artisan ai:status';
+        if (! $engineReady) {
+            return ' — المحرك غير مدمج في هذه الحاوية. الإصلاح الفوري: php artisan ai:bootstrap';
+        }
+        if (! $modelReady) {
+            return ' — النموذج قيد التجهيز (تنزيل/بناء) — راقب: php artisan ai:status';
+        }
+
+        return ' — أعد تشغيل الخدمة: php artisan ai:bootstrap  أو افحص: php artisan ai:status';
     }
 
     // ------------------------------------------------------------------

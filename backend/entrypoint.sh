@@ -295,9 +295,10 @@ fi
 # ---------------------------------------------------------------------------
 if [ "$SERVICE_TYPE" != "static" ]; then
     # -------------------------------------------------------------------------
-    # 6.5. AI inference models directory (وحدة التخزين الدائمة للنموذج المحلي).
+    # 6.5. AI inference cache directory (الحجم الدائم للمحرك والنموذج المحليين).
     # -------------------------------------------------------------------------
     mkdir -p storage/app/ai/models 2>/dev/null || true
+    chmod -R ug+rwX storage/app/ai 2>/dev/null || true
     SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
     case "$SEEDED_FLAG" in
@@ -368,16 +369,18 @@ case "$SERVICE_TYPE" in
         ) &
 
         # -------------------------------------------------------------------
-        # خدمة الاستدلال المحلي للمساعد الذكي — نفس النمط تمامًا: عملية
-        # خلفية ذاتية الالتئام (تحميل النموذج مرة + تشغيل llama-server +
-        # مراقبة وإعادة تشغيل عند الفشل). داخل الحاوية فقط (127.0.0.1).
+        # خدمة الاستدلال المحلي للمساعد الذكي — نفس نمط عامل الطابور: عملية
+        # خلفية ذاتية التمهيد. السكربت يؤمّن كل مكوّن بنفسه: ثنائي llama-server
+        # (bundled في الصورة أو بناء من المصدر إلى الحجم الدائم)، نموذج GGUF
+        # (تنزيل مرة واحدة)، ثم تشغيل + مراقبة على 127.0.0.1 فقط.
+        # لا يعتمد على وجود الثنائي مسبقًا — فلا يفشل إقلاع الخدمة أبدًا.
         # تعطيلها: AI_LOCAL_ENABLED=0 (المساعد يتحول لوضع fallback تلقائيًا).
         # -------------------------------------------------------------------
-        if [ "${AI_LOCAL_ENABLED:-1}" = "1" ] && [ -x /usr/local/bin/llama-server ]; then
-            echo "==> [Wajhatak] Starting local AI inference service (background, self-healing)..."
-            nohup sh /var/www/html/scripts/ai_inference_service.sh >> storage/logs/ai-inference.log 2>&1 &
+        if [ "${AI_LOCAL_ENABLED:-1}" = "1" ]; then
+            echo "==> [Wajhatak] Starting local AI inference service (self-bootstrapping daemon)..."
+            nohup sh /var/www/html/scripts/ai_inference_service.sh daemon >> storage/logs/ai-inference.log 2>&1 &
         else
-            echo "==> [Wajhatak] Local AI inference disabled (AI_LOCAL_ENABLED=0 or missing binary)."
+            echo "==> [Wajhatak] Local AI inference disabled (AI_LOCAL_ENABLED=0)."
         fi
 
         export PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}"
