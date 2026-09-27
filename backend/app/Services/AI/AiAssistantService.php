@@ -78,6 +78,25 @@ class AiAssistantService
             $filters = $parsed['filters'];
             $intent = $parsed['out_of_scope'] ? 'out_of_scope' : 'search';
 
+            // "عقار مشابه لهذا العقار": نستمد الفلاتر من خصائص العقار المرجعي
+            // (يجب أن يكون منشورًا فعليًا) ثم نبحث عن الأكثر شبهًا به.
+            if (! empty($filters['similar_to'])) {
+                $similar = $this->search->similar((int) $filters['similar_to'], (int) $this->settings->get('ai_max_results', 6));
+                if ($similar !== []) {
+                    $this->conversations->addUserMessage($conversation, $message, $filters);
+                    $this->logging->record(
+                        $conversation, $user?->id, 'similar', $filters,
+                        [['tool' => 'search_properties', 'ok' => true]],
+                        count($similar), 'ok', (int) (microtime(true) * 1000) - $started, 0,
+                    );
+                    $reply = $this->localSummaryReply($similar);
+
+                    return $this->payload($conversation, $reply, 'ok', $similar, null, $filters);
+                }
+                // العقار المرجعي غير موجود/غير منشور → نكمل كبحث عادي بلا اختراع.
+                unset($filters['similar_to']);
+            }
+
             // 3) البحث الفعلي في قاعدة البيانات (المصدر الوحيد للحقيقة).
             $searchStarted = (int) (microtime(true) * 1000);
             $results = $this->search->search($filters);

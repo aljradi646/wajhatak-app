@@ -1,6 +1,7 @@
 library;
 
 /// مظروف موحّد لكل الموديلات — يبقي الاستيرادات القديمة تعمل.
+export 'ai_assistant.dart';
 export 'currency.dart';
 export 'location_item.dart';
 export 'message.dart';

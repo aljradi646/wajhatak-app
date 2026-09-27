@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import 'property_location.dart';
-
 /// عقار مُعاد من المساعد الذكي — مصدره فهرس البحث المتزامن مع قاعدة البيانات.
 /// كل الحقوق تأتي من الخادم؛ لا شيء يُصنع محليًا.
 @immutable

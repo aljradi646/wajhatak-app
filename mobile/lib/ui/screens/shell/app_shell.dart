@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/navigation/notification_navigation.dart';
 import '../../../core/services/lux_notification_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/models/models.dart';
 import '../../../state/app_settings_controller.dart';
 import '../../../state/providers.dart';
 import '../../widgets.dart';
+import '../ai/ai_assistant_sheet.dart';
 import '../account/account_screen.dart';
 import '../agent/agent_dashboard_screen.dart';
 import '../auth/auth_screen.dart';
@@ -187,6 +189,22 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
         ],
       ),
+      // الزر العائم للمساعد الذكي — يظهر فوق الشريط السفلي دون تغطية
+      // عناصر مهمة (إزاحة لليسار بعيدًا عن زر التبويب الأوسط).
+      floatingActionButton: user != null
+          ? FloatingActionButton.extended(
+              heroTag: 'wajhatak_ai_assistant',
+              onPressed: () => showAiAssistant(context),
+              backgroundColor: WajhatakColors.emeraldDeep,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.auto_awesome_rounded, size: 20),
+              label: const Text(
+                'المساعد الذكي',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+              ),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.miniStartFloat,
       bottomNavigationBar: WajhatakBottomNavBar(
         selectedIndex: _index,
         onDestinationSelected: (index) => setState(() => _index = index),

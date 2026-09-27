@@ -46,6 +46,10 @@ class AiPropertySearchService
             ->when(array_key_exists('furnished', $filters) && $filters['furnished'] !== null, fn (Builder $q) => $q->where('is_furnished', (bool) $filters['furnished']))
             ->when(! empty($filters['is_new']), fn (Builder $q) => $q->where('is_new', true));
 
+        // --- كلمات مفتاحية ناعمة (قريب من الجامعة / هادئ / للعائلة...) ---
+        // تُطبق كـ OR على نص البحث المُعد؛ النتيجة التي لا تطابق أي كلمة تُعاقب في التسجيل بدل حذفها.
+        $keywords = array_filter((array) ($filters['keywords'] ?? []));
+
         // --- نص حر على عمود البحث المُعد (LIKE محمي عبر binding) ---
         $freeText = trim((string) ($filters['q'] ?? ''));
         if ($freeText !== '') {
@@ -84,6 +88,14 @@ class AiPropertySearchService
         $scored = [];
         foreach ($rows as $row) {
             $score = $this->score($row, $filters);
+
+            // تعزيز الكلمات المفتاحية الناعمة في الترتيب (مطابقة نصية على search_text).
+            foreach ($keywords as $keyword) {
+                if (mb_stripos((string) $row->search_text, $keyword) !== false) {
+                    $score = min(1.0, $score + 0.1);
+                }
+            }
+
             if ($score >= $minScore) {
                 $scored[] = ['row' => $row, 'score' => $score];
             }

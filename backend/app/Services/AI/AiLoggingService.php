@@ -32,7 +32,8 @@ class AiLoggingService
         return AiRequestLog::query()->create([
             'ai_conversation_id' => $conversation?->exists ? $conversation->id : null,
             'user_id' => $userId,
-            'request_id' => (string) Str::uuid(),
+            // Request ID: يُقبَل من الطلب الحالي إن وُجد (X-Request-Id) وإلا يُولد uuid.
+            'request_id' => mb_substr((string) (request()?->header('X-Request-Id') ?: (string) Str::uuid()), 0, 64),
             'intent' => mb_substr($intent, 0, 40),
             'structured_filters' => $this->sanitizeFilters($filters) ?: null,
             'tool_calls' => $toolCalls,

@@ -124,15 +124,29 @@ class AiConversationService
         return $message;
     }
 
-    /** عدد أسئلة المتابعة المتتالية الأخيرة (لحد أسئلة المساعد). */
+    /** عدد أسئلة المتابعة المتتالية الأخيرة (لحد أسئلة المساعد — سؤالان كحد أقصى). */
     public function consecutiveFollowUps(AiConversation $conversation): int
     {
-        return (int) AiMessage::query()
+        // نحسب أطول سلسلة رسائل مساعدة تحتوي «?» تنتهي بآخر رسالة مستخدم.
+        $recent = AiMessage::query()
             ->where('ai_conversation_id', $conversation->id)
-            ->where('role', AiMessageRole::Assistant->value)
-            ->where('content', 'like', '%?%') // علامة تقريبية لرسائل السؤال
-            ->where('created_at', '>=', now()->subMinutes(30))
-            ->count();
+            ->whereIn('role', [AiMessageRole::Assistant->value, AiMessageRole::User->value])
+            ->orderByDesc('id')
+            ->limit(6)
+            ->get(['role', 'content'])
+            ->reverse();
+
+        $streak = 0;
+        foreach ($recent as $message) {
+            if ($message->role === AiMessageRole::User->value) {
+                break; // انتهت السلسلة عند آخر رسالة مستخدم.
+            }
+            if (mb_strpos($message->content, '؟') !== false || mb_strpos($message->content, '?') !== false) {
+                $streak++;
+            }
+        }
+
+        return $streak;
     }
 
     /** مسح محادثة (soft وفق الإعداد) أو أرشفة كل محادثات المستخدم. */

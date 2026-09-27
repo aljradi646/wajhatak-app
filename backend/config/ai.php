@@ -37,7 +37,7 @@ return [
         'max_message_length'   => (int) env('AI_MAX_MESSAGE_LENGTH', 600),
         'max_results'          => (int) env('AI_MAX_RESULTS', 6),
         'max_candidates'       => (int) env('AI_MAX_CANDIDATES', 60),
-        'max_followups'        => (int) env('AI_MAX_FOLLOWUPS', 3),
+        'max_followups'        => (int) env('AI_MAX_FOLLOWUPS', 2),
         'history_messages'     => (int) env('AI_HISTORY_MESSAGES', 8),
         'rate_limit_per_min'   => (int) env('AI_RATE_LIMIT_PER_MINUTE', 10),
         'rate_limit_search'    => (int) env('AI_RATE_LIMIT_SEARCH_PER_MINUTE', 30),

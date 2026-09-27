@@ -1,6 +1,7 @@
 library;
 
 /// مظروف موحّد لكل المستودعات.
+export 'ai_assistant_repository.dart';
 export 'auth_repository.dart';
 export 'conversation_repository.dart';
 export 'notification_repository.dart';

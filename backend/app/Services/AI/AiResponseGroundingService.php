@@ -38,16 +38,40 @@ class AiResponseGroundingService
             $violations[] = 'hallucinated_property_ids';
         }
 
-        // 2) كشف تسرب أسرار أو SQL.
+        // 2) الأسعار المخترعة: أي رقم كبير في الرد (≥ 100,000 بصيغة رقمية أو مع فاصل)
+        //    يجب أن يطابق سعرًا حقيقيًا في نتائج البحث — وإلا يُحذف سطره.
+        $realPrices = array_map(
+            fn ($c) => (string) (int) round((float) ($c['price'] ?? 0)),
+            $candidates,
+        );
+        $removedLines = [];
+        foreach (preg_split('/\n/u', $content) ?: [] as $line) {
+            if (preg_match_all('/(?:\d{1,3}(?:[,،]\d{3})+|\d{6,})/u', $line, $m)) {
+                foreach ($m[0] as $raw) {
+                    $price = (string) (int) str_replace([',', '،'], '', $raw);
+                    if ((int) $price >= 100000 && ! in_array($price, $realPrices, true)) {
+                        $violations[] = 'hallucinated_price';
+                        $removedLines[] = $line;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 3) كشف تسرب أسرار أو SQL.
         if ($this->leaksSecrets($content)) {
             $violations[] = 'sensitive_leak';
         }
 
         $replaced = false;
-        if ($this->settings->guardActive('hallucination') && $removed !== []) {
-            // إزالة الأسطر التي تسوّق العقار المخترع (الأسطر التي تحوي المعرف).
+        if ($this->settings->guardActive('hallucination') && ($removed !== [] || $removedLines !== [])) {
+            // إزالة الأسطر التي تسوّق العقار المخترع أو السعر المخترع.
             foreach ($removed as $id) {
                 $content = preg_replace('/^.*\b'.preg_quote((string) $id, '/').'\b.*$/mu', '', $content) ?? $content;
+            }
+            foreach (array_unique($removedLines) as $line) {
+                $escaped = preg_quote($line, '/');
+                $content = preg_replace('/^'.str_replace(['\n', '\r'], '', $escaped).'$/mu', '', $content) ?? $content;
             }
             $content = trim(preg_replace("/\n{3,}/", "\n\n", $content) ?? $content);
         }

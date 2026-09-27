@@ -33,6 +33,8 @@ class AiIntentService
             'max_area' => ['type' => ['number', 'null']],
             'furnished' => ['type' => ['boolean', 'null']],
             'is_new' => ['type' => ['boolean', 'null']],
+            'keywords' => ['type' => ['array', 'null'], 'items' => ['type' => 'string']],
+            'similar_to' => ['type' => ['integer', 'null']],
             'sort' => ['type' => ['string', 'null'], 'enum' => ['price_asc', 'price_desc', 'area_desc', 'relevance', null]],
             'out_of_scope' => ['type' => ['boolean', 'null']],
         ],
@@ -99,7 +101,7 @@ class AiIntentService
 
         $allowed = ['transaction_type', 'property_type', 'city', 'district', 'neighborhood',
             'bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'min_price', 'max_price',
-            'min_area', 'max_area', 'furnished', 'is_new', 'sort'];
+            'min_area', 'max_area', 'furnished', 'is_new', 'sort', 'keywords', 'similar_to'];
         $out = [];
         foreach ($allowed as $key) {
             $value = $raw[$key] ?? null;
@@ -161,6 +163,27 @@ class AiIntentService
             $filters['sort'] = 'price_asc';
         } elseif (preg_match('/(أغلى|اغلى|الأفخم)/u', $text)) {
             $filters['sort'] = 'price_desc';
+        }
+
+        // "عقار مشابه لهذا العقار" — يشير لعقار مرجعي في المحادثة (id يُلتقط لاحقًا من السياق).
+        if (preg_match('/(مشابه|مشابهة|مثل|شبيه)/u', $text) && preg_match('/(?:عقار|شقة|فيلا|بيت|دور)?\s*(?:رقم|#|المعرف)?\s*(\d{1,10})/u', $text, $m)) {
+            $filters['similar_to'] = (int) $m[1];
+        }
+
+        // كلمات مفتاحية ناعمة (قريب من الجامعة / هادئ / للعائلة) — بحث نصي + تعزيز في الترتيب.
+        $keywords = [];
+        foreach ([
+            'قريب من الجامعة' => 'جامعة', 'قرب الجامعة' => 'جامعة', 'الجامعة' => 'جامعة',
+            'المستشفى' => 'مستشفى', 'قريب من المستشفى' => 'مستشفى',
+            'هادئ' => 'هادئ', 'هادئة' => 'هادئ', 'للعائلة' => 'عائلة', 'عائلي' => 'عائلة',
+            'قريب من السوق' => 'سوق', 'السوق' => 'سوق', 'قريب من المدرسة' => 'مدرسة',
+        ] as $pattern => $keyword) {
+            if (mb_strpos($text, $this->normalize($pattern)) !== false) {
+                $keywords[$keyword] = true;
+            }
+        }
+        if ($keywords !== []) {
+            $filters['keywords'] = array_keys($keywords);
         }
 
         // الأسعار: "أقل من 150 ألف"، "من 50 إلى 100 مليون"، "150K"، "٢٠٠٠٠٠".
@@ -312,6 +335,15 @@ class AiIntentService
         }
         if (isset($filters['is_new'])) {
             $filters['is_new'] = filter_var($filters['is_new'], FILTER_VALIDATE_BOOLEAN);
+        }
+        if (isset($filters['similar_to'])) {
+            $filters['similar_to'] = max(1, min(2147483647, (int) $filters['similar_to']));
+        }
+        if (isset($filters['keywords'])) {
+            $filters['keywords'] = array_slice(
+                array_map(fn ($k) => mb_substr(trim((string) $k), 0, 30), (array) $filters['keywords']),
+                0, 4,
+            );
         }
 
         return $filters;

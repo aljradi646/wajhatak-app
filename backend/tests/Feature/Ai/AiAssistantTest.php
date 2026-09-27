@@ -135,19 +135,22 @@ class AiAssistantTest extends TestCase
         $this->assertSame(2, $filters['bedrooms_min'] ?? null);
     }
 
-    /** ح) الهلوسة: معرفات وهمية في رد النموذج تُكشف وتُنظف. */
-    public function test_hallucinated_property_ids_are_stripped(): void
+    /** ح) الهلوسة: معرفات وهمية + أسعار وهمية في رد النموذج تُكشف وتُنظف. */
+    public function test_hallucinated_property_ids_and_prices_are_stripped(): void
     {
         $grounding = app(\App\Services\AI\AiResponseGroundingService::class);
 
         $candidates = [['property_id' => 42, 'title' => 'شقة حقيقية', 'price' => 100000, 'currency' => 'YER']];
-        $modelReply = "وجدت لك عقارين ممتازين:\n- المعرف 42: شقة حقيقية\n- المعرف 999999: فيلا وهمية بـ 5 ملايين";
+        $modelReply = "وجدت لك عقارين ممتازين:\n- المعرف 42: شقة حقيقية بسعر 100,000\n- المعرف 999999: فيلا وهمية بـ 5,000,000";
 
         $result = $grounding->validate($modelReply, $candidates);
 
         $this->assertContains(999999, $result['removed_ids']);
         $this->assertStringNotContainsString('999999', $result['content']);
         $this->assertStringContainsString('42', $result['content']);
+        // السعر الحقيقي يبقى، والمخترع يُحذف مع سطره.
+        $this->assertStringContainsString('100,000', $result['content']);
+        $this->assertStringNotContainsString('5,000,000', $result['content']);
     }
 
     /** ط) مزامنة الفهرس: تعديل السعر ينعكس فورًا على بحث المساعد. */
@@ -201,6 +204,56 @@ class AiAssistantTest extends TestCase
             $this->assertDatabaseHas('properties', ['id' => $property['property_id']]);
         }
         $this->assertStringNotContainsString('Exception', $data['reply']);
+    }
+
+    /** ن) عقار مشابه: مشتق من خصائص عقار مرجعي منشور. */
+    public function test_similar_property_search_returns_real_matches(): void
+    {
+        $reference = Property::query()->where('status', 'published')->firstOrFail();
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => "أريد عقار مشابه للعقار رقم {$reference->id}",
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        foreach ($data['properties'] as $property) {
+            // كل نتيجة عقار حقيقي منشور، وغير المعرف المرجعي نفسه.
+            $this->assertDatabaseHas('properties', ['id' => $property['property_id'], 'status' => 'published']);
+            $this->assertNotSame($reference->id, $property['property_id']);
+        }
+    }
+
+    /** س) كلمات مفتاحية ناعمة: «قريب من الجامعة» تُلتقط كـ keywords. */
+    public function test_soft_keywords_are_captured(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد شقة غرفتين في صنعاء قريب من الجامعة',
+        ]);
+
+        $response->assertOk();
+        $filters = $response->json('data.filters');
+        $this->assertSame('صنعاء', $filters['city'] ?? null);
+        $this->assertContains('جامعة', $filters['keywords'] ?? []);
+    }
+
+    /** ع) حد أسئلة المتابعة: لا يتجاوز سؤالين متتاليين. */
+    public function test_follow_up_questions_are_capped(): void
+    {
+        // ثلاث رسائل قصيرة متتابعة بلا معلومات كافية.
+        foreach (['أبحث عن عقار', 'ميزانيتي مرنة', 'اعرض لي كل شيء'] as $message) {
+            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+            $response->assertOk();
+        }
+
+        // رسائل المساعد الاستفهامية المتتالية في القاعدة ≤ 2.
+        $questions = \App\Models\AiMessage::query()
+            ->where('role', 'assistant')
+            ->where('content', 'like', '%؟%')
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->count();
+        $this->assertLessThanOrEqual(2, $questions);
     }
 
     /** ل) bootstrap: إعدادات الواجهة تصل للعميل بلا أسرار. */
