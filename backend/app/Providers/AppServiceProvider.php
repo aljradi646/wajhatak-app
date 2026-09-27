@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Property;
+use App\Observers\PropertyObserver;
+use App\Services\AI\AiProviderManager;
+use App\Services\AI\AiSettingsService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +15,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // مدير مزودي الاستدلال — singleton واحد لكل الطلب.
+        $this->app->singleton(AiProviderManager::class);
+
+        // إعدادات المساعد — singleton خفيف مع كاش داخلي.
+        $this->app->singleton(AiSettingsService::class);
     }
 
     /**
@@ -22,5 +30,8 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
+
+        // مزامنة فهرس البحث الذكي مع كل تغيير على العقارات.
+        Property::observe(PropertyObserver::class);
     }
 }

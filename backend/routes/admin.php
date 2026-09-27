@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AgentController;
+use App\Http\Controllers\Admin\AiAssistantController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LocationController;
@@ -65,6 +66,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Property Features
     Route::resource('property-features', PropertyFeatureController::class)->except(['show']);
+
+    // AI Assistant (الإعدادات + المراقبة + السجل)
+    Route::get('ai', [AiAssistantController::class, 'index'])->name('ai.index');
+    Route::post('ai', [AiAssistantController::class, 'update'])->name('ai.update');
+    Route::post('ai/reindex', [AiAssistantController::class, 'reindex'])->name('ai.reindex');
 
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AgentController;
+use App\Http\Controllers\Api\V1\AiAssistantController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\DeviceController;
@@ -31,6 +32,15 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
     Route::get('cities', [TaxonomyController::class, 'cities'])->name('cities.index');
     Route::get('areas', [TaxonomyController::class, 'areas'])->name('areas.index');
     Route::get('currencies', [TaxonomyController::class, 'currencies'])->name('currencies.index');
+
+    // -------------------------------------------------------------------
+    // المساعد العقاري الذكي — Flutter يتصل بـ Laravel فقط، وLaravel وحده
+    // يتصل بخادم النموذج المحلي (لا مسار مباشر من العميل إلى النموذج).
+    // -------------------------------------------------------------------
+    Route::get('ai/bootstrap', [AiAssistantController::class, 'bootstrap'])->name('ai.bootstrap');
+    Route::get('ai/health', [AiAssistantController::class, 'health'])->name('ai.health');
+    Route::post('ai/chat', [AiAssistantController::class, 'chat'])->name('ai.chat');
+    Route::post('ai/search', [AiAssistantController::class, 'search'])->name('ai.search');
 
     Route::middleware('inject.sanctum.token')->middleware('auth:sanctum')->group(function (): void {
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
@@ -65,5 +75,10 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
 
         Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::post('notifications/{notificationId}/read', [NotificationController::class, 'read'])->name('notifications.read');
+
+        // محادثات المساعد (تتطلب حسابًا) — عزل ملكية كامل داخل المتحكم.
+        Route::get('ai/conversations', [AiAssistantController::class, 'conversations'])->name('ai.conversations.index');
+        Route::get('ai/conversations/{conversation}', [AiAssistantController::class, 'show'])->whereNumber('conversation')->name('ai.conversations.show');
+        Route::delete('ai/conversations/{conversation}', [AiAssistantController::class, 'destroy'])->whereNumber('conversation')->name('ai.conversations.destroy');
     });
 });
