@@ -115,7 +115,6 @@ start_server() {
         --port "$PORT" \
         -c "$CONTEXT" \
         $THREADS_FLAG \
-        --mlock 2>/dev/null || true \
         -ngl 0 \
         --alias "$MODEL_LABEL" \
         >> "$LOG_FILE" 2>&1 &
