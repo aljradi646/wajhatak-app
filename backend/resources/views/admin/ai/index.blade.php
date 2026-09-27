@@ -3,10 +3,17 @@
     <div class="space-y-6" x-data="{ tab: 'settings' }">
 
         {{-- ============ التبويبات ============ --}}
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <button @click="tab = 'settings'" :class="tab === 'settings' ? 'btn-brand' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'" class="px-4 py-2 rounded-xl text-sm font-bold transition">الإعدادات</button>
             <button @click="tab = 'monitoring'" :class="tab === 'monitoring' ? 'btn-brand' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'" class="px-4 py-2 rounded-xl text-sm font-bold transition">المراقبة</button>
             <button @click="tab = 'logs'" :class="tab === 'logs' ? 'btn-brand' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'" class="px-4 py-2 rounded-xl text-sm font-bold transition">سجل الطلبات</button>
+
+            {{-- وصول سريع لمحادثة الاختبار الحقيقية من أي تبويب --}}
+            <a href="{{ route('admin.ai.playground') }}"
+               class="ms-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold btn-brand">
+                <x-admin.icon name="chat" class="h-4 w-4" />
+                تجربة المحادثة الآن
+            </a>
         </div>
 
         @if (session('status'))
@@ -198,10 +205,16 @@
             </x-admin.card>
 
             <x-admin.card title="مزامنة فهرس البحث" description="الفهرس يتحدث تلقائيًا عند كل تغيير في العقارات. هذا الزر لإعادة البناء اليدوي.">
-                <form method="POST" action="{{ route('admin.ai.reindex') }}">
-                    @csrf
-                    <x-admin.button type="submit" variant="secondary">إعادة بناء الفهرس الآن</x-admin.button>
-                </form>
+                <div class="flex flex-wrap items-center gap-3">
+                    <form method="POST" action="{{ route('admin.ai.reindex') }}">
+                        @csrf
+                        <x-admin.button type="submit" variant="secondary">إعادة بناء الفهرس الآن</x-admin.button>
+                    </form>
+                    <a href="{{ route('admin.ai.playground') }}"
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold btn-brand">
+                        💬 تجربة المحادثة الآن
+                    </a>
+                </div>
             </x-admin.card>
         </div>
 

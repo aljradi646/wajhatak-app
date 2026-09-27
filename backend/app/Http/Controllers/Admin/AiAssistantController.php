@@ -3,15 +3,21 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiConversation;
 use App\Models\AiRequestLog;
 use App\Models\Setting;
+use App\Services\AI\AiAssistantService;
+use App\Services\AI\AiConversationService;
 use App\Services\AI\AiLoggingService;
 use App\Services\AI\AiProviderManager;
 use App\Services\AI\AiSettingsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * قسم المساعد الذكي في لوحة التحكم: إعدادات كاملة + مراقبة + سجل طلبات.
+ * قسم المساعد الذكي في لوحة التحكم: إعدادات + مراقبة + سجل + محادثة اختبار حقيقية
+ * تستدعي نفس AiAssistantService الذي يستخدمه التطبيق — نفس الحواجز والبحث والتوليد.
  */
 class AiAssistantController extends Controller
 {
@@ -19,6 +25,8 @@ class AiAssistantController extends Controller
         private readonly AiSettingsService $settings,
         private readonly AiProviderManager $providers,
         private readonly AiLoggingService $logging,
+        private readonly AiAssistantService $assistant,
+        private readonly AiConversationService $conversations,
     ) {}
 
     public function index(Request $request)
@@ -77,5 +85,104 @@ class AiAssistantController extends Controller
         \App\Models\ActivityLog::record('ai', "إعادة فهرسة بحث المساعد: {$count} عقار");
 
         return back()->with('status', "تمت مزامنة {$count} عقار مع فهرس المساعد الذكي.");
+    }
+
+    // =====================================================================
+    // محادثة اختبار حقيقية (Playground) — نفس مسار التطبيق تمامًا.
+    // =====================================================================
+
+    /** GET /admin/ai/playground — صفحة اختبار المساعد بالحوار الحقيقي. */
+    public function playground(Request $request)
+    {
+        $conversationId = $request->session()->get('ai_playground_conversation_id');
+        $messages = collect();
+
+        if ($conversationId) {
+            $conversation = AiConversation::query()->find($conversationId);
+            if ($conversation) {
+                $messages = $conversation->messages()
+                    ->where('status', '!=', 'blocked')
+                    ->get(['id', 'role', 'content', 'property_ids', 'created_at'])
+                    ->map(fn ($m) => [
+                        'id' => $m->id,
+                        'role' => $m->role,
+                        'content' => $m->content,
+                        'property_ids' => $m->property_ids ?? [],
+                        'time' => $m->created_at?->format('H:i'),
+                    ]);
+            }
+        }
+
+        return view('admin.ai.playground', [
+            'messages' => $messages,
+            'health' => $this->providers->provider()->health(),
+            'enabled' => $this->settings->enabled(),
+            'assistantName' => $this->settings->assistantName(),
+        ]);
+    }
+
+    /** POST /admin/ai/playground/send — إرسال رسالة عبر المحرك الحقيقي نفسه. */
+    public function playgroundSend(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'message' => ['required', 'string', 'min:1', 'max:600'],
+        ]);
+
+        if (! $this->settings->enabled()) {
+            return response()->json([
+                'reply' => 'المساعد غير متاح حاليًا (معطل من الإعدادات). فعّله من تبويب الإعدادات أولًا.',
+                'status' => 'disabled',
+                'properties' => [],
+            ], 503);
+        }
+
+        $admin = $request->user();
+
+        // نفس معدل التطبيق — اللوحة ليست استثناءً.
+        if (! RateLimiter::attempt('ai-admin:'.$admin->id, (int) config('ai.limits.rate_limit_per_min', 10), fn () => true, 60)) {
+            return response()->json(['reply' => 'طلبات كثيرة. انتظر دقيقة ثم أعد المحاولة.', 'status' => 'rate_limited', 'properties' => []], 429);
+        }
+
+        // محادثة اختبار مرتبطة بحساب المدير نفسه (نفس التخزين والسياق).
+        $conversationId = $request->session()->get('ai_playground_conversation_id');
+        $conversation = $conversationId
+            ? AiConversation::query()->where('id', $conversationId)->where('user_id', $admin->id)->first()
+            : null;
+        $conversation ??= $this->conversations->currentFor($admin, 'ar');
+        $request->session()->put('ai_playground_conversation_id', $conversation->id);
+
+        // ✅ نفس الاستدعاء الحرفي الذي يستخدمه التطبيق: حواجز + نية + بحث حقيقي + نموذج + grounding.
+        $result = $this->assistant->handleChat($admin, $data['message'], $conversation, 'ar');
+
+        return response()->json(['data' => [
+            'reply' => $result['reply'],
+            'status' => $result['status'],
+            'properties' => array_map(fn ($p) => [
+                'property_id' => $p['property_id'],
+                'title' => $p['title'],
+                'price' => $p['price'],
+                'currency' => $p['currency'],
+                'city' => $p['city'],
+                'district' => $p['district'] ?? null,
+                'bedrooms' => $p['bedrooms'] ?? null,
+                'available' => $p['available'] ?? true,
+            ], $result['properties'] ?? []),
+            'filters' => $result['filters'] ?? [],
+        ]]);
+    }
+
+    /** POST /admin/ai/playground/clear — مسح محادثة الاختبار. */
+    public function playgroundClear(Request $request)
+    {
+        $conversationId = $request->session()->get('ai_playground_conversation_id');
+        if ($conversationId) {
+            $conversation = AiConversation::query()->find($conversationId);
+            if ($conversation && $conversation->user_id === $request->user()->id) {
+                $this->conversations->clear($conversation, (string) $this->settings->get('ai_clear_policy', 'soft'));
+            }
+        }
+        $request->session()->forget('ai_playground_conversation_id');
+
+        return redirect()->route('admin.ai.playground')->with('status', 'تم مسح محادثة الاختبار.');
     }
 }

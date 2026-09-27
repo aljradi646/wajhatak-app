@@ -189,22 +189,20 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
         ],
       ),
-      // الزر العائم للمساعد الذكي — يظهر فوق الشريط السفلي دون تغطية
-      // عناصر مهمة (إزاحة لليسار بعيدًا عن زر التبويب الأوسط).
+      // الزر العائم للمساعد الذكي — أيقونة فقط بدون نص، واضع فوق الشريط
+      // السفلي يسارًا حتى لا يغطي عناصر التنقل المهمة.
       floatingActionButton: user != null
-          ? FloatingActionButton.extended(
+          ? FloatingActionButton(
               heroTag: 'wajhatak_ai_assistant',
               onPressed: () => showAiAssistant(context),
               backgroundColor: WajhatakColors.emeraldDeep,
               foregroundColor: Colors.white,
-              icon: const Icon(Icons.auto_awesome_rounded, size: 20),
-              label: const Text(
-                'المساعد الذكي',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
-              ),
+              tooltip: 'المساعد الذكي',
+              shape: const CircleBorder(),
+              child: const Icon(Icons.auto_awesome_rounded, size: 24),
             )
           : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.miniStartFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
       bottomNavigationBar: WajhatakBottomNavBar(
         selectedIndex: _index,
         onDestinationSelected: (index) => setState(() => _index = index),

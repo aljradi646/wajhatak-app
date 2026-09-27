@@ -141,9 +141,14 @@
                             خصائص العقارات
                         </x-admin.nav-link>
 
-                        <x-admin.nav-link href="{{ route('admin.ai.index') }}" :active="request()->routeIs('admin.ai.*')">
-                            <x-slot name="icon"><x-admin.icon name="settings" /></x-slot>
+                        <x-admin.nav-link href="{{ route('admin.ai.index') }}" :active="request()->routeIs('admin.ai.index', 'admin.ai.update', 'admin.ai.reindex')">
+                            <x-slot name="icon"><x-admin.icon name="ai-assistant" /></x-slot>
                             المساعد الذكي
+                        </x-admin.nav-link>
+
+                        <x-admin.nav-link href="{{ route('admin.ai.playground') }}" :active="request()->routeIs('admin.ai.playground')">
+                            <x-slot name="icon"><x-admin.icon name="chat" /></x-slot>
+                            اختبار المساعد
                         </x-admin.nav-link>
 
                         <x-admin.nav-link href="{{ route('admin.settings.index') }}" :active="request()->routeIs('admin.settings.*')">

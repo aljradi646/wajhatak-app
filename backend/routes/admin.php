@@ -67,10 +67,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Property Features
     Route::resource('property-features', PropertyFeatureController::class)->except(['show']);
 
-    // AI Assistant (الإعدادات + المراقبة + السجل)
+    // AI Assistant (الإعدادات + المراقبة + السجل + محادثة اختبار حقيقية)
     Route::get('ai', [AiAssistantController::class, 'index'])->name('ai.index');
     Route::post('ai', [AiAssistantController::class, 'update'])->name('ai.update');
     Route::post('ai/reindex', [AiAssistantController::class, 'reindex'])->name('ai.reindex');
+    Route::get('ai/playground', [AiAssistantController::class, 'playground'])->name('ai.playground');
+    Route::post('ai/playground/send', [AiAssistantController::class, 'playgroundSend'])->name('ai.playground.send');
+    Route::post('ai/playground/clear', [AiAssistantController::class, 'playgroundClear'])->name('ai.playground.clear');
 
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
