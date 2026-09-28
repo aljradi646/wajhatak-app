@@ -276,26 +276,33 @@ if [ -d image-bundle/properties ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Only "app" and "worker" services provision the database. Provisioning runs
-# exactly ONCE: RealDataSeeder finishes by writing Setting 'system_initialized'
-# = 1, and every later boot (redeploy or restart) skips migrations AND seeds so
-# the existing data is never touched.
+# Database provisioning:
+#   • Migrations run on EVERY boot — they are idempotent (Laravel tracks the
+#     migrations table), and this is what keeps a previously-provisioned
+#     production database in sync with NEW code (new tables/columns for the
+#     AI assistant, agent verification, email codes...). Skipping them on
+#     later boots left the live DB missing the assistant tables, which made
+#     every chat request fail with a generic error.
+#   • Seeds run exactly ONCE: RealDataSeeder writes Setting
+#     'system_initialized' = 1, and every later boot skips seeds so the
+#     existing data is never touched or duplicated.
 # ---------------------------------------------------------------------------
 if [ "$SERVICE_TYPE" != "static" ]; then
     # -------------------------------------------------------------------------
     # المساعد الذكي محرك حتمي داخل Laravel — لا خدمة استدلال خلفية ولا مجلد نماذج.
     # -------------------------------------------------------------------------
+    echo "==> [Wajhatak] Running migrations (idempotent — syncs new tables/columns with the live database)..."
+    php artisan migrate --force || echo "    migrate reported an issue (non-fatal, continuing)."
+
     SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
     case "$SEEDED_FLAG" in
         *SEEDED*)
-            echo "==> [Wajhatak] Database already provisioned (system_initialized=1)."
-            echo "    Skipping ALL migrations and seeds to protect your existing data."
+            echo "==> [Wajhatak] Data already seeded (system_initialized=1) — skipping seeds to protect existing data."
             ;;
         *)
-            echo "==> [Wajhatak] First-time provisioning: creating schema, then seeding"
+            echo "==> [Wajhatak] First-time provisioning: seeding"
             echo "    roles/permissions/locations, the real Sana'a dataset and the admin account..."
-            php artisan migrate --force
             php artisan db:seed --class=DatabaseSeeder --force
             php artisan db:seed --class=RealDataSeeder --force
             php artisan db:seed --class=AdminUserSeeder --force

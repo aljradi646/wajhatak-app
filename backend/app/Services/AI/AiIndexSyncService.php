@@ -48,6 +48,9 @@ class AiIndexSyncService
                 'is_new' => (bool) $property->is_new,
                 'is_featured' => (bool) $property->is_featured,
                 'published_at' => $property->published_at,
+                // الإحداثيات الحقيقية لموقع العقار — للبحث الجغرافي القريب.
+                'latitude' => $property->location?->latitude,
+                'longitude' => $property->location?->longitude,
                 'search_text' => $searchText,
                 'content_hash' => $hash,
             ],

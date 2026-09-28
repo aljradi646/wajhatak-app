@@ -37,6 +37,20 @@ class DynamicMailService
         $from = $this->mailSettings->all();
         $replyTo = $from['mail_reply_to'] !== '' ? $from['mail_reply_to'] : $from['mail_from_address'];
 
+        // بناء mailer SMTP لحظيًا من إعدادات اللوحة (بدون config cache):
+        // نكتب الإعداد ثم نمسح النسخة المحلولة كي يلتقط Laravel القيم الجديدة فورًا.
+        config()->set('mail.mailers.dynamic_smtp', [
+            'transport' => 'smtp',
+            'host' => $from['mail_host'],
+            'port' => $from['mail_port'],
+            'encryption' => $from['mail_encryption'] === 'none' ? null : $from['mail_encryption'],
+            'username' => $from['mail_username'],
+            'password' => $from['mail_password'],
+            'timeout' => $from['mail_timeout'],
+            'local_domain' => config('mail.mailers.smtp.local_domain', 'localhost'),
+        ]);
+        Mail::purge('dynamic_smtp');
+
         Mail::mailer('dynamic_smtp')->raw($body, function ($message) use ($toEmail, $subject, $from, $replyTo, $headers) {
             $message->to($toEmail)
                 ->from($from['mail_from_address'], $from['mail_from_name'])

@@ -86,6 +86,9 @@ return new class extends Migration
             $table->boolean('is_new')->default(false);
             $table->boolean('is_featured')->default(false);
             $table->timestamp('published_at')->nullable();
+            // الإحداثيات الحقيقية — للبحث الجغرافي «قريب مني».
+            $table->decimal('latitude', 10, 7)->nullable()->index();
+            $table->decimal('longitude', 10, 7)->nullable()->index();
             // نص بحث حر مُعد مسبقًا (title + location + features + description).
             $table->text('search_text')->nullable();
             // تجزئة محتوى العقار لكشف التعديلات (تزامن رخيص).
