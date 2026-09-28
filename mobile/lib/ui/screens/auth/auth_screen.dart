@@ -10,6 +10,7 @@ import '../../../data/api_client.dart';
 import '../../../state/providers.dart';
 import '../../brand.dart';
 import '../../widgets.dart';
+import 'email_verification_screen.dart';
 
 class AuthRequiredScreen extends StatelessWidget {
   const AuthRequiredScreen({
@@ -86,8 +87,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             );
       }
       if (mounted) {
+        final user = ref.read(sessionProvider).asData?.value?.user;
         Navigator.of(context).popUntil((route) => route.isFirst);
         util.notice(context, 'تم تسجيل الدخول بنجاح.');
+
+        // التحقق الحقيقي من البريد: بعد التسجيل دائمًا، وبعد الدخول إن كان غير موثق.
+        if (user != null && user.emailVerified != true && mounted) {
+          final autoSend = _register;
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EmailVerificationScreen(autoSend: autoSend),
+            ),
+          );
+        }
       }
     } on ApiFailure catch (error) {
       if (mounted) util.notice(context, error.message);

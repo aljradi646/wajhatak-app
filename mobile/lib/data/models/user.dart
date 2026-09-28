@@ -10,6 +10,8 @@ class LuxUser {
     required this.roles,
     this.phone,
     this.avatarUrl,
+    this.emailVerified,
+    this.agentVerificationStatus,
   });
 
   final int id;
@@ -19,7 +21,14 @@ class LuxUser {
   final String? phone;
   final String? avatarUrl;
 
+  /// هل البريد موثق برمز فعلي؟ (null = بيانات قديمة قبل الميزة)
+  final bool? emailVerified;
+
+  /// حالة توثيق حساب الوكيل: pending | approved | rejected.
+  final String? agentVerificationStatus;
+
   bool get isAgent => roles.contains('agent') || roles.contains('admin');
+  bool get isAgentApproved => agentVerificationStatus == 'approved';
 
   factory LuxUser.fromJson(Map<String, dynamic> json) => LuxUser(
     id: json['id'] as int,
@@ -27,6 +36,8 @@ class LuxUser {
     email: json['email'] as String? ?? '',
     phone: json['phone'] as String?,
     avatarUrl: json['avatar_url'] as String?,
+    emailVerified: json['email_verified'] as bool?,
+    agentVerificationStatus: json['agent_verification_status'] as String?,
     roles: (json['roles'] as List<dynamic>? ?? const []).cast<String>(),
   );
 
@@ -36,6 +47,8 @@ class LuxUser {
     'email': email,
     'phone': phone,
     'avatar_url': avatarUrl,
+    'email_verified': emailVerified,
+    'agent_verification_status': agentVerificationStatus,
     'roles': roles,
   };
 
@@ -46,6 +59,8 @@ class LuxUser {
     List<String>? roles,
     String? phone,
     String? avatarUrl,
+    bool? emailVerified,
+    String? agentVerificationStatus,
   }) => LuxUser(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -53,5 +68,7 @@ class LuxUser {
     roles: roles ?? this.roles,
     phone: phone ?? this.phone,
     avatarUrl: avatarUrl ?? this.avatarUrl,
+    emailVerified: emailVerified ?? this.emailVerified,
+    agentVerificationStatus: agentVerificationStatus ?? this.agentVerificationStatus,
   );
 }

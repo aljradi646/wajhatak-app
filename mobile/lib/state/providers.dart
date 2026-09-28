@@ -31,6 +31,10 @@ final authRepositoryProvider = Provider<AuthRepository>(
   ),
 );
 
+final accountRepositoryProvider = Provider<AccountRepository>(
+  (ref) => AccountRepository(ref.watch(apiClientProvider)),
+);
+
 final propertyRepositoryProvider = Provider<PropertyRepository>(
   (ref) => PropertyRepository(ref.watch(apiClientProvider)),
 );
@@ -155,6 +159,19 @@ class SessionController extends AsyncNotifier<SessionData?> {
   }
 
   Future<void> clearExpiredSession() => _clearAuthenticatedState();
+
+  /// إعادة تحميل بيانات الجلسة من الخادم (بعد توثيق البريد مثلًا).
+  Future<void> restoreSessionAfterVerification() async {
+    if (AppConfig.isUiPreview) return;
+    try {
+      final refreshed = await ref.read(authRepositoryProvider).restore();
+      if (refreshed != null) {
+        state = AsyncData(refreshed);
+      }
+    } on Object {
+      // فشل التحديث لا يُسقط الجلسة الحالية.
+    }
+  }
 
   Future<void> _clearAuthenticatedState() async {
     if (!AppConfig.isUiPreview) {

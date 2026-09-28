@@ -11,6 +11,7 @@ import '../../../data/api_client.dart';
 import '../../../data/models/models.dart';
 import '../../../state/providers.dart';
 import '../../widgets.dart';
+import '../property/location_picker_screen.dart';
 
 /// إضافة عقار: نموذج عصري بأقسام — أساسي، سعر + عملة، موقع متتالي (دولة ← محافظة ← مدينة/منطقة)، مزايا، صور.
 class CreateListingScreen extends ConsumerStatefulWidget {
@@ -41,6 +42,10 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   bool _furnished = false;
   bool _isNew = false;
   bool _submitting = false;
+
+  // الموقع الحقيقي للعقار على الخريطة.
+  double? _pinLatitude;
+  double? _pinLongitude;
 
   // الموقع المتتالي
   LocationItem? _country;
@@ -97,6 +102,24 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     }
   }
 
+  /// فتح منتقي الموقع الحقيقي على الخريطة (صلاحية الموقع تُطلب داخل الشاشة).
+  Future<void> _pickOnMap() async {
+    final picked = await Navigator.of(context).push<PickedLocation>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initialLatitude: _pinLatitude,
+          initialLongitude: _pinLongitude,
+        ),
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _pinLatitude = picked.latitude;
+        _pinLongitude = picked.longitude;
+      });
+    }
+  }
+
   void _removeImage(int index) {
     setState(() => _images.removeAt(index));
   }
@@ -136,6 +159,9 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
           if (_neighborhood.text.trim().isNotEmpty)
             'neighborhood': _neighborhood.text.trim(),
           'address': _address.text.trim(),
+          // الإحداثيات الحقيقية المحددة على الخريطة.
+          if (_pinLatitude != null) 'latitude': _pinLatitude,
+          if (_pinLongitude != null) 'longitude': _pinLongitude,
         },
       }, _images);
       ref.invalidate(myListingsProvider);
@@ -499,6 +525,49 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                   ),
                   validator: (value) =>
                       (value ?? '').trim().isNotEmpty ? null : 'أدخل العنوان.',
+                ),
+                const SizedBox(height: 12),
+                // بطاقة تحديد الموقع الحقيقي على الخريطة.
+                Container(
+                  decoration: BoxDecoration(
+                    color: _pinLatitude != null
+                        ? WajhatakColors.emerald.withValues(alpha: .08)
+                        : Theme.of(context).colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _pinLatitude != null
+                          ? WajhatakColors.emerald
+                          : Theme.of(context).colorScheme.outline,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      _pinLatitude != null
+                          ? Icons.location_on_rounded
+                          : Icons.add_location_alt_rounded,
+                      color: _pinLatitude != null
+                          ? WajhatakColors.emerald
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    title: Text(
+                      _pinLatitude != null
+                          ? 'تم تحديد الموقع على الخريطة ✓'
+                          : 'حدد موقع العقار على الخريطة',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                    ),
+                    subtitle: _pinLatitude != null
+                        ? Text(
+                            '(${_pinLatitude!.toStringAsFixed(5)}, ${_pinLongitude!.toStringAsFixed(5)})',
+                            textDirection: TextDirection.ltr,
+                            style: const TextStyle(fontSize: 11),
+                          )
+                        : const Text(
+                            'موقع دقيق يظهر للباحثين على خريطة العقارات',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: _pickOnMap,
+                  ),
                 ),
               ],
             ),

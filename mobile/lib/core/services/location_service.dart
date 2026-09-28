@@ -1,7 +1,5 @@
 import 'package:geolocator/geolocator.dart';
 
-import '../utils/notice.dart' as notice;
-
 /// الموقع الحقيقي للجهاز — يطلب صلاحية الموقع وقت الحاجة فقط
 /// (عند فتح الخريطة أو عند «قريب مني») ويجلب الإحداثيات الفعلية.
 class LocationService {
