@@ -12,13 +12,10 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * اختبارات المساعد الذكي الشاملة.
+ * اختبارات المساعد الذكي الشاملة — المحرك حتمي 100% بلا نموذج.
  *
- * ملاحظة عن بيئة الاختبار: خادم الاستدلال المحلي غير متاح أثناء الاختبار
- * (وهذا مقصود — الاختبارات لا تعتمد على الشبكة). المساعد مصمم ليتدهور
- * بأمان: محلل القواعد (regex عربي) يعمل بدون النموذج، والبحث الهيكلي
- * حقيقي 100% من قاعدة البيانات، والردود تُبنى محليًا عند تعذر النموذج.
- * اختبارات الحواجز (حقن/نطاق/خصوصية) لا تحتاج نموذجًا أصلًا — القرار في الكود.
+ * كل الاختبارات تعمل بلا شبكة: المحرك يقرأ قاعدة البيانات مباشرة ويبني
+ * الردود من نتائج حقيقية فقط. Http::fake يضمن ألا يخرج أي طلب شبكة أبدًا.
  */
 class AiAssistantTest extends TestCase
 {
@@ -27,6 +24,11 @@ class AiAssistantTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // ضمان صارم: المحرك الحتمي لا يتصل بأي خادم خارجي إطلاقًا.
+        Http::fake(['*' => function ($request) {
+            throw new \UnexpectedValueException('المحرك الحتمي لا يجري أي طلبات شبكة: '.$request->url());
+        }]);
+
         $this->seed(\Database\Seeders\RealDataSeeder::class);
     }
 
@@ -135,22 +137,32 @@ class AiAssistantTest extends TestCase
         $this->assertSame(2, $filters['bedrooms_min'] ?? null);
     }
 
-    /** ح) الهلوسة: معرفات وهمية + أسعار وهمية في رد النموذج تُكشف وتُنظف. */
-    public function test_hallucinated_property_ids_and_prices_are_stripped(): void
+    /** ح) الحوار اليومي: تحية تُرد طبيعيًا بلا بحث ولا نتائج وهمية. */
+    public function test_daily_greeting_gets_natural_small_talk_reply(): void
     {
-        $grounding = app(\App\Services\AI\AiResponseGroundingService::class);
+        $response = $this->postJson('/api/v1/ai/chat', ['message' => 'مرحبا كيفك']);
 
-        $candidates = [['property_id' => 42, 'title' => 'شقة حقيقية', 'price' => 100000, 'currency' => 'YER']];
-        $modelReply = "وجدت لك عقارين ممتازين:\n- المعرف 42: شقة حقيقية بسعر 100,000\n- المعرف 999999: فيلا وهمية بـ 5,000,000";
+        $response->assertOk();
+        $data = $response->json('data');
+        $this->assertSame('ok', $data['status']);
+        $this->assertStringContainsString('مساعدك', $data['reply']);
+        $this->assertSame([], $data['properties']);
+    }
 
-        $result = $grounding->validate($modelReply, $candidates);
+    /** ح2) طلب تفاصيل عقار حقيقي بالمعرف يعرض بياناته الفعلية من القاعدة. */
+    public function test_details_request_shows_real_property_data(): void
+    {
+        $property = Property::query()->where('status', 'published')->firstOrFail();
 
-        $this->assertContains(999999, $result['removed_ids']);
-        $this->assertStringNotContainsString('999999', $result['content']);
-        $this->assertStringContainsString('42', $result['content']);
-        // السعر الحقيقي يبقى، والمخترع يُحذف مع سطره.
-        $this->assertStringContainsString('100,000', $result['content']);
-        $this->assertStringNotContainsString('5,000,000', $result['content']);
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => "معلومات عن العقار {$property->id}",
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame($property->id, (int) ($data['properties'][0]['property_id'] ?? 0));
+        $this->assertStringContainsString('تفاصيل العقار رقم', $data['reply']);
     }
 
     /** ط) مزامنة الفهرس: تعديل السعر ينعكس فورًا على بحث المساعد. */
@@ -188,22 +200,18 @@ class AiAssistantTest extends TestCase
             ->assertOk();
     }
 
-    /** ك) fallback: النموذج غير متاح → رد محلي مبني على نتائج حقيقية. */
-    public function test_model_unavailable_returns_graceful_fallback(): void
+    /** ك) بلا نموذج أصلًا: رد كامل من قاعدة البيانات بلا أي طلب شبكة. */
+    public function test_deterministic_engine_needs_no_external_http(): void
     {
-        // محاكاة تعذر الوصول لخادم الاستدلال (بلا أي استجابة ناجحة).
-        Http::fake(['*' => Http::response(null, 500)]);
-
         $response = $this->postJson('/api/v1/ai/chat', ['message' => 'شقة في صنعاء']);
         $response->assertOk();
         $data = $response->json('data');
+        $this->assertSame('ok', $data['status']);
         $this->assertNotEmpty($data['reply']);
 
-        // النتائج إن وُجدت فهي حقيقية من القاعدة، والرد لا يحوي أخطاء تقنية.
         foreach ($data['properties'] as $property) {
             $this->assertDatabaseHas('properties', ['id' => $property['property_id']]);
         }
-        $this->assertStringNotContainsString('Exception', $data['reply']);
     }
 
     /** ن) عقار مشابه: مشتق من خصائص عقار مرجعي منشور. */

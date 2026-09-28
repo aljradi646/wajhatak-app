@@ -66,20 +66,10 @@ services:
       RAILWAY_SERVICE_TYPE: app
       PORT: ${PORT:-8080}
       # ---------------------------------------------------------------------
-      # خدمة الاستدلال المحلي للمساعد الذكي — تعمل داخل الحاوية نفسها
-      # (نفس نمط عامل الطابور) عبر llama-server المبني في الصورة.
+      # المساعد الذكي محرك حتمي داخل Laravel — لا خدمة استدلال ولا نماذج.
       # ---------------------------------------------------------------------
-      AI_LOCAL_ENABLED: ${AI_LOCAL_ENABLED:-1}
-      # سقف ذاكرة الحاوية: يستوعب النموذج (~2.6GB) + PHP + عامل الطابور.
-      # ارفعه إن اخترت نموذجًا أكبر (7B → 8000+).
-      mem_limit: ${APP_MEM_LIMIT:-6g}
-      AI_LOCAL_MODEL_URL: ${AI_LOCAL_MODEL_URL:-https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf}
-      AI_LOCAL_MODEL_NAME: ${AI_LOCAL_MODEL_NAME:-glm-4.6}
-      AI_LOCAL_PORT: ${AI_LOCAL_PORT:-8018}
-      AI_LOCAL_CONTEXT: ${AI_LOCAL_CONTEXT:-4096}
-      AI_LOCAL_MAX_RAM_MB: ${AI_LOCAL_MAX_RAM_MB:-3500}
-      AI_INFERENCE_BASE_URL: http://127.0.0.1:${AI_LOCAL_PORT:-8018}/v1
-      AI_MODEL: ${AI_MODEL:-glm-4.6}
+      # سقف ذاكرة الحاوية: PHP + عامل الطابور فقط (بلا نموذج).
+      mem_limit: ${APP_MEM_LIMIT:-1g}
       # Control-panel admin account
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@wajhatak.app}
       ADMIN_NAME: ${ADMIN_NAME:-مدير النظام}
@@ -90,10 +80,7 @@ services:
       - "${PORT:-8080}:8080"
     volumes:
       - app_storage:/var/www/html/storage
-      # وحدة تخزين دائمة للنموذج (~1.9GB) — يُحمَّل مرة واحدة فقط.
-      - ai_models:/var/www/html/storage/app/ai/models
 
 volumes:
   db_data:
   app_storage:
-  ai_models:

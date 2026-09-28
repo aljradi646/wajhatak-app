@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AiAssistantController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LocationController;
+use App\Http\Controllers\Admin\MailSettingsController;
 use App\Http\Controllers\Admin\PropertyController;
 use App\Http\Controllers\Admin\PropertyFeatureController;
 use App\Http\Controllers\Admin\PropertyTypeController;
@@ -43,6 +44,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('locations/cascade/areas/{city}', [LocationController::class, 'areasFor'])->name('locations.areas-for');
 
     // Agents
+    Route::get('agents/verifications', [AgentController::class, 'verifications'])->name('agents.verifications');
+    Route::post('agents/{agent}/approve', [AgentController::class, 'approve'])->name('agents.approve');
+    Route::post('agents/{agent}/reject-verification', [AgentController::class, 'rejectVerification'])->name('agents.reject-verification');
     Route::resource('agents', AgentController::class);
 
     // Properties (includes soft-delete trash/restore/force)
@@ -74,6 +78,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('ai/playground', [AiAssistantController::class, 'playground'])->name('ai.playground');
     Route::post('ai/playground/send', [AiAssistantController::class, 'playgroundSend'])->name('ai.playground.send');
     Route::post('ai/playground/clear', [AiAssistantController::class, 'playgroundClear'])->name('ai.playground.clear');
+
+    // إعدادات البريد الإلكتروني (SMTP + قوالب الرسائل)
+    Route::get('mail', [MailSettingsController::class, 'index'])->name('mail.index');
+    Route::post('mail', [MailSettingsController::class, 'update'])->name('mail.update');
+    Route::post('mail/test', [MailSettingsController::class, 'testConnection'])->name('mail.test');
+    Route::post('mail/send-test', [MailSettingsController::class, 'sendTest'])->name('mail.send-test');
+    Route::post('mail/templates', [MailSettingsController::class, 'updateTemplates'])->name('mail.templates');
 
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');

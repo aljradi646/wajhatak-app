@@ -5,32 +5,27 @@ namespace App\Services\AI;
 use App\Enums\AiRequestStatus;
 use App\Models\AiConversation;
 use App\Models\User;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * المنسق الرئيسي للمساعد — يربط: الحواجز ← تحليل النية ← البحث ← النموذج
- * المحلي ← التحقق الأرضي ← التسجيل. أي فشل في النموذج ينتج رد fallback
- * لطيف ويبقى التطبيق يعمل بدون AI تمامًا (متطلب إلزامي).
+ * المنسق الرئيسي للمساعد — محرك حتمي 100% على الخادم:
+ * الحواجز ← نية الحوار اليومي ← تحليل البحث ← البحث الحقيقي في القاعدة ←
+ * محرك الردود (يبني العربية الطبيعية من البيانات الحقيقية فقط) ← التسجيل.
  *
- * المسار: Flutter → Laravel → AI Service → Local Model → Tools → DB →
- *         Grounding → Flutter. لا يتصل Flutter بخادم النموذج مطلقًا.
+ * لا يعتمد على أي نموذج لغوي ولا مزود خارجي ولا أي ملفات مُحمّلة:
+ * يعمل فورًا على أي استضافة بأصغر موارد، ولا يمكنه اختراع معلومة غير موجودة.
  */
 class AiAssistantService
 {
     private const OUT_OF_SCOPE_REPLY = 'أنا مساعد وجهتك، ومتخصص في مساعدتك في البحث عن العقارات واستخدام منصة وجهتك.';
-    private const UNAVAILABLE_REPLY = 'المساعد غير متاح حاليًا، لكن يمكنك استخدام البحث العقاري التقليدي.';
 
     public function __construct(
         private readonly AiSettingsService $settings,
         private readonly AiGuardrailService $guardrails,
         private readonly AiIntentService $intents,
         private readonly AiPropertySearchService $search,
-        private readonly AiToolService $tools,
-        private readonly AiResponseGroundingService $grounding,
+        private readonly AiReplyEngine $replies,
         private readonly AiConversationService $conversations,
-        private readonly AiPromptService $prompts,
-        private readonly AiProviderManager $providers,
         private readonly AiLoggingService $logging,
     ) {}
 
@@ -45,6 +40,7 @@ class AiAssistantService
         string $message,
         ?AiConversation $conversation = null,
         string $locale = 'ar',
+        array $clientContext = [],
     ): array {
         $started = (int) (microtime(true) * 1000);
         $conversation = $conversation ?? $this->conversations->currentFor($user, $locale);
@@ -71,12 +67,50 @@ class AiAssistantService
                 return $this->payload($conversation, $reply, 'blocked', [], $guard['reason']);
             }
 
-            // 2) تحليل النية + دمج سياق المحادثة.
+            // 2) الحوار اليومي أولاً: تحية/شكر/قدرات/إحصاء — ردود فورية بلا بحث.
             $history = $this->conversations->historyFor($conversation);
             $previous = $this->conversations->accumulatedFilters($conversation);
+
+            $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
+            if ($smallTalk !== null) {
+                $reply = $this->replies->smallTalkReply($message, $smallTalk);
+                $this->conversations->addUserMessage($conversation, $message, []);
+                $this->conversations->addAssistantMessage($conversation, $reply, []);
+                $this->finish($conversation, $user, AiRequestStatus::Ok->value, 'small_talk', [], [], 0, $started, 0, null, $reply, []);
+
+                return $this->payload($conversation, $reply, 'ok', [], null, []);
+            }
+
+            // 2.5) سؤال تفاصيل عن عقار محدد: «معلومات عن العقار 5» — من سجل حقيقي.
+            $detailsTarget = AiChatIntentDetector::detectDetailsTarget($message);
+            if ($detailsTarget !== null) {
+                $reply = $this->replies->detailsReply($detailsTarget);
+                if ($reply !== null) {
+                    $this->conversations->addUserMessage($conversation, $message, ['last_property_id' => $detailsTarget]);
+                    $this->conversations->addAssistantMessage($conversation, $reply, [$detailsTarget]);
+                    $this->finish($conversation, $user, AiRequestStatus::Ok->value, 'details', [], [], 1, $started, 0, null, $reply, [$detailsTarget]);
+
+                    $item = $this->search->details($detailsTarget);
+
+                    return $this->payload($conversation, $reply, 'ok', $item !== null ? [$item] : [], null, ['last_property_id' => $detailsTarget]);
+                }
+                // المعرف غير موجود/غير منشور → نكمل كبحث عادي بلا اختراع.
+            }
+
+            // 3) تحليل نية البحث + دمج سياق المحادثة + سياق جهاز العميل (موقعه الحقيقي).
             $parsed = $this->intents->parse($message, $history, $previous);
             $filters = $parsed['filters'];
+            if (isset($clientContext['latitude'], $clientContext['longitude'])) {
+                $filters['client_latitude'] = (float) $clientContext['latitude'];
+                $filters['client_longitude'] = (float) $clientContext['longitude'];
+                if (isset($clientContext['radius_km'])) {
+                    $filters['radius_km'] = (float) $clientContext['radius_km'];
+                }
+            }
             $intent = $parsed['out_of_scope'] ? 'out_of_scope' : 'search';
+
+            // إثراء الرد: اسم نوع العقار بالعربية + إحداثيات موقع العميل للبحث القريب.
+            $this->decorateFilters($message, $filters);
 
             // "عقار مشابه لهذا العقار": نستمد الفلاتر من خصائص العقار المرجعي
             // (يجب أن يكون منشورًا فعليًا) ثم نبحث عن الأكثر شبهًا به.
@@ -89,7 +123,7 @@ class AiAssistantService
                         [['tool' => 'search_properties', 'ok' => true]],
                         count($similar), 'ok', (int) (microtime(true) * 1000) - $started, 0,
                     );
-                    $reply = $this->localSummaryReply($similar);
+                    $reply = $this->replies->similarReply($similar);
 
                     return $this->payload($conversation, $reply, 'ok', $similar, null, $filters);
                 }
@@ -97,7 +131,7 @@ class AiAssistantService
                 unset($filters['similar_to']);
             }
 
-            // 3) البحث الفعلي في قاعدة البيانات (المصدر الوحيد للحقيقة).
+            // 4) البحث الفعلي في قاعدة البيانات (المصدر الوحيد للحقيقة).
             $searchStarted = (int) (microtime(true) * 1000);
             $results = $this->search->search($filters);
             $searchMs = (int) (microtime(true) * 1000) - $searchStarted;
@@ -106,7 +140,7 @@ class AiAssistantService
 
             $this->conversations->addUserMessage($conversation, $message, $filters);
 
-            // 4) لا نتائج → إما سؤال متابعة أو رد بعدم توفر.
+            // 5) لا نتائج → إما سؤال متابعة أو رد بعدم توفر.
             if ($results['total'] === 0) {
                 $reply = $this->noResultsReply($filters, $conversation);
                 $this->finish($conversation, $user, AiRequestStatus::Ok->value, $intent, $filters, $toolCalls, 0, $started, $searchMs, null, $reply, []);
@@ -114,33 +148,20 @@ class AiAssistantService
                 return $this->payload($conversation, $reply, 'ok', [], null, $filters);
             }
 
-            // 5) توليد الرد — النموذج المحلي إن توفّر، وإلا رد محلي مبني على
-            //    نتائج البحث الحقيقية (لا يُعرض خطأ تقني أبدًا).
-            try {
-                $modelReply = $this->generateReply($message, $history, $results['items']);
-            } catch (Throwable $modelError) {
-                report($modelError);
-                $modelReply = $this->localSummaryReply($results['items']);
-            }
-
-            // 6) التحقق الأرضي — إلزامي دائمًا.
-            $grounded = $this->grounding->validate($modelReply, $results['items']);
-            if ($grounded['violations'] !== []) {
-                Log::warning('ai.grounding.violation', ['violations' => $grounded['violations']]);
-            }
+            // 6) بناء الرد الطبيعي من النتائج الحقيقية فقط (محرك حتمي — بلا نموذج).
+            $reply = $this->replies->summaryReply($message, $results['items'], $filters, $history);
 
             $assistantMessage = $this->conversations->addAssistantMessage(
                 $conversation,
-                $grounded['content'],
+                $reply,
                 array_map(fn ($item) => (int) $item['property_id'], $results['items']),
             );
 
-            $this->finish($conversation, $user, AiRequestStatus::Ok->value, $intent, $filters, $toolCalls, count($results['items']), $started, $searchMs, null, $grounded['content'], []);
+            $this->finish($conversation, $user, AiRequestStatus::Ok->value, $intent, $filters, $toolCalls, count($results['items']), $started, $searchMs, null, $reply, []);
 
             return [
-                ...$this->payload($conversation, $grounded['content'], 'ok', $results['items'], null, $filters),
+                ...$this->payload($conversation, $reply, 'ok', $results['items'], null, $filters),
                 'message_id' => $assistantMessage->id,
-                'replaced' => $grounded['replaced'],
             ];
         } catch (Throwable $e) {
             report($e);
@@ -152,10 +173,10 @@ class AiAssistantService
                     AiRequestStatus::Error->value, (int) (microtime(true) * 1000) - $started, $searchMs, 0, class_basename($e),
                 );
 
-                return $this->payload($conversation, self::UNAVAILABLE_REPLY, 'error', [], 'ai_unavailable', $filters);
+                return $this->payload($conversation, 'حدث خلل مؤقت أثناء معالجة طلبك. جرّب مرة أخرى بعد لحظات.', 'error', [], 'ai_unavailable', $filters);
             } catch (Throwable) {
                 return [
-                    'reply' => self::UNAVAILABLE_REPLY,
+                    'reply' => 'حدث خلل مؤقت أثناء معالجة طلبك. جرّب مرة أخرى بعد لحظات.',
                     'status' => 'error',
                     'error' => 'ai_unavailable',
                     'conversation_id' => null,
@@ -191,63 +212,29 @@ class AiAssistantService
 
     // ------------------------------------------------------------------
 
-    /** استدعاء النموذج المحلي لتوليد الرد النهائي من قطع DATA فقط. */
-    private function generateReply(string $message, array $history, array $candidates): string
+    /** إثراء الفلاتر قبل البحث: اسم النوع بالعربية للردود + إحداثيات العميل للبحث القريب. */
+    private function decorateFilters(string $message, array &$filters): void
     {
-        $dataLines = [];
-        foreach ($candidates as $i => $property) {
-            $dataLines[] = sprintf(
-                "[ID: %d] %s | %s | %s %s | %s | %.0f %s | %s | %.0f م² | غرف: %s | حمامات: %s | مفروش: %s | الحالة: %s | تطابق: %.0f%%",
-                $property['property_id'],
-                $property['title'],
-                $property['type'] ?? '-',
-                $property['transaction_type'],
-                $property['city'] ?? '-',
-                collect([$property['district'], $property['neighborhood']])->filter()->implode('، '),
-                $property['price'] ?? 0,
-                $property['currency'] ?? '',
-                $property['is_furnished'] ? 'نعم' : 'لا',
-                $property['area'] ?? 0,
-                $property['bedrooms'] ?? 'غير محدد',
-                $property['bathrooms'] ?? 'غير محدد',
-                $property['status'],
-                ($property['match_score'] ?? 0) * 100,
-            );
+        // اسم النوع بالعربية لجُمل الرد الطبيعية (يُحسب من الفهرس إن توفّر).
+        if (! empty($filters['property_type']) && empty($filters['property_type_name'])) {
+            $filters['property_type_name'] = match ($filters['property_type']) {
+                'apartment' => 'شقة', 'villa' => 'فيلا', 'floor' => 'دور',
+                'townhouse' => 'تاون هاوس', 'land' => 'أرض', 'shop' => 'محل',
+                'office' => 'مكتب', 'building' => 'عمارة', 'farm' => 'مزرعة',
+                'house' => 'بيت', default => null,
+            };
         }
 
-        $dataBlock = $this->prompts->dataBlockHeader()."\n".implode("\n", $dataLines);
-
-        $messages = [
-            ['role' => 'system', 'content' => $this->prompts->responseSystemPrompt()],
-            ...$history,
-            ['role' => 'user', 'content' => $message],
-            ['role' => 'user', 'content' => $dataBlock],
-        ];
-
-        $response = $this->providers->provider()->chat($messages, [
-            'temperature' => (float) $this->settings->get('ai_temperature', 0.3),
-            'max_tokens' => (int) $this->settings->get('ai_max_tokens', 700),
-        ]);
-
-        return trim($response->content);
-    }
-
-    /** رد محلي من نتائج البحث الحقيقية — يُستخدم عند تعذر النموذج (fallback). */
-    private function localSummaryReply(array $candidates): string
-    {
-        $lines = ['وجدت لك هذه العقارات المطابقة:'];
-        foreach (array_slice($candidates, 0, 4) as $property) {
-            $lines[] = sprintf(
-                '• %s — %s %s في %s (المعرف %d)',
-                $property['title'],
-                number_format((float) $property['price']),
-                $property['currency'] ?? '',
-                collect([$property['city'], $property['district']])->filter()->implode(' - '),
-                $property['property_id'],
-            );
+        // «قريب مني»: بحث جغرافي بإحداثيات العميل الحقيقية إن أرسلها التطبيق.
+        if (AiChatIntentDetector::wantsNearby($message)
+            && isset($filters['client_latitude'], $filters['client_longitude'])
+            && ! isset($filters['city'])) {
+            $filters['nearby'] = [
+                'latitude' => (float) $filters['client_latitude'],
+                'longitude' => (float) $filters['client_longitude'],
+                'radius_km' => (float) ($filters['radius_km'] ?? $this->settings->get('ai_default_search_radius_km', 10)),
+            ];
         }
-
-        return implode("\n", $lines);
     }
 
     private function noResultsReply(array $filters, AiConversation $conversation): string
@@ -265,7 +252,7 @@ class AiAssistantService
             }
         }
 
-        return 'لا توجد لدي حاليًا عقارات مطابقة لطلبك في قاعدة بيانات وجهتك. جرّب تعديل الميزانية أو توسيع الموقع، أو استخدم البحث العقاري التقليدي.';
+        return $this->replies->noResultsReply($filters);
     }
 
     private function outOfScopeReply(): string

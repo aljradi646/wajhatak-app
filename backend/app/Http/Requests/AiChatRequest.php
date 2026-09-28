@@ -29,6 +29,10 @@ class AiChatRequest extends FormRequest
             'conversation_id' => ['nullable', 'integer', 'exists:ai_conversations,id'],
             'session_token' => ['nullable', 'string', 'max:64'],
             'locale' => ['nullable', 'string', 'max:5'],
+            // إحداثيات موقع العميل الحقيقية (اختيارية) — للتعبيرات «قريب مني».
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'radius_km' => ['nullable', 'numeric', 'min:0.5', 'max:100'],
         ];
     }
 

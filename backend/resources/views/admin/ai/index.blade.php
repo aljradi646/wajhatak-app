@@ -50,29 +50,13 @@
                     </div>
                 </x-admin.card>
 
-                {{-- ============ Model ============ --}}
-                <x-admin.card title="النموذج" description="الاتصال بمحرك الاستدلال المحلي (Self-Hosted). لا توجد أي مفاتيح سحابية — يبقى عنوان الخادم داخل شبكتك.">
+                {{-- ============ المحرك الحتمي ============ --}}
+                <x-admin.card title="المحرك" description="مساعد حتمي 100% يعمل داخل الخادم — بلا نموذج لغوي، بلا مزود خارجي، وبلا أي تنزيلات.">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-1">المزود</label>
-                            <select name="ai_provider" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm dark:bg-gray-800 dark:border-gray-600">
-                                @foreach ($providers as $provider)
-                                    <option value="{{ $provider }}" @selected($values['ai_provider'] === $provider)>{{ $provider }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <x-admin.input label="اسم النموذج" name="ai_model" :value="$values['ai_model']" placeholder="glm-4.6" />
-                        <div class="md:col-span-2">
-                            <x-admin.input label="نقطة نهاية الاستدلال (داخلية)" name="ai_inference_endpoint" :value="$values['ai_inference_endpoint']" placeholder="http://ai-server:8000/v1" />
-                        </div>
-                        <x-admin.input label="درجة الحرارة (0 - 1)" name="ai_temperature" :value="$values['ai_temperature']" type="number" step="0.05" min="0" max="1" />
-                        <x-admin.input label="أقصى عدد رموز للمخرجات" name="ai_max_tokens" :value="$values['ai_max_tokens']" type="number" min="100" max="4000" />
-                        <x-admin.input label="نافذة السياق" name="ai_context_window" :value="$values['ai_context_window']" type="number" min="1024" />
-                        <x-admin.input label="المهلة بالثواني" name="ai_timeout" :value="$values['ai_timeout']" type="number" min="5" max="120" placeholder="افتراضي من البيئة" />
-                        <div class="md:col-span-2 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-dashed border-gray-300 dark:border-gray-600 p-3 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                            🔒 مفاتيح خادم الاستدلال لا تُعرض هنا ولا تُرسل للتطبيق أبدًا — تُدار فقط عبر متغيرات البيئة (AI_INFERENCE_API_KEY). حالة الخادم الآن:
-                            <span class="font-bold {{ $health->healthy ? 'text-green-600' : 'text-red-500' }}">{{ $health->healthy ? 'يعمل ✓' : 'غير متصل ✗' }}</span>
-                            @if ($health->latencyMs) ({{ $health->latencyMs }}ms) @endif
+                        <div class="md:col-span-2 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 text-xs text-green-700 dark:text-green-300 leading-relaxed">
+                            ✅ المحرك الحتمي يعمل على الخادم مباشرة: الردود تُبنى من عقارات وجهتك الحقيقية فقط، فيعمل فورًا بأصغر موارد ولا يمكنه اختراع معلومة غير موجودة.
+                            حالة المحرك الآن:
+                            <span class="font-bold text-green-600">جاهز ✓</span>
                         </div>
                     </div>
                 </x-admin.card>
@@ -190,18 +174,15 @@
                 @endforeach
             </div>
 
-            <x-admin.card title="صحة النموذج المحلي" description="فحص مباشر لخادم الاستدلال عبر نقطة /models.">
+            <x-admin.card title="حالة المحرك الحتمي" description="المحرك يعمل داخل الخادم مباشرة — لا خادم استدلال ولا نماذج محمّلة.">
                 <div class="flex flex-wrap items-center gap-4 text-sm">
-                    <span class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-bold {{ $health->healthy ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400' }}">
-                        {{ $health->healthy ? '● يعمل' : '● غير متصل' }}
+                    <span class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-bold bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400">
+                        ● جاهز
                     </span>
-                    <span>المزود: <b>{{ $health->provider }}</b></span>
-                    @if ($health->latencyMs)<span>زمن الفحص: <b>{{ $health->latencyMs }}ms</b></span>@endif
+                    <span>المحرك: <b>حتمي داخل الخادم (deterministic)</b></span>
+                    <span>الردود: <b>من عقارات وجهتك الحقيقية فقط</b></span>
                     @if ($health->message)<span class="text-gray-500">{{ $health->message }}</span>@endif
                 </div>
-                @if (!empty($health->details['available_models']))
-                    <p class="mt-3 text-xs text-gray-500">النماذج المتاحة: {{ implode('، ', array_slice($health->details['available_models'], 0, 6)) }}</p>
-                @endif
             </x-admin.card>
 
             <x-admin.card title="مزامنة فهرس البحث" description="الفهرس يتحدث تلقائيًا عند كل تغيير في العقارات. هذا الزر لإعادة البناء اليدوي.">

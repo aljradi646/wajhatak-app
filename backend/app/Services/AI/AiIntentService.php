@@ -2,20 +2,16 @@
 
 namespace App\Services\AI;
 
-use App\Services\AI\Providers\LocalGlmProvider;
-use App\Services\AI\AiProviderException;
-use Illuminate\Support\Facades\Log;
-
 /**
  * محلل النية — يحول لغة المستخدم الطبيعية إلى معايير بحث منظمة.
- * الاستراتيجية: 1) قواعد سريعة (regex) تلتقط الحالات الصريحة رخيصًا وموثوقًا
- * (المدينة، النوع، الغرف، السعر، التأثيث، نوع العملية)؛ 2) النموذج المحلي
- * للمركب المتبقي؛ ثم 3) دمج مع سياق المحادثة والتحقق من النطاق.
+ * استراتيجية حتمية 100% (بلا أي نموذج لغوي ولا مزود خارجي): قواعد سريعة
+ * (regex) تلتقط الحالات الصريحة موثوقًا — المدينة، النوع، الغرف، السعر،
+ * التأثيث، نوع العملية — ثم دمج مع سياق المحادثة والتحقق من النطاق.
  * النتيجة لا تفترض معلومات غير مذكورة (كل حقل غير واضح = null).
  */
 class AiIntentService
 {
-    /** المخطط الذي يلتزم به النموذج. */
+    /** المخطط الذي يلتزم به البحث. */
     public const SCHEMA = [
         'type' => 'object',
         'properties' => [
@@ -41,7 +37,6 @@ class AiIntentService
     ];
 
     public function __construct(
-        private readonly AiProviderManager $providers,
         private readonly AiGuardrailService $guardrails,
     ) {}
 
@@ -59,58 +54,14 @@ class AiIntentService
 
         $filters = $this->ruleBased($message);
 
-        // حقول لم تلتقطها القواعد → النموذج المحلي (بحد صارم للمخرجات وبلا أدوات).
-        $remaining = $this->unsettledFields($filters);
-        if ($remaining !== [] || preg_match('/قريب|جوار|قرب|مناسب|هادئ|عائلة|جامعة|مستشفى|سوق/u', $message)) {
-            try {
-                $modelFilters = $this->modelParse($message, $history);
-                $filters = $this->merge($filters, $modelFilters);
-            } catch (AiProviderException $e) {
-                // القواعد تكفي غالبًا؛ النموذج تعذر → نكمل بالقواعد فقط.
-                Log::info('ai.intent.model_fallback', ['error' => class_basename($e)]);
-            }
-        }
-
         // دمج مع سياق المحادثة: الجديد يتغلب على القديم، والقديم يبقى للمفقود.
         $filters = $this->merge($previousFilters, $filters);
 
         return [
             'filters' => $this->normalizeFilters($filters),
             'out_of_scope' => (bool) ($filters['out_of_scope'] ?? false),
-            'parser' => 'rules+model',
+            'parser' => 'rules',
         ];
-    }
-
-    /** تحويل JSON النموذج إلى معايير آمنة (بلا أي حقول غير مسموحة). */
-    private function modelParse(string $message, array $history): array
-    {
-        $messages = [
-            ['role' => 'system', 'content' => app(AiPromptService::class)->parserSystemPrompt()],
-            ...array_slice($history, -4),
-            ['role' => 'user', 'content' => $message],
-        ];
-
-        $raw = $this->providers->provider()->structured($messages, self::SCHEMA, [
-            'temperature' => 0.1,
-            'max_tokens' => 250,
-        ]);
-
-        if (! empty($raw['out_of_scope'])) {
-            return ['out_of_scope' => true];
-        }
-
-        $allowed = ['transaction_type', 'property_type', 'city', 'district', 'neighborhood',
-            'bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'min_price', 'max_price',
-            'min_area', 'max_area', 'furnished', 'is_new', 'sort', 'keywords', 'similar_to'];
-        $out = [];
-        foreach ($allowed as $key) {
-            $value = $raw[$key] ?? null;
-            if ($value !== null && $value !== '' && $value !== 'null') {
-                $out[$key] = $value;
-            }
-        }
-
-        return $out;
     }
 
     // ------------------------------------------------------------------

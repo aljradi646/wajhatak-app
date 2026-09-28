@@ -8,7 +8,6 @@ use App\Http\Requests\AiSearchRequest;
 use App\Models\AiConversation;
 use App\Services\AI\AiAssistantService;
 use App\Services\AI\AiConversationService;
-use App\Services\AI\AiProviderManager;
 use App\Services\AI\AiSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +20,6 @@ class AiAssistantController extends Controller
         private readonly AiAssistantService $assistant,
         private readonly AiConversationService $conversations,
         private readonly AiSettingsService $settings,
-        private readonly AiProviderManager $providers,
     ) {}
 
     /** POST /api/v1/ai/chat — رسالة كاملة مع توليد رد ونتائج حقيقية. */
@@ -67,6 +65,11 @@ class AiAssistantController extends Controller
             (string) $request->string('message'),
             $conversation,
             (string) $request->input('locale', 'ar'),
+            [
+                'latitude' => $request->filled('latitude') ? (float) $request->input('latitude') : null,
+                'longitude' => $request->filled('longitude') ? (float) $request->input('longitude') : null,
+                'radius_km' => $request->filled('radius_km') ? (float) $request->input('radius_km') : null,
+            ],
         );
 
         return response()->json(['data' => $result]);
@@ -143,16 +146,15 @@ class AiAssistantController extends Controller
         return response()->json(status: 204);
     }
 
-    /** GET /api/v1/ai/health — صحة النموذج (عامة ومبسطة، بلا أسرار). */
+    /** GET /api/v1/ai/health — صحة المحرك الحتمي (عامة ومبسطة، بلا أسرار). */
     public function health(): JsonResponse
     {
-        $status = $this->providers->provider()->health();
-
+        // المحرك حتمي ويعمل على الخادم مباشرة — لا يوجد خادم استدلال خارجي.
         return response()->json(['data' => [
             'assistant_enabled' => $this->settings->enabled(),
-            'healthy' => $status->healthy,
-            'latency_ms' => $status->latencyMs,
-            // لا نكشف أسماء النماذج أو عناوين الشبكة الداخلية للعميل.
+            'healthy' => true,
+            'latency_ms' => null,
+            'engine' => 'deterministic',
         ]]);
     }
 

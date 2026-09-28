@@ -46,6 +46,22 @@ class AiPropertySearchService
             ->when(array_key_exists('furnished', $filters) && $filters['furnished'] !== null, fn (Builder $q) => $q->where('is_furnished', (bool) $filters['furnished']))
             ->when(! empty($filters['is_new']), fn (Builder $q) => $q->where('is_new', true));
 
+        // --- بحث جغرافي حقيقي: «قريب مني» بإحداثيات العميل ---
+        // يُحدد مربعًا محيطيًا (bounding box) حول الموقع ثم يحسب المسافة
+        // الفعلية (هافرسين) لكل مترشح ويرفض ما خارج نصف القطر.
+        $nearby = $filters['nearby'] ?? null;
+        if (is_array($nearby) && isset($nearby['latitude'], $nearby['longitude'])) {
+            $lat = (float) $nearby['latitude'];
+            $lng = (float) $nearby['longitude'];
+            $radiusKm = max(0.5, min(100, (float) ($nearby['radius_km'] ?? 10)));
+            $latDelta = $radiusKm / 111.0;
+            $lngDelta = $radiusKm / (111.0 * max(0.2, cos(deg2rad($lat))));
+            $query->where('latitude', '>=', $lat - $latDelta)
+                ->where('latitude', '<=', $lat + $latDelta)
+                ->where('longitude', '>=', $lng - $lngDelta)
+                ->where('longitude', '<=', $lng + $lngDelta);
+        }
+
         // --- كلمات مفتاحية ناعمة (قريب من الجامعة / هادئ / للعائلة...) ---
         // تُطبق كـ OR على نص البحث المُعد؛ النتيجة التي لا تطابق أي كلمة تُعاقب في التسجيل بدل حذفها.
         $keywords = array_filter((array) ($filters['keywords'] ?? []));
@@ -84,6 +100,21 @@ class AiPropertySearchService
 
         $rows = $query->limit($maxCandidates)->get();
 
+        // ترشيح المسافة الفعلية للبحث القريب + تعزيز القرب في الترتيب.
+        if (is_array($nearby) && isset($nearby['latitude'], $nearby['longitude'])) {
+            $radiusKm = max(0.5, min(100, (float) ($nearby['radius_km'] ?? 10)));
+            $rows = $rows->filter(function (AiSearchIndex $row) use ($nearby, $radiusKm) {
+                if ($row->latitude === null || $row->longitude === null) {
+                    return false;
+                }
+
+                return $this->haversineKm(
+                    (float) $nearby['latitude'], (float) $nearby['longitude'],
+                    (float) $row->latitude, (float) $row->longitude,
+                ) <= $radiusKm;
+            })->values();
+        }
+
         // --- تسجيل النتائج (Matching Score) وترتيبها النهائي ---
         $scored = [];
         foreach ($rows as $row) {
@@ -94,6 +125,16 @@ class AiPropertySearchService
                 if (mb_stripos((string) $row->search_text, $keyword) !== false) {
                     $score = min(1.0, $score + 0.1);
                 }
+            }
+
+            // تعزيز القرب الجغرافي: كلما اقترب العقار من العميل ارتفع ترتيبه.
+            if (is_array($nearby) && isset($nearby['latitude'], $nearby['longitude'])
+                && $row->latitude !== null && $row->longitude !== null) {
+                $distance = $this->haversineKm(
+                    (float) $nearby['latitude'], (float) $nearby['longitude'],
+                    (float) $row->latitude, (float) $row->longitude,
+                );
+                $score = min(1.0, $score + max(0.0, 0.2 * (1 - $distance / $radiusKm)));
             }
 
             if ($score >= $minScore) {
@@ -179,6 +220,17 @@ class AiPropertySearchService
 
     // ------------------------------------------------------------------
 
+    /** مسافة هافرسين بالكيلومتر بين نقطتين جغرافيتين. */
+    private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $r = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return $r * 2 * atan2(sqrt($a), sqrt(1 - $a));
+    }
+
     /** درجة مطابقة 0..1 بين صف الفهرس والمعايير (تُستخدم للترتيب والحد الأدنى). */
     private function score(AiSearchIndex $row, array $filters): float
     {
@@ -257,6 +309,8 @@ class AiPropertySearchService
                 ->orderByDesc('is_cover')->orderBy('sort_order')
                 ->first(['path']);
             $data['image_url'] = $image ? asset('storage/'.$image->path) : null;
+            $data['latitude'] = $row->latitude !== null ? (float) $row->latitude : null;
+            $data['longitude'] = $row->longitude !== null ? (float) $row->longitude : null;
         }
 
         return $data;

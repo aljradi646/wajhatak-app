@@ -5,11 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AiConversation;
 use App\Models\AiRequestLog;
-use App\Models\Setting;
 use App\Services\AI\AiAssistantService;
 use App\Services\AI\AiConversationService;
+use App\Services\AI\AiHealthStatus;
 use App\Services\AI\AiLoggingService;
-use App\Services\AI\AiProviderManager;
 use App\Services\AI\AiSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +22,6 @@ class AiAssistantController extends Controller
 {
     public function __construct(
         private readonly AiSettingsService $settings,
-        private readonly AiProviderManager $providers,
         private readonly AiLoggingService $logging,
         private readonly AiAssistantService $assistant,
         private readonly AiConversationService $conversations,
@@ -33,7 +31,8 @@ class AiAssistantController extends Controller
     {
         $values = $this->settings->all();
         $stats = $this->logging->stats();
-        $health = $this->providers->provider()->health();
+        // المحرك حتمي يعمل على الخادم مباشرة — دائمًا جاهز بلا خادم استدلال.
+        $health = new AiHealthStatus(true, 'deterministic', null, null, 'المحرك الحتمي يعمل على الخادم مباشرة — جاهز.');
 
         $logs = AiRequestLog::query()
             ->latest()
@@ -45,7 +44,7 @@ class AiAssistantController extends Controller
             'stats' => $stats,
             'health' => $health,
             'logs' => $logs,
-            'providers' => $this->providers->available(),
+            'providers' => ['deterministic'],
         ]);
     }
 
@@ -54,8 +53,6 @@ class AiAssistantController extends Controller
         // مفاتيح مسموحة فقط — أي مفتاح آخر يُتجاهل (منع العبث من النموذج).
         $allowed = [
             'ai_enabled', 'ai_assistant_name', 'ai_welcome_message', 'ai_default_language',
-            'ai_provider', 'ai_model', 'ai_inference_endpoint', 'ai_temperature', 'ai_max_tokens',
-            'ai_context_window', 'ai_timeout',
             'ai_system_prompt', 'ai_personality', 'ai_response_style', 'ai_max_results',
             'ai_min_match_score', 'ai_allow_comparison', 'ai_allow_recommendations', 'ai_allow_followups',
             'ai_scope_properties', 'ai_scope_locations', 'ai_scope_features', 'ai_scope_availability', 'ai_scope_faq',
@@ -67,11 +64,6 @@ class AiAssistantController extends Controller
         ];
 
         $this->settings->putMany($request->only($allowed));
-
-        // مسح كاش الإعدادات العامة لضمان سريان التغييرات فورًا.
-        Setting::forget('ai_provider');
-        Setting::forget('ai_model');
-        Setting::forget('ai_inference_endpoint');
 
         \App\Models\ActivityLog::record('ai', 'تم تحديث إعدادات المساعد الذكي');
 
@@ -115,7 +107,7 @@ class AiAssistantController extends Controller
 
         return view('admin.ai.playground', [
             'messages' => $messages,
-            'health' => $this->providers->provider()->health(),
+            'health' => new AiHealthStatus(true, 'deterministic', null, null, 'المحرك الحتمي جاهز.'),
             'enabled' => $this->settings->enabled(),
             'assistantName' => $this->settings->assistantName(),
         ]);

@@ -20,21 +20,9 @@
 #   8. For the "app" service: starts the queue worker (deferred notifications)
 #      in the background and serves the app with `php artisan serve` on $PORT.
 #
-# The same image backs three Railway services selected via
-# RAILWAY_SERVICE_TYPE (default: app):
-#   - app       : queue worker (background) + AI inference service (background,
-#                 self-healing, 127.0.0.1:8018) + `php artisan serve` on $PORT
-#   - worker    : `php artisan queue:work` (foreground daemon)
-#   - scheduler : `php artisan schedule:run` loop
-#
-# خدمة الاستدلال المحلي للمساعد الذكي (AI inference):
-#   - تعمل داخل خدمة "app" افتراضيًا (AI_LOCAL_ENABLED=1) بنفس نمط عامل
-#     الطابور: تحميل نموذج GGUF متوافق مع CPU مرة واحدة (~1.9GB إلى
-#     storage/app/ai/models ثم volume دائم) + llama-server + watchdog.
-#   - يتطلب ~3GB ذاكرة متاحة فوق استهلاك PHP — ارفع ذاكرة الخدمة في
-#     لوحة Railway وفقًا لذلك.
-#   - للتحويل لخادم AI خارجي: AI_LOCAL_ENABLED=0 و
-#     AI_INFERENCE_BASE_URL=http://<ai-server>:8000/v1
+# المساعد العقاري الذكي محرك حتمي 100% يعمل داخل Laravel مباشرة:
+# لا نموذج لغوي، لا خادم استدلال، ولا أي ملفات تُحمّل — يعمل فورًا على
+# أي استضافة بأصغر موارد (حجم الصورة أقل من 500MB بلا أي نموذج).
 # =============================================================================
 set -e
 
@@ -295,10 +283,8 @@ fi
 # ---------------------------------------------------------------------------
 if [ "$SERVICE_TYPE" != "static" ]; then
     # -------------------------------------------------------------------------
-    # 6.5. AI inference cache directory (الحجم الدائم للمحرك والنموذج المحليين).
+    # المساعد الذكي محرك حتمي داخل Laravel — لا خدمة استدلال خلفية ولا مجلد نماذج.
     # -------------------------------------------------------------------------
-    mkdir -p storage/app/ai/models 2>/dev/null || true
-    chmod -R ug+rwX storage/app/ai 2>/dev/null || true
     SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
     case "$SEEDED_FLAG" in
@@ -369,19 +355,9 @@ case "$SERVICE_TYPE" in
         ) &
 
         # -------------------------------------------------------------------
-        # خدمة الاستدلال المحلي للمساعد الذكي — نفس نمط عامل الطابور: عملية
-        # خلفية ذاتية التمهيد. السكربت يؤمّن كل مكوّن بنفسه: ثنائي llama-server
-        # (bundled في الصورة أو بناء من المصدر إلى الحجم الدائم)، نموذج GGUF
-        # (تنزيل مرة واحدة)، ثم تشغيل + مراقبة على 127.0.0.1 فقط.
-        # لا يعتمد على وجود الثنائي مسبقًا — فلا يفشل إقلاع الخدمة أبدًا.
-        # تعطيلها: AI_LOCAL_ENABLED=0 (المساعد يتحول لوضع fallback تلقائيًا).
+        # المساعد الذكي محرك حتمي داخل Laravel نفسه — لا عملية خلفية إضافية.
         # -------------------------------------------------------------------
-        if [ "${AI_LOCAL_ENABLED:-1}" = "1" ]; then
-            echo "==> [Wajhatak] Starting local AI inference service (self-bootstrapping daemon)..."
-            nohup sh /var/www/html/scripts/ai_inference_service.sh daemon >> storage/logs/ai-inference.log 2>&1 &
-        else
-            echo "==> [Wajhatak] Local AI inference disabled (AI_LOCAL_ENABLED=0)."
-        fi
+        echo "==> [Wajhatak] AI assistant: deterministic in-process engine (no model download, no external provider)."
 
         export PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}"
         echo "==> [Wajhatak] Starting Laravel server: php artisan serve on :${PORT:-8080}"

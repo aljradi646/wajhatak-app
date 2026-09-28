@@ -5,8 +5,8 @@
         {{-- شريط الحالة --}}
         <div class="rounded-2xl border p-4 flex flex-wrap items-center gap-3 text-sm {{ $enabled ? 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' : 'border-amber-300 bg-amber-50 dark:bg-amber-500/10' }}">
             <span class="font-black text-base">{{ $assistantName }}</span>
-            <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-bold text-xs {{ $health->healthy ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400' }}">
-                ● النموذج {{ $health->healthy ? 'يعمل' : 'غير متصل' }} @if($health->latencyMs)({{ $health->latencyMs }}ms)@endif
+            <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-bold text-xs bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400">
+                ● المحرك الحتمي جاهز
             </span>
             @unless($enabled)
                 <span class="text-amber-700 dark:text-amber-400 font-bold">⚠ المساعد معطل — فعّله من تبويب الإعدادات</span>
@@ -25,7 +25,7 @@
                 </span>
                 <div>
                     <div class="font-black text-gray-900 dark:text-gray-100">محادثة اختبار حقيقية</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">تُمرر عبر نفس محرك التطبيق: حواجز ← نية ← بحث في القاعدة ← نموذج ← تحقق أرضي</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">تُمرر عبر نفس محرك التطبيق: حواجز ← نية ← بحث حقيقي في القاعدة ← محرك ردود حتمي</div>
                 </div>
             </div>
 

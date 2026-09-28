@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\V1\AiAssistantController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\DeviceController;
+use App\Http\Controllers\Api\V1\EmailVerificationController;
+use App\Http\Controllers\Api\V1\AgentProfileController;
 use App\Http\Controllers\Api\V1\FavoriteController;
 use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -47,6 +49,15 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
         Route::get('me', [MeController::class, 'show'])->name('me.show');
         Route::patch('me', [MeController::class, 'update'])->name('me.update');
         Route::post('me/avatar', [MeController::class, 'uploadAvatar'])->name('me.avatar.store');
+
+        // التحقق الحقيقي من البريد الإلكتروني برمز مُرسل إلى الصندوق الفعلي.
+        Route::get('me/email/status', [EmailVerificationController::class, 'status'])->name('me.email.status');
+        Route::post('me/email/verification-code', [EmailVerificationController::class, 'send'])->name('me.email.send');
+        Route::post('me/email/verify', [EmailVerificationController::class, 'verify'])->name('me.email.verify');
+
+        // ملف الوكيل الكامل (بيانات التوثيق + المستندات).
+        Route::get('me/agent-profile', [AgentProfileController::class, 'show'])->name('me.agent-profile.show');
+        Route::post('me/agent-profile', [AgentProfileController::class, 'store'])->name('me.agent-profile.store');
         Route::get('me/notification-preferences', [NotificationPreferenceController::class, 'show'])->name('me.notification-preferences.show');
         Route::patch('me/notification-preferences', [NotificationPreferenceController::class, 'update'])->name('me.notification-preferences.update');
         Route::post('me/devices', [DeviceController::class, 'store'])->name('me.devices.store');

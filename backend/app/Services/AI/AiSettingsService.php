@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Cache;
 /**
  * إعدادات المساعد القابلة للإدارة من لوحة التحكم — تُخزن في جدول settings
  * بمفاتيح ai_* وتُقرأ عبر هذه الخدمة فقط. قواعد السلامة الأساسية (قواعد
- * النظام غير القابلة للتغيير) لا يمكن تعطيلها من هنا أبدًا — انظر AiPromptService.
+ * النظام غير القابلة للتغيير) لا يمكن تعطيلها من هنا أبدًا — انظر AiGuardrailService.
  */
 class AiSettingsService
 {
@@ -23,15 +23,7 @@ class AiSettingsService
         'ai_welcome_message' => ['أهلًا بك! أنا مساعد وجهتك العقاري 🏡\nساعدك في إيجاد الشقة أو البيت أو الأرض المناسبة لك بالسعر والموقع الذي تريده.\nكيف أخدمك اليوم؟', 'text'],
         'ai_default_language' => ['ar', 'string'],
 
-        // Model
-        'ai_provider' => ['local_glm', 'string'],
-        'ai_model' => ['', 'string'],
-        'ai_inference_endpoint' => ['', 'string'],
-        'ai_inference_key' => ['', 'string'],
-        'ai_temperature' => ['0.3', 'string'],
-        'ai_max_tokens' => ['700', 'string'],
-        'ai_context_window' => ['8192', 'string'],
-        'ai_timeout' => ['', 'string'],
+        // المحرك حتمي داخل الخادم — لا مفاتيح نموذج/مزود.
 
         // Behavior
         'ai_system_prompt' => ['', 'text'],
@@ -100,7 +92,6 @@ class AiSettingsService
         // سقفيات أمنية لا يمكن للإدارة تجاوزها:
         $values['ai_max_results'] = max(1, min((int) $values['ai_max_results'], (int) config('ai.limits.max_results', 6)));
         $values['ai_max_candidates'] = max(1, min((int) $values['ai_max_candidates'], (int) config('ai.limits.max_candidates', 60)));
-        $values['ai_temperature'] = max(0.0, min((float) $values['ai_temperature'], 1.0));
 
         return $values;
     }

@@ -1,29 +1,9 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
-# Stage 0: llama.cpp (static llama-server) — محرك الاستدلال المحلي للمساعد الذكي
-#
-# بناء ثابت (static musl) يعمل على أي alpine بدون مكتبات إضافية. يقدّم
-# OpenAI-compatible API (/v1/chat/completions + /v1/models) وهو ما يعتمده
-# LocalGlmProvider حرفيًا. الخدمة تُدار من entrypoint.sh بنفس نمط عامل الطابور.
+# المساعد الذكي محرك حتمي داخل Laravel (App\Services\AI\AiReplyEngine) —
+# لا Stage لبناء llama.cpp ولا تنزيل نماذج: صورة أصغر وأسرع بناءً وأقل استهلاكًا.
 # =============================================================================
-FROM alpine:3.21 AS llama-builder
-
-RUN apk add --no-cache build-base cmake git
-
-RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp /src
-
-# بناء llama-server فقط (بدون اختبارات/أمثلة) + ثابت + بلا OpenMP لضمان التوافق.
-RUN cmake -S /src -B /build \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DGGML_NATIVE=OFF \
-        -DGGML_OPENMP=OFF \
-        -DLLAMA_CURL=OFF \
-        -DLLAMA_BUILD_TESTS=OFF \
-        -DLLAMA_BUILD_EXAMPLES=OFF \
-        -DLLAMA_BUILD_SERVER=ON \
-        -DCMAKE_EXE_LINKER_FLAGS="-static -s" \
-    && cmake --build /build -j"$(nproc)" --target llama-server
 
 # =============================================================================
 # Stage 1: PHP dependencies (Composer)
@@ -123,10 +103,6 @@ COPY --from=composer_stage /app/vendor ./vendor
 # Configuration files for the web server and bootstrap
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY entrypoint.sh /usr/local/bin/entrypoint
-
-# محرك الاستدلال المحلي للمساعد الذكي (ثابت — لا يحتاج مكتبات وقت التشغيل)
-COPY --from=llama-builder /build/bin/llama-server /usr/local/bin/llama-server
-RUN chmod +x /usr/local/bin/llama-server && llama-server --version 2>/dev/null || true
 
 # Prepare writable directories first, then regenerate the optimized autoloader
 # and let Laravel discover package service providers.
