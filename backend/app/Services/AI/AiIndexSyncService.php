@@ -68,8 +68,13 @@ class AiIndexSyncService
         $count = 0;
         Property::query()->with(['type', 'location', 'features'])->chunkById(200, function ($properties) use (&$count) {
             foreach ($properties as $property) {
-                $this->sync($property);
-                $count++;
+                try {
+                    $this->sync($property);
+                    $count++;
+                } catch (\Throwable $e) {
+                    // عقار واحد معطوب لا يوقف إعادة بناء الفهرس كله.
+                    report($e);
+                }
             }
         });
 
@@ -89,7 +94,11 @@ class AiIndexSyncService
             $property->type?->name_en,
             $property->features->pluck('name_ar')->implode(' '),
             $property->is_furnished ? 'مفروش مؤثث' : null,
-            $property->transaction_type === 'rent' ? 'إيجار كراء' : 'بيع تمليك',
+            // ملاحظة: transaction_type قد يكون enum (TransactionType) لا نصًا،
+            // لذلك نقارن القيمة النهائية بلا اعتماد على النوع.
+            ($property->transaction_type instanceof \BackedEnum
+                ? $property->transaction_type->value
+                : (string) $property->transaction_type) === 'rent' ? 'إيجار كراء' : 'بيع تمليك',
             mb_substr((string) $property->description, 0, 600),
         ])->filter()->implode(' | ');
     }

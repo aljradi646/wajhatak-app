@@ -38,7 +38,7 @@ class AiReplyEngine
             $lines[] = 'وهناك '.($count - 3).' عقارًا آخر مطابقًا ظهرت لك بطاقاته في المحادثة 👇';
         }
 
-        $lines[] = $this->nextStepLine($filters, $count);
+        $lines[] = $this->nextStepLine($filters, $count, (int) ($first['property_id'] ?? 0));
 
         return implode("\n", $lines);
     }
@@ -219,7 +219,7 @@ class AiReplyEngine
     }
 
     /** جملة الخطوة التالية حسب ما ناقص في الطلب. */
-    private function nextStepLine(array $filters, int $count): string
+    private function nextStepLine(array $filters, int $count, int $firstPropertyId = 0): string
     {
         if (empty($filters['transaction_type'])) {
             return 'هل تفضّل البيع أم الإيجار؟ أخبرني وأضيّق البحث لك أكثر.';
@@ -231,6 +231,11 @@ class AiReplyEngine
             return 'هل تريد ترتيبها من الأرخص، أو مقارنة اثنين منها؟';
         }
 
-        return 'أعجبك هذا؟ أرسل «معلومات عن العقار '.($filters['last_property_id'] ?? '').'» لتفاصيل أوسع، أو اطلب عقارًا مشابهًا.';
+        // لا نذكر معرفًا فارغًا: نستخدم معرف العقار المعروض فعلًا (أو نصيحة عامة).
+        $id = $firstPropertyId > 0 ? $firstPropertyId : (int) ($filters['last_property_id'] ?? 0);
+
+        return $id > 0
+            ? 'أعجبك هذا؟ اكتب «معلومات عن العقار '.$id.'» لتفاصيل أوسع، أو اطلب عقارًا مشابهًا.'
+            : 'أعجبك هذا العقار؟ اطلب «عقار مشابه» وسأعرض لك الأقرب له في نفس المنطقة.';
     }
 }

@@ -5,6 +5,8 @@ namespace App\Services\AI;
 use App\Models\AiSearchIndex;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * بحث العقارات للمساعد — يقرأ من ai_search_index (المتزامنة لحظيًا مع
@@ -14,6 +16,11 @@ use Illuminate\Support\Facades\DB;
  */
 class AiPropertySearchService
 {
+    /** ذاكرة الطلب الواحد لفحص المخطط (الخدمة تُنشأ لكل طلب — لا تُحفظ بين الطلبات). */
+    private ?bool $indexAvailable = null;
+
+    private ?bool $fullTextIndexAvailable = null;
+
     public function __construct(private readonly AiSettingsService $settings) {}
 
     /**
@@ -21,6 +28,30 @@ class AiPropertySearchService
      * @return array{items: list<array<string, mixed>>, total: int}
      */
     public function search(array $filters, ?int $limit = null): array
+    {
+        // حماية من مخطط ناقص (جدول فهرس غير موجود على استضافة نفّذت النشر
+        // قبل الهجرة): لا نرمي خطأ في وجه المستخدم بل نُبلّغ بحالة متدهورة.
+        if (! $this->indexAvailable()) {
+            return ['items' => [], 'total' => 0, 'degraded' => true];
+        }
+
+        try {
+            return $this->runSearch($filters, $limit);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // خطأ مخطط/استعلام — نُسجّل السبب الحقيقي بوضوح ونكمل بأمان.
+            Log::error('ai.search_failed', [
+                'message' => $e->getMessage(),
+                'sql' => $e->getSql(),
+                'filters' => $filters,
+            ]);
+            report($e);
+
+            return ['items' => [], 'total' => 0, 'degraded' => true];
+        }
+    }
+
+    /** @return array{items: list<array<string, mixed>>, total: int, degraded?: bool} */
+    private function runSearch(array $filters, ?int $limit = null): array
     {
         $limit = $limit ?? (int) $this->settings->get('ai_max_results', 6);
         $maxCandidates = (int) $this->settings->get('ai_max_candidates', 60);
@@ -70,7 +101,7 @@ class AiPropertySearchService
         $freeText = trim((string) ($filters['q'] ?? ''));
         if ($freeText !== '') {
             $driver = DB::getDriverName();
-            if ($driver === 'mysql') {
+            if ($driver === 'mysql' && $this->hasFullTextIndex()) {
                 // FULLTEXT عبر MATCH...AGAINST في وضع boolean مع تراجع إلى LIKE.
                 $query->where(function (Builder $q) use ($freeText) {
                     $q->whereFullText(['search_text'], $freeText, ['mode' => 'boolean'])
@@ -153,39 +184,74 @@ class AiPropertySearchService
     /** بحث بالمدينة/الحي لأدوات search_locations. */
     public function findLocations(string $term, int $limit = 8): array
     {
+        if (! $this->indexAvailable()) {
+            return [];
+        }
+
         $like = '%'.$term.'%';
 
-        return AiSearchIndex::query()
-            ->whereIn('status', ['published'])
-            ->where(fn (Builder $q) => $q->where('city', 'like', $like)
-                ->orWhere('district', 'like', $like)
-                ->orWhere('neighborhood', 'like', $like))
-            ->selectRaw('city, district, neighborhood, count(*) as properties_count, min(price) as min_price, max(price) as max_price')
-            ->groupBy('city', 'district', 'neighborhood')
-            ->orderByDesc('properties_count')
-            ->limit($limit)
-            ->get()
-            ->map(fn ($r) => [
-                'city' => $r->city,
-                'district' => $r->district,
-                'neighborhood' => $r->neighborhood,
-                'properties_count' => (int) $r->properties_count,
-                'min_price' => $r->min_price !== null ? (float) $r->min_price : null,
-                'max_price' => $r->max_price !== null ? (float) $r->max_price : null,
-            ])
-            ->all();
+        try {
+            return AiSearchIndex::query()
+                ->whereIn('status', ['published'])
+                ->where(fn (Builder $q) => $q->where('city', 'like', $like)
+                    ->orWhere('district', 'like', $like)
+                    ->orWhere('neighborhood', 'like', $like))
+                ->selectRaw('city, district, neighborhood, count(*) as properties_count, min(price) as min_price, max(price) as max_price')
+                ->groupBy('city', 'district', 'neighborhood')
+                ->orderByDesc('properties_count')
+                ->limit($limit)
+                ->get()
+                ->map(fn ($r) => [
+                    'city' => $r->city,
+                    'district' => $r->district,
+                    'neighborhood' => $r->neighborhood,
+                    'properties_count' => (int) $r->properties_count,
+                    'min_price' => $r->min_price !== null ? (float) $r->min_price : null,
+                    'max_price' => $r->max_price !== null ? (float) $r->max_price : null,
+                ])
+                ->all();
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('ai.locations_failed', ['message' => $e->getMessage()]);
+
+            return [];
+        }
     }
 
     /** تفاصيل موسعة لعقار واحد من الفهرس (لأدوات get_property_details). */
     public function details(int $propertyId): ?array
     {
-        $row = AiSearchIndex::query()->where('property_id', $propertyId)->whereIn('status', ['published'])->first();
+        if (! $this->indexAvailable()) {
+            return null;
+        }
 
-        return $row ? $this->present($row, 1.0, detailed: true) : null;
+        try {
+            $row = AiSearchIndex::query()->where('property_id', $propertyId)->whereIn('status', ['published'])->first();
+
+            return $row ? $this->present($row, 1.0, detailed: true) : null;
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('ai.details_failed', ['message' => $e->getMessage(), 'property_id' => $propertyId]);
+
+            return null;
+        }
     }
 
     /** عقارات مشابهة (نفس النوع/المدينة وسعر مقارب) — لعقار مشابه لهذا. */
     public function similar(int $propertyId, int $limit = 4): array
+    {
+        if (! $this->indexAvailable()) {
+            return [];
+        }
+
+        try {
+            return $this->runSimilar($propertyId, $limit);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('ai.similar_failed', ['message' => $e->getMessage(), 'property_id' => $propertyId]);
+
+            return [];
+        }
+    }
+
+    private function runSimilar(int $propertyId, int $limit): array
     {
         $base = AiSearchIndex::query()->where('property_id', $propertyId)->first();
         if (! $base) {
@@ -219,6 +285,46 @@ class AiPropertySearchService
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * هل جدول فهرس المساعد موجود وجاهز للاستعلام؟
+     * النتيجة تُحفظ في الطلب الواحد لتفادي فحص المخطط في كل استدعاء.
+     */
+    private function indexAvailable(): bool
+    {
+        if ($this->indexAvailable === null) {
+            try {
+                $this->indexAvailable = Schema::hasTable('ai_search_index')
+                    && Schema::hasColumn('ai_search_index', 'search_text')
+                    && Schema::hasColumn('ai_search_index', 'type_slug');
+            } catch (\Throwable) {
+                $this->indexAvailable = false;
+            }
+        }
+
+        return $this->indexAvailable;
+    }
+
+    /** هل فهرس FULLTEXT موجود فعلًا على عمود البحث؟ (MySQL يرفض MATCH بدونه). */
+    private function hasFullTextIndex(): bool
+    {
+        if ($this->fullTextIndexAvailable === null) {
+            $this->fullTextIndexAvailable = false;
+            try {
+                foreach (Schema::getIndexes('ai_search_index') as $index) {
+                    $columns = array_map('strtolower', (array) ($index['columns'] ?? []));
+                    if (($index['type'] ?? null) === 'fulltext' && in_array('search_text', $columns, true)) {
+                        $this->fullTextIndexAvailable = true;
+                        break;
+                    }
+                }
+            } catch (\Throwable) {
+                $this->fullTextIndexAvailable = false;
+            }
+        }
+
+        return $this->fullTextIndexAvailable;
+    }
 
     /** مسافة هافرسين بالكيلومتر بين نقطتين جغرافيتين. */
     private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float

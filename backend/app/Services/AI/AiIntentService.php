@@ -73,51 +73,54 @@ class AiIntentService
         $text = $this->normalize($message);
 
         foreach ($this->transactionMap() as $pattern => $value) {
-            if (preg_match($pattern, $text)) {
+            if ($this->matches($pattern, $text)) {
                 $filters['transaction_type'] = $value;
                 break;
             }
         }
 
         foreach ($this->typeMap() as $pattern => $value) {
-            if (preg_match($pattern, $text)) {
+            if ($this->matches($pattern, $text)) {
                 $filters['property_type'] = $value;
                 break;
             }
         }
 
-        if (preg_match('/(غرفتين|غرفتان|غرفتين أو (اثنتين|2)|2\s*غرف)/u', $text)) {
-            $filters['bedrooms_min'] = 2;
-        } elseif (preg_match('/(ثلاث\s*غرف|3\s*غرف|غرفتين أو ثلاث|غرفتين او ثلاث|2\s*(?:إلى|-)\s*3)/u', $text)) {
+        // الترتيب مقصود: نطاق «من .. إلى» أولًا، ثم الحالات المفردة.
+        if ($this->matches('/(ثلاث\s*غرف|3\s*غرف|غرفتين أو ثلاث|غرفتين او ثلاث|2\s*(?:إلى|-)\s*3)/u', $text)) {
             $filters['bedrooms_min'] = 2;
             $filters['bedrooms_max'] = 3;
-        } elseif (preg_match('/(غرفة\s*واحدة|غرفة\s*نوم\s*واحدة|1\s*غرفة)/u', $text)) {
+        } elseif ($this->matches('/(غرفتين|غرفتان|2\s*غرف)/u', $text)) {
+            $filters['bedrooms_min'] = 2;
+        } elseif ($this->matches('/(غرفة\s*واحدة|غرفة\s*نوم\s*واحدة|1\s*غرفة)/u', $text)) {
             $filters['bedrooms_min'] = 1;
             $filters['bedrooms_max'] = 1;
-        } elseif (preg_match('/(أربع|4)\s*غرف/u', $text)) {
+        } elseif ($this->matches('/(أربع|4)\s*غرف/u', $text)) {
             $filters['bedrooms_min'] = 4;
-        } elseif (preg_match('/(خمس|5)\s*غرف/u', $text)) {
+        } elseif ($this->matches('/(خمس|5)\s*غرف/u', $text)) {
             $filters['bedrooms_min'] = 5;
         }
 
-        if (preg_match('/مفروش/u', $text)) {
-            $filters['furnished'] = true;
-        } elseif (preg_match('/(غير\s*مفروش|بدون\s*أثاث|بدون\s*اثاث)/u', $text)) {
+        // الانتباه للترتيب: «غير مفروش» تحتوي كلمة «مفروش»، لذا يُفحص النفي أولًا.
+        if ($this->matches('/(غير\s*مفروش|بدون\s*أثاث|بدون\s*اثاث|غير\s*مؤثث)/u', $text)) {
             $filters['furnished'] = false;
+        } elseif ($this->matches('/مفروش/u', $text)) {
+            $filters['furnished'] = true;
         }
 
-        if (preg_match('/جديد|حديث\s*البناء/u', $text)) {
+        if ($this->matches('/جديد|حديث\s*البناء/u', $text)) {
             $filters['is_new'] = true;
         }
 
-        if (preg_match('/(أرخص|ارخص)/u', $text)) {
+        if ($this->matches('/(أرخص|ارخص)/u', $text)) {
             $filters['sort'] = 'price_asc';
-        } elseif (preg_match('/(أغلى|اغلى|الأفخم)/u', $text)) {
+        } elseif ($this->matches('/(أغلى|اغلى|الأفخم|الافخم)/u', $text)) {
             $filters['sort'] = 'price_desc';
         }
 
         // "عقار مشابه لهذا العقار" — يشير لعقار مرجعي في المحادثة (id يُلتقط لاحقًا من السياق).
-        if (preg_match('/(مشابه|مشابهة|مثل|شبيه)/u', $text) && preg_match('/(?:عقار|شقة|فيلا|بيت|دور)?\s*(?:رقم|#|المعرف)?\s*(\d{1,10})/u', $text, $m)) {
+        if ($this->matches('/(مشابه|مشابهة|مثل|شبيه)/u', $text)
+            && preg_match('/(?:عقار|شقة|فيلا|بيت|دور)?\s*(?:رقم|#|المعرف)?\s*(\d{1,10})/u', $text, $m) === 1) {
             $filters['similar_to'] = (int) $m[1];
         }
 
@@ -151,9 +154,9 @@ class AiIntentService
             }
         }
 
-        // المدن والأحياء المعروفة.
+        // المدن والأحياء المعروفة (نمط المدينة يُوحَّد بينما تبقى قيمتها كما في القاعدة).
         foreach ($this->cityMap() as $pattern => $city) {
-            if (preg_match('/'.$pattern.'/u', $text)) {
+            if ($this->matches('/'.$pattern.'/u', $text)) {
                 $filters['city'] = $city;
                 break;
             }
@@ -196,7 +199,7 @@ class AiIntentService
                 $position = mb_strpos($text, $m[0]);
                 $before = $position !== false ? mb_substr($text, 0, $position) : $text;
                 $isMax = (bool) preg_match('/(أقل|اقل|حتى|بحدود|ميزانية|دون)/u', $before);
-                $isMin = (bool) preg_match('/(فوق|أكثر|اكثر|بداية|يبدأ)/u', $before);
+                $isMin = (bool) preg_match('/(فوق|أكثر|اكثر|بداية|يبدأ|يبدا)/u', $before);
                 $out[] = [$value, $isMax && ! $isMin ? 'max' : ($isMin ? 'min' : 'max')];
             }
         }
@@ -250,6 +253,16 @@ class AiIntentService
         $text = preg_replace('/[\x{064B}-\x{0652}]/u', '', $text) ?? $text;
 
         return str_replace(['أ', 'إ', 'آ', 'ة', 'ى'], ['ا', 'ا', 'ا', 'ه', 'ي'], $text);
+    }
+
+    /**
+     * مطابقة نمط على نص *مُوحَّد*: يجب توحيد النمط أيضًا، وإلا فإن كل نمط
+     * مكتوب بـ«ة/أ/إ/آ/ى» لا يطابق شيئًا أبدًا (مثال: «شقة» مقابل «شقه»)
+     * — وهو سبب فقدان نوع العقار ومدينة «إب» من كل طلب.
+     */
+    private function matches(string $pattern, string $normalizedText): bool
+    {
+        return preg_match($this->normalize($pattern), $normalizedText) === 1;
     }
 
     /** الحقول التي لم تُحدد بعد وتحتاج قرارًا (للمتابعة الذكية). */

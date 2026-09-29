@@ -58,7 +58,7 @@ class AiGuardrailService
         ];
 
         foreach ($patterns as $pattern) {
-            if (preg_match('/'.$pattern.'/iu', $text)) {
+            if ($this->matches($pattern, $text)) {
                 return true;
             }
         }
@@ -80,7 +80,7 @@ class AiGuardrailService
         ];
 
         foreach ($patterns as $pattern) {
-            if (preg_match('/'.$pattern.'/iu', $text)) {
+            if ($this->matches($pattern, $text)) {
                 return true;
             }
         }
@@ -105,8 +105,8 @@ class AiGuardrailService
 
         foreach ($domainKeywords as $keyword) {
             if (str_contains($keyword, '\\')
-                ? preg_match('/'.$keyword.'/iu', $text) === 1
-                : Str::contains($text, $keyword, ignoreCase: true)) {
+                ? $this->matches($keyword, $text)
+                : Str::contains($text, $this->normalize($keyword), ignoreCase: true)) {
                 // نطاق مقبول (كلمة عقارية أو عبارة استخدام منصة).
                 return false;
             }
@@ -121,12 +121,22 @@ class AiGuardrailService
         ];
 
         foreach ($outOfDomain as $pattern) {
-            if (preg_match('/'.$pattern.'/iu', $text)) {
+            if ($this->matches($pattern, $text)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * مطابقة نمط على نص *مُوحَّد*: لا بد من توحيد النمط نفسه أيضًا، وإلا فإن
+     * كل نمط مكتوب بـ«ة/أ/إ/آ/ى» (قصيدة، مقالة، أظهر، أنت...) لا يطابق شيئًا
+     * أبدًا، فيمرّ الطلب خارج النطاق بدل حجبه.
+     */
+    private function matches(string $pattern, string $normalizedText): bool
+    {
+        return preg_match('/'.$this->normalize($pattern).'/iu', $normalizedText) === 1;
     }
 
     /** توحيد النص: إزالة التشكيل وتوحيد الألف والتاء المربوطة والهمزات. */

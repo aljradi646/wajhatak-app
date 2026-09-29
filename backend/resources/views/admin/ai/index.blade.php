@@ -175,13 +175,63 @@
             </div>
 
             <x-admin.card title="حالة المحرك الحتمي" description="المحرك يعمل داخل الخادم مباشرة — لا خادم استدلال ولا نماذج محمّلة.">
-                <div class="flex flex-wrap items-center gap-4 text-sm">
-                    <span class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-bold bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400">
-                        ● جاهز
-                    </span>
-                    <span>المحرك: <b>حتمي داخل الخادم (deterministic)</b></span>
-                    <span>الردود: <b>من عقارات وجهتك الحقيقية فقط</b></span>
-                    @if ($health->message)<span class="text-gray-500">{{ $health->message }}</span>@endif
+                <div class="space-y-4 text-sm">
+                    <div class="flex flex-wrap items-center gap-4">
+                        @if ($health->healthy)
+                            <span class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-bold bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400">● جاهز</span>
+                        @else
+                            <span class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-bold bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400">● يحتاج إصلاحًا</span>
+                        @endif
+                        <span>المحرك: <b>حتمي داخل الخادم (deterministic)</b></span>
+                        <span>الردود: <b>من عقارات وجهتك الحقيقية فقط</b></span>
+                    </div>
+
+                    @if ($health->message)
+                        <p class="text-gray-500">{{ $health->message }}</p>
+                    @endif
+
+                    {{-- تشخيص حقيقي: كل جدول من جداول المساعد وأعمدته الحرجة. --}}
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        @foreach (($health->details['tables'] ?? []) as $table => $info)
+                            @php($ok = ! empty($info['exists']) && empty($info['missing_columns']) && empty($info['error']))
+                            <div class="rounded-xl border p-3 {{ $ok ? 'border-green-200 dark:border-green-500/30' : 'border-red-300 dark:border-red-500/40' }}">
+                                <div class="font-bold text-xs" dir="ltr">{{ $table }}</div>
+                                @if ($ok)
+                                    <div class="text-xs mt-1 text-green-600 dark:text-green-400">✓ جاهز</div>
+                                @else
+                                    <div class="text-xs mt-1 text-red-600 dark:text-red-400">✗ ناقص</div>
+                                    @if (! empty($info['missing_columns']))
+                                        <div class="text-[10px] text-red-500 mt-1" dir="ltr">{{ implode(', ', $info['missing_columns']) }}</div>
+                                    @endif
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-4">
+                        <span>عقارات منشورة في القاعدة: <b>{{ $health->details['published_properties'] ?? 0 }}</b></span>
+                        <span>صفوف فهرس المساعد: <b>{{ $health->details['indexed_properties'] ?? 0 }}</b></span>
+                    </div>
+
+                    <div>
+                        <form method="POST" action="{{ route('admin.ai.repair') }}">
+                            @csrf
+                            <x-admin.button type="submit" variant="secondary">تشخيص وإصلاح المخطط تلقائيًا</x-admin.button>
+                        </form>
+                    </div>
+                </div>
+            </x-admin.card>
+
+            <x-admin.card title="فهم المحرك للعربية (فحص حي)" description="نتيجة تحليل النية لعبِارات حقيقية من داخل نظام التشغيل نفسه — للتأكد من أن الفهم صحيح، لا تخميني.">
+                <div class="space-y-2 text-sm">
+                    @forelse (($rules ?? []) as $probe => $filters)
+                        <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 dark:border-gray-700 pb-2">
+                            <span class="font-bold">«{{ $probe }}»</span>
+                            <code class="text-xs text-gray-500 break-all" dir="ltr">{{ json_encode($filters, JSON_UNESCAPED_UNICODE) }}</code>
+                        </div>
+                    @empty
+                        <p class="text-gray-400">لا توجد بيانات فحص.</p>
+                    @endforelse
                 </div>
             </x-admin.card>
 
@@ -211,6 +261,7 @@
                                 <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">المعايير</th>
                                 <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">النتائج</th>
                                 <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">الحالة</th>
+                                <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">رمز الخطأ</th>
                                 <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">الزمن</th>
                                 <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">البحث</th>
                             </tr>
@@ -226,11 +277,12 @@
                                         @php($colors = ['ok' => 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400', 'blocked' => 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400', 'error' => 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400', 'fallback' => 'bg-gray-100 text-gray-600'])
                                         <span class="rounded-full px-2.5 py-0.5 text-xs font-bold {{ $colors[$log->status] ?? 'bg-gray-100' }}">{{ $log->status }}</span>
                                     </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-xs text-red-500" dir="ltr">{{ $log->error_code ?? '—' }}</td>
                                     <td class="px-4 py-3 whitespace-nowrap">{{ $log->latency_ms }}ms</td>
                                     <td class="px-4 py-3 whitespace-nowrap text-gray-500">{{ $log->search_ms }}ms</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">لا توجد طلبات مسجلة بعد.</td></tr>
+                                <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">لا توجد طلبات مسجلة بعد.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

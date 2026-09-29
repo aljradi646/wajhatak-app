@@ -8,11 +8,13 @@ use App\Http\Requests\AiSearchRequest;
 use App\Models\AiConversation;
 use App\Services\AI\AiAssistantService;
 use App\Services\AI\AiConversationService;
+use App\Services\AI\AiSchemaService;
 use App\Services\AI\AiSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Throwable;
 
 class AiAssistantController extends Controller
 {
@@ -20,6 +22,7 @@ class AiAssistantController extends Controller
         private readonly AiAssistantService $assistant,
         private readonly AiConversationService $conversations,
         private readonly AiSettingsService $settings,
+        private readonly AiSchemaService $schema,
     ) {}
 
     /** POST /api/v1/ai/chat — رسالة كاملة مع توليد رد ونتائج حقيقية. */
@@ -57,7 +60,14 @@ class AiAssistantController extends Controller
         }
 
         if ($conversation === null) {
-            $conversation = $this->conversations->currentFor($user, (string) $request->input('locale', 'ar'), $sessionToken ?: null);
+            // فشل فتح المحادثة (جدول ناقص/قاعدة مشغولة) لا يجب أن يمنع الرد:
+            // نُكمل بلا محادثة محفوظة ويجيب المساعد من العقارات الحقيقية.
+            try {
+                $conversation = $this->conversations->currentFor($user, (string) $request->input('locale', 'ar'), $sessionToken ?: null);
+            } catch (Throwable $e) {
+                report($e);
+                $conversation = null;
+            }
         }
 
         $result = $this->assistant->handleChat(
@@ -146,13 +156,30 @@ class AiAssistantController extends Controller
         return response()->json(status: 204);
     }
 
-    /** GET /api/v1/ai/health — صحة المحرك الحتمي (عامة ومبسطة، بلا أسرار). */
+    /** GET /api/v1/ai/health — صحة المحرك الحتمي (فحص حقيقي، بلا أسرار). */
     public function health(): JsonResponse
     {
-        // المحرك حتمي ويعمل على الخادم مباشرة — لا يوجد خادم استدلال خارجي.
+        // فحص فعلي للمخطط بدل إعلان «سليم» دائمًا: إن كان جدول/عمود ناقصًا
+        // فالرد يقول ذلك صراحةً بدل أن يكتشفه المستخدم برسالة خطأ غامضة.
+        $diagnostics = $this->schema->diagnose();
+        $missing = collect($diagnostics)
+            ->filter(fn (array $info) => empty($info['exists']) || ! empty($info['missing_columns']) || ! empty($info['error']))
+            ->keys()
+            ->all();
+
+        $indexed = 0;
+        try {
+            $indexed = \App\Models\AiSearchIndex::query()->count();
+        } catch (Throwable) {
+            $missing[] = 'ai_search_index(غير قابل للقراءة)';
+        }
+
         return response()->json(['data' => [
             'assistant_enabled' => $this->settings->enabled(),
-            'healthy' => true,
+            'healthy' => $missing === [] && $this->settings->enabled(),
+            'tables_ready' => $missing === [],
+            'missing' => $missing,
+            'indexed_properties' => $indexed,
             'latency_ms' => null,
             'engine' => 'deterministic',
         ]]);

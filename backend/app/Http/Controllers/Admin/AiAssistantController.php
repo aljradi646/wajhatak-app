@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AiConversation;
 use App\Models\AiRequestLog;
+use App\Models\AiSearchIndex;
+use App\Models\Property;
 use App\Services\AI\AiAssistantService;
 use App\Services\AI\AiConversationService;
 use App\Services\AI\AiHealthStatus;
 use App\Services\AI\AiLoggingService;
+use App\Services\AI\AiSchemaService;
 use App\Services\AI\AiSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,14 +28,41 @@ class AiAssistantController extends Controller
         private readonly AiLoggingService $logging,
         private readonly AiAssistantService $assistant,
         private readonly AiConversationService $conversations,
+        private readonly AiSchemaService $schema,
     ) {}
 
     public function index(Request $request)
     {
         $values = $this->settings->all();
         $stats = $this->logging->stats();
-        // المحرك حتمي يعمل على الخادم مباشرة — دائمًا جاهز بلا خادم استدلال.
-        $health = new AiHealthStatus(true, 'deterministic', null, null, 'المحرك الحتمي يعمل على الخادم مباشرة — جاهز.');
+
+        // تشخيص حقيقي (لا شعارات): هل جداول المساعد وأعمدته موجودة؟ وهل الفهرس
+        // يطابق العقارات الفعلية؟ هذا ما يجعل سبب أي خلل ظاهرًا في اللوحة.
+        $diagnostics = $this->schema->diagnose();
+        $schemaProblems = collect($diagnostics)
+            ->filter(fn (array $info) => empty($info['exists']) || ! empty($info['missing_columns']) || ! empty($info['error']))
+            ->keys()
+            ->all();
+
+        $indexed = $this->safeCount(AiSearchIndex::class);
+        $published = $this->safeCount(Property::class, fn ($q) => $q->where('status', 'published'));
+        $needsReindex = $schemaProblems === [] && $indexed === 0 && $published > 0;
+
+        $health = new AiHealthStatus(
+            healthy: $schemaProblems === [] && $this->settings->enabled(),
+            provider: 'deterministic',
+            message: $schemaProblems !== []
+                ? 'جداول/أعمدة ناقصة: '.implode('، ', $schemaProblems).' — اضغط «إصلاح المخطط» أو نفّذ php artisan ai:doctor --fix'
+                : ($needsReindex
+                    ? 'الفهرس فارغ رغم وجود '.$published.' عقارًا منشورًا — اضغط «إعادة بناء الفهرس الآن»'
+                    : 'المحرك الحتمي يعمل على الخادم مباشرة — جاهز.'),
+            details: [
+                'tables' => $diagnostics,
+                'indexed_properties' => $indexed,
+                'published_properties' => $published,
+                'schema_problems' => $schemaProblems,
+            ],
+        );
 
         $logs = AiRequestLog::query()
             ->latest()
@@ -43,9 +73,60 @@ class AiAssistantController extends Controller
             'values' => $values,
             'stats' => $stats,
             'health' => $health,
+            'diagnostics' => $diagnostics,
+            'rules' => $this->rulesReport(),
             'logs' => $logs,
             'providers' => ['deterministic'],
         ]);
+    }
+
+    /** إصلاح ذاتي لمخطط المساعد من اللوحة (نفس ما ينفذه ai:doctor --fix). */
+    public function repair()
+    {
+        $result = app(\App\Services\AI\AiSchemaService::class)->ensure(force: true);
+
+        \App\Models\ActivityLog::record('ai', 'تشخيص وإصلاح مخطط المساعد');
+
+        $message = 'تم الفحص. جداول أُنشئت: '.count($result['created'])
+            .'، أعمدة أُضيفت: '.count($result['columns'])
+            .'، عقارات فُهرست: '.$result['indexed'].'.';
+
+        return back()->with($result['errors'] === [] ? 'status' : 'error', $message.implode(' ', $result['errors']));
+    }
+
+    /** تشغيل سريع لقواعد الفهم على عبارات عربية للتأكد من سلامة المحرك. */
+    private function rulesReport(): array
+    {
+        $probes = [
+            'ابحث لي عن شقة للايجار في صنعاء',
+            'شقة ثلاث غرف في حدة أقل من 80 ألف',
+            'فيلا للبيع في عدن بميزانية 50 مليون',
+            'شقة غير مفروش',
+        ];
+
+        return collect($probes)->mapWithKeys(function (string $probe) {
+            try {
+                $parsed = app(\App\Services\AI\AiIntentService::class)->parse($probe);
+
+                return [$probe => $parsed['filters']];
+            } catch (\Throwable $e) {
+                return [$probe => ['error' => $e->getMessage()]];
+            }
+        })->all();
+    }
+
+    private function safeCount(string $model, ?callable $constraint = null): int
+    {
+        try {
+            $query = $model::query();
+            if ($constraint) {
+                $constraint($query);
+            }
+
+            return $query->count();
+        } catch (\Throwable) {
+            return 0;
+        }
     }
 
     public function update(Request $request)
@@ -149,6 +230,9 @@ class AiAssistantController extends Controller
         return response()->json(['data' => [
             'reply' => $result['reply'],
             'status' => $result['status'],
+            // المرحلة التي فشلت (وضع التصحيح) — تشخيص فوري داخل صفحة الاختبار.
+            'failed_stage' => $result['failed_stage'] ?? null,
+            'error' => $result['error'] ?? null,
             'properties' => array_map(fn ($p) => [
                 'property_id' => $p['property_id'],
                 'title' => $p['title'],

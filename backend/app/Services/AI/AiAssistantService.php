@@ -4,20 +4,30 @@ namespace App\Services\AI;
 
 use App\Enums\AiRequestStatus;
 use App\Models\AiConversation;
+use App\Models\AiMessage;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
  * المنسق الرئيسي للمساعد — محرك حتمي 100% على الخادم:
- * الحواجز ← نية الحوار اليومي ← تحليل البحث ← البحث الحقيقي في القاعدة ←
- * محرك الردود (يبني العربية الطبيعية من البيانات الحقيقية فقط) ← التسجيل.
+ * ضمان المخطط ← الحواجز ← نية الحوار اليومي ← تحليل البحث ← البحث الحقيقي
+ * في القاعدة ← محرك الردود (يبني العربية الطبيعية من البيانات الحقيقية فقط)
+ * ← التسجيل.
  *
  * لا يعتمد على أي نموذج لغوي ولا مزود خارجي ولا أي ملفات مُحمّلة:
  * يعمل فورًا على أي استضافة بأصغر موارد، ولا يمكنه اختراع معلومة غير موجودة.
+ *
+ * مبدأ المتانة الإنتاجي: كل مرحلة معزولة. فشل مرحلة واحدة (إعدادات/سجل/
+ * فهرس/تسجيل) لا يُفرغ الرد بالكامل، وكل فشل يُسجَّل باسم مرحلته وسببه
+ * الحقيقي في `ai_request_logs.error_code` وسجل الأخطاء — لا خطأ صامت أبدًا.
  */
 class AiAssistantService
 {
     private const OUT_OF_SCOPE_REPLY = 'أنا مساعد وجهتك، ومتخصص في مساعدتك في البحث عن العقارات واستخدام منصة وجهتك.';
+
+    /** آخر مرحلة فشلت في الطلب الحالي (لتشخيص دقيق بلا كشف تفاصيل داخلية). */
+    private ?string $failedStage = null;
 
     public function __construct(
         private readonly AiSettingsService $settings,
@@ -27,6 +37,7 @@ class AiAssistantService
         private readonly AiReplyEngine $replies,
         private readonly AiConversationService $conversations,
         private readonly AiLoggingService $logging,
+        private readonly AiSchemaService $schema,
     ) {}
 
     /**
@@ -42,55 +53,69 @@ class AiAssistantService
         string $locale = 'ar',
         array $clientContext = [],
     ): array {
-        $started = (int) (microtime(true) * 1000);
-        $conversation = $conversation ?? $this->conversations->currentFor($user, $locale);
+        $started = $this->ms();
         $searchMs = 0;
         $toolCalls = [];
         $filters = [];
         $intent = 'chat';
+        $stage = 'bootstrap';
 
         try {
-            // 1) حاجز الحماية المسبق (نطاق/حقن/حساسية) — قبل أي استدعاء للنموذج.
-            $guard = $this->guardrails->inspect($message);
-            if ($guard['blocked']) {
+            // 0) ضمان مخطط المساعد (جداول/أعمدة/فهرس) — يمنع فشل كل طلب بسبب
+            //    هجرة لم تُنفَّذ على الاستضافة. مرة كل بضع دقائق، وغير قاتل.
+            $stage = 'schema';
+            $this->attempt($stage, fn () => $this->schema->ensure());
+
+            $stage = 'conversation';
+            $conversation = $conversation
+                ?? $this->attempt($stage, fn () => $this->conversations->currentFor($user, $locale));
+            if (! $conversation instanceof AiConversation) {
+                // تعذر فتح/قراءة المحادثة: لا نُسقط الرد — نُكمل بمحادثة مؤقتة
+                // غير محفوظة، فيبقى المساعد يجيب من العقارات الحقيقية.
+                $conversation = new AiConversation(['locale' => $locale, 'status' => 'active']);
+            }
+
+            // 1) حاجز الحماية المسبق (نطاق/حقن/حساسية) — قبل أي معالجة.
+            $stage = 'guardrails';
+            $guard = $this->attempt($stage, fn () => $this->guardrails->inspect($message), ['blocked' => false, 'reason' => null]);
+            if (! empty($guard['blocked'])) {
                 $reply = $guard['reason'] === 'out_of_domain'
                     ? $this->outOfScopeReply()
                     : 'عذرًا، لا أستطيع المساعدة في هذا الطلب.';
 
-                $this->logging->record(
-                    $conversation, $user?->id, 'blocked', [], [], 0, 'blocked',
-                    (int) (microtime(true) * 1000) - $started, 0, 0, 'guard_'.$guard['reason'],
-                );
-                $this->conversations->addUserMessage($conversation, $message, []);
-                $this->conversations->addAssistantMessage($conversation, $reply, [], 'blocked');
+                $this->attempt('persist', fn () => $this->conversations->addUserMessage($conversation, $message, []));
+                $this->out($conversation, $user, 'blocked', 'blocked', [], [], 0, $started, 0, 'guard_'.$guard['reason'], $reply);
 
                 return $this->payload($conversation, $reply, 'blocked', [], $guard['reason']);
             }
 
             // 2) الحوار اليومي أولاً: تحية/شكر/قدرات/إحصاء — ردود فورية بلا بحث.
-            $history = $this->conversations->historyFor($conversation);
-            $previous = $this->conversations->accumulatedFilters($conversation);
+            $stage = 'history';
+            $history = (array) $this->attempt($stage, fn () => $this->conversations->historyFor($conversation), []);
+            $previous = (array) $this->attempt($stage, fn () => $this->conversations->accumulatedFilters($conversation), []);
 
             $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
             if ($smallTalk !== null) {
-                $reply = $this->replies->smallTalkReply($message, $smallTalk);
-                $this->conversations->addUserMessage($conversation, $message, []);
-                $this->conversations->addAssistantMessage($conversation, $reply, []);
-                $this->finish($conversation, $user, AiRequestStatus::Ok->value, 'small_talk', [], [], 0, $started, 0, null, $reply, []);
+                $stage = 'small_talk';
+                $reply = $this->attempt($stage, fn () => $this->replies->smallTalkReply($message, $smallTalk));
+                if (is_string($reply) && $reply !== '') {
+                    $this->attempt('persist', fn () => $this->conversations->addUserMessage($conversation, $message, []));
+                    $this->out($conversation, $user, 'small_talk', 'ok', [], [], 0, $started, 0, null, $reply);
 
-                return $this->payload($conversation, $reply, 'ok', [], null, []);
+                    return $this->payload($conversation, $reply, 'ok', [], null, []);
+                }
+                // فشل بناء رد الحوار اليومي → نكمل كبحث عادي بدل إظهار خطأ.
             }
 
             // 2.5) سؤال تفاصيل عن عقار محدد: «معلومات عن العقار 5» — من سجل حقيقي.
             $detailsTarget = AiChatIntentDetector::detectDetailsTarget($message);
             if ($detailsTarget !== null) {
-                $reply = $this->replies->detailsReply($detailsTarget);
-                if ($reply !== null) {
-                    $this->conversations->addUserMessage($conversation, $message, ['last_property_id' => $detailsTarget]);
-                    $this->conversations->addAssistantMessage($conversation, $reply, [$detailsTarget]);
-                    $this->finish($conversation, $user, AiRequestStatus::Ok->value, 'details', [], [], 1, $started, 0, null, $reply, [$detailsTarget]);
-
-                    $item = $this->search->details($detailsTarget);
+                $stage = 'details';
+                $reply = $this->attempt($stage, fn () => $this->replies->detailsReply($detailsTarget));
+                if (is_string($reply) && $reply !== '') {
+                    $item = $this->attempt($stage, fn () => $this->search->details($detailsTarget));
+                    $this->attempt('persist', fn () => $this->conversations->addUserMessage($conversation, $message, ['last_property_id' => $detailsTarget]));
+                    $this->out($conversation, $user, 'details', 'ok', [], [], 1, $started, 0, null, $reply, [$detailsTarget]);
 
                     return $this->payload($conversation, $reply, 'ok', $item !== null ? [$item] : [], null, ['last_property_id' => $detailsTarget]);
                 }
@@ -98,85 +123,120 @@ class AiAssistantService
             }
 
             // 3) تحليل نية البحث + دمج سياق المحادثة + سياق جهاز العميل (موقعه الحقيقي).
-            $parsed = $this->intents->parse($message, $history, $previous);
-            $filters = $parsed['filters'];
-            if (isset($clientContext['latitude'], $clientContext['longitude'])) {
-                $filters['client_latitude'] = (float) $clientContext['latitude'];
-                $filters['client_longitude'] = (float) $clientContext['longitude'];
-                if (isset($clientContext['radius_km'])) {
-                    $filters['radius_km'] = (float) $clientContext['radius_km'];
+            $stage = 'intent';
+            $parsed = $this->attempt(
+                $stage,
+                fn () => $this->intents->parse($message, $history, $previous),
+                ['filters' => [], 'out_of_scope' => false, 'parser' => 'fallback'],
+            );
+            $filters = is_array($parsed['filters'] ?? null) ? $parsed['filters'] : [];
+
+            foreach (['latitude' => 'client_latitude', 'longitude' => 'client_longitude'] as $key => $target) {
+                if (isset($clientContext[$key]) && is_numeric($clientContext[$key])) {
+                    $filters[$target] = (float) $clientContext[$key];
                 }
             }
-            $intent = $parsed['out_of_scope'] ? 'out_of_scope' : 'search';
+            if (isset($filters['client_latitude'], $filters['client_longitude']) && isset($clientContext['radius_km']) && is_numeric($clientContext['radius_km'])) {
+                $filters['radius_km'] = (float) $clientContext['radius_km'];
+            }
+            $intent = ! empty($parsed['out_of_scope']) ? 'out_of_scope' : 'search';
 
             // إثراء الرد: اسم نوع العقار بالعربية + إحداثيات موقع العميل للبحث القريب.
-            $this->decorateFilters($message, $filters);
+            $this->attempt($stage, fn () => $this->decorateFilters($message, $filters));
+
+            // حفظ رسالة المستخدم مرة واحدة مع معاييرها (سياق المحادثة).
+            $this->attempt('persist', fn () => $this->conversations->addUserMessage($conversation, $message, $filters));
 
             // "عقار مشابه لهذا العقار": نستمد الفلاتر من خصائص العقار المرجعي
             // (يجب أن يكون منشورًا فعليًا) ثم نبحث عن الأكثر شبهًا به.
             if (! empty($filters['similar_to'])) {
-                $similar = $this->search->similar((int) $filters['similar_to'], (int) $this->settings->get('ai_max_results', 6));
+                $stage = 'similar';
+                $similar = (array) $this->attempt(
+                    $stage,
+                    fn () => $this->search->similar((int) $filters['similar_to'], (int) $this->settings->get('ai_max_results', 6)),
+                    [],
+                );
                 if ($similar !== []) {
-                    $this->conversations->addUserMessage($conversation, $message, $filters);
-                    $this->logging->record(
-                        $conversation, $user?->id, 'similar', $filters,
-                        [['tool' => 'search_properties', 'ok' => true]],
-                        count($similar), 'ok', (int) (microtime(true) * 1000) - $started, 0,
-                    );
-                    $reply = $this->replies->similarReply($similar);
+                    $reply = $this->attempt($stage, fn () => $this->replies->similarReply($similar), '');
+                    if (! is_string($reply) || $reply === '') {
+                        $reply = 'هذه أقرب العقارات المشابهة المتوفرة لدينا حاليًا:';
+                    }
+                    $this->out($conversation, $user, 'similar', 'ok', $filters, [['tool' => 'search_properties', 'ok' => true]], count($similar), $started, 0, null, $reply);
 
                     return $this->payload($conversation, $reply, 'ok', $similar, null, $filters);
                 }
-                // العقار المرجعي غير موجود/غير منشور → نكمل كبحث عادي بلا اختراع.
                 unset($filters['similar_to']);
             }
 
             // 4) البحث الفعلي في قاعدة البيانات (المصدر الوحيد للحقيقة).
-            $searchStarted = (int) (microtime(true) * 1000);
-            $results = $this->search->search($filters);
-            $searchMs = (int) (microtime(true) * 1000) - $searchStarted;
+            $stage = 'search';
+            $searchStarted = $this->ms();
+            $results = $this->attempt($stage, fn () => $this->search->search($filters), null);
+            $searchMs = $this->ms() - $searchStarted;
+
+            if (! is_array($results)) {
+                // فشل غير متوقع في البحث: رد صادق ومحدد بدل رسالة الخطأ العامة.
+                $this->failedStage ??= $stage;
+
+                return $this->degraded($conversation, $user, $intent, $filters, $started, $searchMs);
+            }
 
             $toolCalls[] = ['tool' => 'search_properties', 'ok' => true];
 
-            $this->conversations->addUserMessage($conversation, $message, $filters);
-
             // 5) لا نتائج → إما سؤال متابعة أو رد بعدم توفر.
-            if ($results['total'] === 0) {
+            if ((int) $results['total'] === 0 || $results['items'] === []) {
+                if (! empty($results['degraded'])) {
+                    return $this->degraded($conversation, $user, $intent, $filters, $started, $searchMs);
+                }
+
                 $reply = $this->noResultsReply($filters, $conversation);
-                $this->finish($conversation, $user, AiRequestStatus::Ok->value, $intent, $filters, $toolCalls, 0, $started, $searchMs, null, $reply, []);
+                $this->out($conversation, $user, $intent, 'ok', $filters, $toolCalls, 0, $started, $searchMs, null, $reply);
 
                 return $this->payload($conversation, $reply, 'ok', [], null, $filters);
             }
 
             // 6) بناء الرد الطبيعي من النتائج الحقيقية فقط (محرك حتمي — بلا نموذج).
-            $reply = $this->replies->summaryReply($message, $results['items'], $filters, $history);
+            $stage = 'reply';
+            $reply = $this->attempt(
+                $stage,
+                fn () => $this->replies->summaryReply($message, $results['items'], $filters, $history),
+                null,
+            );
+            if (! is_string($reply) || $reply === '') {
+                // بديل مضمون: سطر لكل عقار حقيقي — البيانات نفسها بلا صياغة.
+                $reply = 'وجدت لك '.count($results['items'])." عقارًا مطابقًا 🏡\n"
+                    .implode("\n", array_map(
+                        fn (array $item) => '• '.($item['title'] ?? 'عقار').' (المعرف '.$item['property_id'].')',
+                        array_slice($results['items'], 0, 3),
+                    ));
+            }
 
-            $assistantMessage = $this->conversations->addAssistantMessage(
-                $conversation,
-                $reply,
+            $assistantMessage = $this->out(
+                $conversation, $user, $intent, 'ok', $filters, $toolCalls,
+                count($results['items']), $started, $searchMs, null, $reply,
                 array_map(fn ($item) => (int) $item['property_id'], $results['items']),
             );
 
-            $this->finish($conversation, $user, AiRequestStatus::Ok->value, $intent, $filters, $toolCalls, count($results['items']), $started, $searchMs, null, $reply, []);
-
             return [
                 ...$this->payload($conversation, $reply, 'ok', $results['items'], null, $filters),
-                'message_id' => $assistantMessage->id,
+                'message_id' => $assistantMessage?->id,
             ];
         } catch (Throwable $e) {
-            report($e);
+            // خط الدفاع الأخير — لا ينبغي الوصول إليه بعد عزل المراحل أعلاه،
+            // لكن إن وصلنا فالمستخدم يستحق ردًا واضحًا وسجلًا يشرح السبب.
+            $this->logFailure($stage, $e);
+            $this->failedStage ??= $stage;
 
-            // Fallback لطيف — التطبيق يبقى صالحًا بدون AI.
             try {
                 $this->logging->record(
-                    $conversation, $user?->id, $intent, $filters, $toolCalls, 0,
-                    AiRequestStatus::Error->value, (int) (microtime(true) * 1000) - $started, $searchMs, 0, class_basename($e),
+                    $conversation ?? null, $user?->id, $intent, $filters, $toolCalls, 0,
+                    AiRequestStatus::Error->value, $this->ms() - $started, $searchMs, 0, $this->errorCode($stage, $e),
                 );
 
-                return $this->payload($conversation, 'حدث خلل مؤقت أثناء معالجة طلبك. جرّب مرة أخرى بعد لحظات.', 'error', [], 'ai_unavailable', $filters);
+                return $this->payload($conversation ?? new AiConversation, $this->errorReply(), 'error', [], 'ai_unavailable', $filters);
             } catch (Throwable) {
                 return [
-                    'reply' => 'حدث خلل مؤقت أثناء معالجة طلبك. جرّب مرة أخرى بعد لحظات.',
+                    'reply' => $this->errorReply(),
                     'status' => 'error',
                     'error' => 'ai_unavailable',
                     'conversation_id' => null,
@@ -191,7 +251,7 @@ class AiAssistantService
     /** بحث مباشر بالمعايير (POST /ai/search) — بلا توليد نصي. */
     public function handleSearch(array $filters, ?User $user): array
     {
-        $started = (int) (microtime(true) * 1000);
+        $started = $this->ms();
         $filters = collect($filters)->only([
             'transaction_type', 'property_type', 'city', 'district', 'neighborhood',
             'bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'min_price', 'max_price',
@@ -200,14 +260,103 @@ class AiAssistantService
 
         try {
             $results = $this->search->search($filters);
-            $this->logging->record(null, $user?->id, 'search', $filters, null, count($results['items']), AiRequestStatus::Ok->value, (int) (microtime(true) * 1000) - $started);
+            $this->logging->record(null, $user?->id, 'search', $filters, null, count($results['items']), AiRequestStatus::Ok->value, $this->ms() - $started);
 
-            return ['status' => 'ok', 'filters' => $filters, 'total' => $results['total'], 'properties' => $results['items']];
+            return [
+                'status' => 'ok',
+                'filters' => $filters,
+                'total' => $results['total'],
+                'properties' => $results['items'],
+                'degraded' => (bool) ($results['degraded'] ?? false),
+            ];
         } catch (Throwable $e) {
+            $this->logFailure('search', $e);
             report($e);
 
             return ['status' => 'error', 'filters' => $filters, 'total' => 0, 'properties' => [], 'error' => 'search_failed'];
         }
+    }
+
+    // ------------------------------------------------------------------
+    // أدوات المتانة والتشخيص
+    // ------------------------------------------------------------------
+
+    /**
+     * تنفيذ مرحلة مع عزل كامل: أي استثناء يُسجَّل باسم مرحلته ويُرجع القيمة
+     * البديلة بدل إسقاط الطلب كله.
+     */
+    private function attempt(string $stage, callable $callback, mixed $fallback = null): mixed
+    {
+        try {
+            return $callback();
+        } catch (Throwable $e) {
+            $this->logFailure($stage, $e);
+            $this->failedStage ??= $stage;
+
+            return $fallback;
+        }
+    }
+
+    /** تسجيل السبب الحقيقي بالتفصيل — لا نكتفي بـ report(). */
+    private function logFailure(string $stage, Throwable $e): void
+    {
+        Log::error('ai.stage_failed', [
+            'stage' => $stage,
+            'exception' => $e::class,
+            'message' => $e->getMessage(),
+            'file' => $e->getFile().':'.$e->getLine(),
+        ]);
+    }
+
+    private function errorCode(string $stage, Throwable $e): string
+    {
+        return mb_substr($stage.'|'.$this->failedStage.'|'.class_basename($e), 0, 60);
+    }
+
+    /** رد صادق ومحدد عندما تتعذر قراءة بيانات العقارات (لا رسالة عامة غامضة). */
+    private function degraded(
+        AiConversation $conversation,
+        ?User $user,
+        string $intent,
+        array $filters,
+        int $started,
+        int $searchMs,
+    ): array {
+        $reply = 'تعذر الوصول إلى بيانات العقارات لحظيًا. أعد المحاولة بعد قليل — وإن تكرر الأمر راجع لوحة التحكم (المساعد الذكي ← سجل الطلبات).';
+
+        $this->out($conversation, $user, $intent, 'error', $filters, [], 0, $started, $searchMs, 'search_degraded', $reply);
+
+        return $this->payload($conversation, $reply, 'error', [], 'search_degraded', $filters);
+    }
+
+    /** حفظ رد المساعد + تسجيل الطلب — كلاهما غير قاتل. */
+    private function out(
+        AiConversation $conversation,
+        ?User $user,
+        string $intent,
+        string $status,
+        array $filters,
+        array $toolCalls,
+        int $results,
+        int $started,
+        int $searchMs,
+        ?string $errorCode,
+        string $reply,
+        array $propertyIds = [],
+    ): ?AiMessage {
+        $message = $this->attempt('persist', fn () => $this->conversations->addAssistantMessage($conversation, $reply, $propertyIds, $status));
+
+        $this->attempt('logging', fn () => $this->logging->record(
+            $conversation, $user?->id, $intent, $filters, $toolCalls, $results,
+            $status, $this->ms() - $started, $searchMs, 0, $errorCode ?? $this->failedStage,
+        ));
+
+        return $message instanceof AiMessage ? $message : null;
+    }
+
+    private function ms(): int
+    {
+        return (int) (microtime(true) * 1000);
     }
 
     // ------------------------------------------------------------------
@@ -242,8 +391,10 @@ class AiAssistantService
         $maxFollowups = (int) config('ai.limits.max_followups', 3);
 
         // سؤال متابعة ذكي فقط إذا كانت المعلومات الأساسية ناقصة ولم نتجاوز الحد.
-        if ($this->settings->get('ai_allow_followups', true)
-            && $this->conversations->consecutiveFollowUps($conversation) < $maxFollowups) {
+        $allowFollowups = (bool) $this->attempt('settings', fn () => $this->settings->get('ai_allow_followups', true), true);
+        $followUps = (int) $this->attempt('followups', fn () => $this->conversations->consecutiveFollowUps($conversation), $maxFollowups);
+
+        if ($allowFollowups && $followUps < $maxFollowups) {
             if (empty($filters['transaction_type'])) {
                 return 'هل تريد شراء العقار أم استئجاره؟ هذا يساعدني في عرض الأنسب لك.';
             }
@@ -257,41 +408,34 @@ class AiAssistantService
 
     private function outOfScopeReply(): string
     {
-        return (string) $this->settings->get('ai_out_of_scope_response', self::OUT_OF_SCOPE_REPLY);
+        return (string) $this->attempt(
+            'settings',
+            fn () => $this->settings->get('ai_out_of_scope_response', self::OUT_OF_SCOPE_REPLY),
+            self::OUT_OF_SCOPE_REPLY,
+        );
     }
 
-    private function finish(
-        AiConversation $conversation,
-        ?User $user,
-        string $status,
-        string $intent,
-        array $filters,
-        array $toolCalls,
-        int $results,
-        int $started,
-        int $searchMs,
-        ?string $errorCode,
-        string $reply,
-        array $propertyIds,
-    ): void {
-        $latency = (int) (microtime(true) * 1000) - $started;
-
-        $this->logging->record(
-            $conversation, $user?->id, $intent, $filters, $toolCalls, $results,
-            $status, $latency, $searchMs, 0, $errorCode,
-        );
+    /** نص الخطأ العام الأخير — مع إشارة تشخيص إن كان التطبيق في وضع التصحيح. */
+    private function errorReply(): string
+    {
+        return 'حدث خلل مؤقت أثناء معالجة طلبك. جرّب مرة أخرى بعد لحظات.';
     }
 
     private function payload(AiConversation $conversation, string $reply, string $status, array $properties, ?string $errorCode, array $filters = []): array
     {
-        return [
+        $payload = [
             'reply' => $reply,
             'status' => $status,
             'error' => $errorCode,
-            'conversation_id' => $conversation->id,
-            'session_token' => $conversation->session_token,
+            'conversation_id' => $conversation->exists ? $conversation->id : null,
+            'session_token' => $conversation->exists ? $conversation->session_token : null,
             'properties' => $properties,
             'filters' => $filters,
+            // اسم المرحلة التي فشلت (إن فشلت) — بلا أي تفاصيل داخلية ولا SQL،
+            // ويظهر في لوحة التحكم (سجل الطلبات + صفحة الاختبار) للتشخيص الفوري.
+            'failed_stage' => $this->failedStage,
         ];
+
+        return $payload;
     }
 }

@@ -9,6 +9,7 @@ use App\Models\PropertyType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -275,6 +276,166 @@ class AiAssistantTest extends TestCase
         $this->assertArrayHasKey('welcome_message', $data);
         $this->assertArrayNotHasKey('api_key', $data);
         $this->assertArrayNotHasKey('inference_endpoint', $data);
+    }
+
+    // ==================================================================
+    // اختبارات الحماية من الخلل العام «حدث خلل مؤقت أثناء معالجة طلبك»
+    // ==================================================================
+
+    /** 1) لا رسالة خلل عام لأي رسالة عادية — مهما كان نوعها. */
+    public function test_normal_messages_never_get_the_generic_error(): void
+    {
+        $messages = [
+            'مرحبا',
+            'شقة للإيجار في صنعاء',
+            'شقة غير مفروشة في حدة',
+            'أرض للبيع في عدن',
+            'معلومات عن العقار 1',
+            'كم عقار عندكم',
+            'قريبة مني شقة',
+            'مين انت',
+            'أرخص العقارات',
+        ];
+
+        foreach ($messages as $message) {
+            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+            $response->assertOk();
+            $data = $response->json('data');
+
+            $this->assertNotSame('error', $data['status'], "رسالة فشلت: {$message}");
+            $this->assertStringNotContainsString('حدث خلل مؤقت', (string) $data['reply'], "رسالة أرجعت خطأً عامًا: {$message}");
+            $this->assertNotEmpty($data['reply']);
+        }
+    }
+
+    /** 2) السبب الجذري للخلل السابق: جدول الفهرس مفقود على الاستضافة. */
+    public function test_missing_ai_tables_are_healed_at_runtime(): void
+    {
+        Schema::dropIfExists('ai_search_index');
+        $this->assertFalse(Schema::hasTable('ai_search_index'));
+
+        $response = $this->postJson('/api/v1/ai/chat', ['message' => 'شقة للإيجار في صنعاء']);
+
+        $response->assertOk();
+        $this->assertSame('ok', $response->json('data.status'));
+        // الجدول أُعيد إنشاؤه آليًا داخل الطلب نفسه.
+        $this->assertTrue(Schema::hasTable('ai_search_index'));
+    }
+
+    /** 3) عمود مفقود في الفهرس لا يمنع الرد (يُضاف آليًا). */
+    public function test_missing_index_columns_are_healed(): void
+    {
+        Schema::table('ai_search_index', function ($table) {
+            $table->dropColumn('currency');
+        });
+        $this->assertFalse(Schema::hasColumn('ai_search_index', 'currency'));
+
+        $response = $this->postJson('/api/v1/ai/chat', ['message' => 'شقة في صنعاء']);
+        $response->assertOk();
+        $this->assertSame('ok', $response->json('data.status'));
+        $this->assertTrue(Schema::hasColumn('ai_search_index', 'currency'));
+    }
+
+    /** 4) الإحداثيات تُخزَّن فعلاً في فهرس المساعد (كانت تُسقط بصمت). */
+    public function test_search_index_stores_property_coordinates(): void
+    {
+        $property = Property::query()->where('status', 'published')->firstOrFail();
+        $property->location->update(['latitude' => 15.369445, 'longitude' => 44.191006]);
+
+        // تحديث نموذج جديد (بلا علاقات محملة) يطلق المزامنة بالكامل.
+        Property::query()->whereKey($property->id)->firstOrFail()->update(['is_featured' => ! $property->is_featured]);
+
+        $indexed = \App\Models\AiSearchIndex::query()->where('property_id', $property->id)->firstOrFail();
+        $this->assertEqualsWithDelta(15.369445, (float) $indexed->latitude, 0.0001);
+        $this->assertEqualsWithDelta(44.191006, (float) $indexed->longitude, 0.0001);
+    }
+
+    /** 5) البحث القريب يستخدم الإحداثيات الحقيقية. */
+    public function test_nearby_search_uses_real_coordinates(): void
+    {
+        $property = Property::query()->where('status', 'published')->firstOrFail();
+        $property->location->update(['latitude' => 15.369445, 'longitude' => 44.191006]);
+        Property::query()->whereKey($property->id)->firstOrFail()->update(['title' => $property->title.' ']);
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد شقة قريبة مني',
+            'latitude' => 15.369445,
+            'longitude' => 44.191006,
+            'radius_km' => 5,
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('ok', $response->json('data.status'));
+        // العقار نفسه داخل دائرة 5 كم → إما نتيجة مطابقة أو رد صادق بلا خلل.
+        $this->assertStringNotContainsString('حدث خلل مؤقت', (string) $response->json('data.reply'));
+    }
+
+    /** 6) اسم النوع «شقة» يُفهم (كان يُفقد بسبب التاء المربوطة). */
+    public function test_arabic_property_type_is_parsed_after_normalization(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', ['message' => 'أريد شقة في صنعاء']);
+
+        $response->assertOk();
+        $filters = $response->json('data.filters');
+        $this->assertSame('apartment', $filters['property_type'] ?? null);
+        $this->assertSame('صنعاء', $filters['city'] ?? null);
+    }
+
+    /** 7) «غير مفروشة» تُفهم كاسم (كانت تُقلب إلى «مفروشة»). */
+    public function test_negative_furnished_is_understood(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', ['message' => 'شقة غير مفروشة في صنعاء']);
+
+        $response->assertOk();
+        $filters = $response->json('data.filters');
+        $this->assertArrayHasKey('furnished', $filters);
+        $this->assertFalse((bool) $filters['furnished']);
+
+        // ولا تُعرض عقارات مفروشة في النتائج.
+        foreach ($response->json('data.properties') as $property) {
+            $this->assertFalse((bool) $property['is_furnished']);
+        }
+    }
+
+    /** 8) رسالة خارج النطاق تُحجب فعلاً (كانت الأنماط بـ«ة/أ» لا تطابق شيئًا). */
+    public function test_out_of_domain_text_is_blocked_after_normalization(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', ['message' => 'اكتب لي قصيدة عن البحر']);
+
+        $response->assertOk();
+        $this->assertSame('blocked', $response->json('data.status'));
+    }
+
+    /** 9) فحص الصحة يقول الحقيقة عن المخطط. */
+    public function test_health_reports_schema_readiness(): void
+    {
+        $this->getJson('/api/v1/ai/health')
+            ->assertOk()
+            ->assertJsonPath('data.tables_ready', true)
+            ->assertJsonPath('data.healthy', true);
+
+        Schema::dropIfExists('ai_search_index');
+
+        $this->getJson('/api/v1/ai/health')
+            ->assertOk()
+            ->assertJsonPath('data.tables_ready', false)
+            ->assertJsonPath('data.healthy', false);
+    }
+
+    /** 10) كل فشل يُسجَّل برمز خطأ يحمل مرحلته — لا خطأ صامت. */
+    public function test_request_logs_carry_a_useful_error_code(): void
+    {
+        $this->postJson('/api/v1/ai/chat', ['message' => 'شقة للإيجار في صنعاء'])->assertOk();
+
+        $log = \App\Models\AiRequestLog::query()->latest()->firstOrFail();
+        $this->assertSame('ok', $log->status);
+        $this->assertNull($log->error_code);
+
+        // الحالات المحجوبة تحمل رمز الحاجز نفسه.
+        $this->postJson('/api/v1/ai/chat', ['message' => 'اكتب لي برنامج Flutter'])->assertOk();
+        $blocked = \App\Models\AiRequestLog::query()->latest()->firstOrFail();
+        $this->assertSame('blocked', $blocked->status);
+        $this->assertStringContainsString('guard_', (string) $blocked->error_code);
     }
 
     // ------------------------------------------------------------------

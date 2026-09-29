@@ -14,16 +14,16 @@ import '../../widgets.dart';
 
 /// شاشة بيانات توثيق الوكيل — كل ما تحتاجه الإدارة لقبول الحساب.
 /// تُفتح من الملف الشخصي لحسابات الوكلاء غير الموثقة.
-class AgentVerificationScreen extends ConsumerStatefulWidget {
-  const AgentVerificationScreen({super.key});
+class AgentAccountVerificationScreen extends ConsumerStatefulWidget {
+  const AgentAccountVerificationScreen({super.key});
 
   @override
-  ConsumerState<AgentVerificationScreen> createState() =>
-      _AgentVerificationScreenState();
+  ConsumerState<AgentAccountVerificationScreen> createState() =>
+      _AgentAccountVerificationScreenState();
 }
 
-class _AgentVerificationScreenState
-    extends ConsumerState<AgentVerificationScreen> {
+class _AgentAccountVerificationScreenState
+    extends ConsumerState<AgentAccountVerificationScreen> {
   final _form = GlobalKey<FormState>();
   final _agencyName = TextEditingController();
   final _jobTitle = TextEditingController();

@@ -20,7 +20,11 @@ class AiSearchIndex extends Model
         'property_id', 'title', 'description', 'transaction_type', 'status',
         'type_slug', 'type_name_ar', 'city', 'district', 'neighborhood',
         'price', 'currency', 'area', 'bedrooms', 'bathrooms', 'is_furnished',
-        'is_new', 'is_featured', 'published_at', 'search_text', 'content_hash',
+        'is_new', 'is_featured', 'published_at',
+        // إحداثيات العقار الحقيقية — لا بد أن تكون قابلة للتعبئة وإلا أُسقطت
+        // بصمت عند المزامنة فتفشل نتائج «قريب مني».
+        'latitude', 'longitude',
+        'search_text', 'content_hash',
     ];
 
     protected function casts(): array
@@ -34,6 +38,8 @@ class AiSearchIndex extends Model
             'is_new' => 'boolean',
             'is_featured' => 'boolean',
             'published_at' => 'datetime',
+            'latitude' => 'float',
+            'longitude' => 'float',
         ];
     }
 
@@ -55,6 +61,10 @@ class AiSearchIndex extends Model
             $property->location?->city,
             $property->location?->district,
             $property->location?->neighborhood,
+            // الإحداثيات ضمن التجزئة: نقل دبوس العقار على الخريطة يجب أن
+            // يُحدّث فهرس المساعد (وإلا بقي البحث «قريب مني» على موقع قديم).
+            (string) $property->location?->latitude,
+            (string) $property->location?->longitude,
             (string) $property->price,
             $property->currency,
             (string) $property->area,

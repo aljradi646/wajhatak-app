@@ -10,12 +10,13 @@
 #   3. Waits for the database (via `db:show`, which works on a fresh DB).
 #   4. Generates an APP_KEY on first boot when missing.
 #   5. Prepares storage and creates the public storage symlink.
-#   6. ONE-TIME provisioning (guarded by the Setting 'system_initialized'):
-#      creates all tables, seeds roles/permissions/locations, then the REAL
-#      Sana'a dataset (agents عبدالرحمن & مهند + real property listings with
-#      photos downloaded from the internet) and the control-panel admin.
-#      After that flag is set, EVERY later boot skips migrations and seeds so
-#      redeploys or restarts can never modify the database again.
+#   6. Migrations run on EVERY boot (idempotent) so the live database always
+#      matches the deployed code — new tables/columns for the AI assistant,
+#      agent verification and email codes included. Seeds run exactly ONCE,
+#      guarded by the Setting 'system_initialized' (RealDataSeeder).
+#   6b. Runs the AI engine self-test and `ai:doctor --fix` (real health check
+#      of the assistant: schema, settings, index, live search, live chat) so
+#      any assistant problem is visible in the deploy log and self-healed.
 #   7. Caches config/routes/views.
 #   8. For the "app" service: starts the queue worker (deferred notifications)
 #      in the background and serves the app with `php artisan serve` on $PORT.
@@ -80,6 +81,17 @@ if [ ! -f vendor/autoload.php ] || [ -d vendor/laravel/pail ]; then
     composer install --no-interaction --no-progress --prefer-dist --no-dev --no-scripts --no-ansi || true
     rm -rf vendor/laravel/pail 2>/dev/null || true
     composer dump-autoload --optimize --no-dev --no-interaction --no-ansi >/dev/null 2>&1 || true
+fi
+
+# اختبار ذاتي لمحرك المساعد الحتمي (بلا قاعدة بيانات ولا vendor) — يكشف أي
+# تعبير نمطي معطوب أو تراجع في فهم العربية قبل أن يصل للمستخدمين.
+if [ -f scripts/ai_selftest/run.php ]; then
+    if php scripts/ai_selftest/run.php >/dev/null 2>&1; then
+        echo "==> [Wajhatak] AI engine self-test: OK"
+    else
+        echo "!! [Wajhatak] AI engine self-test FAILED — راجع: php scripts/ai_selftest/run.php" >&2
+        php scripts/ai_selftest/run.php 2>&1 | tail -n 25 | sed 's/^/      | /' >&2 || true
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -308,6 +320,13 @@ if [ "$SERVICE_TYPE" != "static" ]; then
             php artisan db:seed --class=AdminUserSeeder --force
             ;;
     esac
+
+    # 6b. صحة المساعد الذكي: فحص حقيقي من داخل التطبيق (مخطط + إعدادات +
+    #     فهرس مقابل العقارات + بحث حقيقي + محادثة حقيقية)، مع إصلاح آلي
+    #     لأي جدول/عمود ناقص أو فهرس فارغ. السبب صار ظاهرًا في سجل النشر
+    #     بلا تخمين. غير قاتل: نُكمل التشغيل حتى لو أبلغ عن مشكلة.
+    echo "==> [Wajhatak] AI assistant health check (ai:doctor --fix)..."
+    php artisan ai:doctor --fix || echo "    ai:doctor reported issues (non-fatal, continuing)."
 
     # 7. Cache config/routes/views (recomputed from current env each boot)
     echo "==> [Wajhatak] Caching config, routes and views..."

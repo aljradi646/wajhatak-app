@@ -114,6 +114,13 @@
                         if (payload.filters && Object.keys(payload.filters).length > 0) {
                             this.appendFilters(payload.filters);
                         }
+                        // تشخيص ظاهر بدل رسالة غامضة: الحالة + رمز الخطأ + المرحلة.
+                        if (payload.status && payload.status !== 'ok' && (payload.error || payload.failed_stage)) {
+                            this.appendBubble('assistant', '🧪 تشخيص تقني — الحالة: ' + payload.status
+                                + ' | رمز الخطأ: ' + (payload.error ?? '—')
+                                + ' | المرحلة: ' + (payload.failed_stage ?? '—')
+                                + ' (التفاصيل الكاملة في storage/logs/laravel.log وأمر ai:doctor).');
+                        }
                     } catch (e) {
                         typing.remove();
                         this.appendBubble('assistant', 'تعذر الاتصال بالخادم. أعد المحاولة.');

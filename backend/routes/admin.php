@@ -75,6 +75,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('ai', [AiAssistantController::class, 'index'])->name('ai.index');
     Route::post('ai', [AiAssistantController::class, 'update'])->name('ai.update');
     Route::post('ai/reindex', [AiAssistantController::class, 'reindex'])->name('ai.reindex');
+    // إصلاح ذاتي لمخطط المساعد (جداول/أعمدة ناقصة + فهرس فارغ) من اللوحة.
+    Route::post('ai/repair', [AiAssistantController::class, 'repair'])->name('ai.repair');
     Route::get('ai/playground', [AiAssistantController::class, 'playground'])->name('ai.playground');
     Route::post('ai/playground/send', [AiAssistantController::class, 'playgroundSend'])->name('ai.playground.send');
     Route::post('ai/playground/clear', [AiAssistantController::class, 'playgroundClear'])->name('ai.playground.clear');
