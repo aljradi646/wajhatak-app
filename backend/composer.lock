@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "23559f9cdfe48156208b4c7b9173b973",
+    "content-hash": "9ef5d5f4c889c0e0ebdb2454ec5e2c12",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -1293,30 +1293,39 @@
         {
             "name": "khaled.alshamaa/ar-php",
             "version": "v7.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/khaled-alshamaa/ar-php.git",
+                "reference": "1e2d3fa335ce57ff261920228dd6e73fe7e49e19"
+            },
             "dist": {
-                "type": "path",
-                "url": "vendor/khaled.alshamaa/ar-php",
-                "reference": "4eb2fc58e503b7d1dfbf4db119caffa39f9ec38b"
+                "type": "zip",
+                "url": "https://api.github.com/repos/khaled-alshamaa/ar-php/zipball/1e2d3fa335ce57ff261920228dd6e73fe7e49e19",
+                "reference": "1e2d3fa335ce57ff261920228dd6e73fe7e49e19",
+                "shasum": ""
             },
             "require": {
+                "ext-calendar": "*",
                 "ext-json": "*",
                 "ext-mbstring": "*",
                 "php": ">=5.6"
             },
             "type": "library",
             "autoload": {
-                "classmap": [
-                    "src/"
-                ]
+                "psr-4": {
+                    "ArPHP\\I18N\\": "src"
+                }
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "LGPL-3.0"
             ],
-            "description": "PHP and Arabic Language - RTL/pdf glyph shaping runtime files assembled for this deployment (full sources blocked by codeload interruption)",
-            "transport-options": {
-                "symlink": false,
-                "relative": true
-            }
+            "description": "PHP and Arabic Language",
+            "support": {
+                "issues": "https://github.com/khaled-alshamaa/ar-php/issues",
+                "source": "https://github.com/khaled-alshamaa/ar-php/tree/v7.0.0"
+            },
+            "time": "2024-08-01T12:00:00+00:00"
         },
         {
             "name": "laravel/framework",
