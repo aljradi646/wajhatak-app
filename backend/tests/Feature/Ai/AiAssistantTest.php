@@ -150,6 +150,90 @@ class AiAssistantTest extends TestCase
         $this->assertSame([], $data['properties']);
     }
 
+    /**
+     * ح1) كل صيغ التحية الشائعة — بما فيها «ألو» — تُرد محادثةً طبيعية
+     * ولا يجوز أن تُنفّذ بحثًا أو تعرض أي عقارات (متطلب أساسي من الأعمال).
+     */
+    public function test_all_common_greetings_never_trigger_a_search(): void
+    {
+        foreach (['ألو', 'الو', 'هلا', 'السلام عليكم', 'كيفك', 'هلا والله', 'صباح الخير', 'شلونك'] as $greeting) {
+            $response = $this->postJson('/api/v1/ai/chat', ['message' => $greeting]);
+
+            $response->assertOk();
+            $data = $response->json('data');
+            $this->assertSame('ok', $data['status'], "التحية فشلت: {$greeting}");
+            $this->assertSame([], $data['properties'], "تحية عرضت عقارات: {$greeting}");
+            $this->assertNotEmpty($data['reply']);
+        }
+    }
+
+    /**
+     * ح3) رسالة مبهمة بلا أي معيار بحث حقيقي لا تُنفّذ بحثًا يعرض كل العقارات؛
+     * يطلب المساعد التوضيح ضمن سقف أسئلة المتابعة ثم يرشد المستخدم.
+     */
+    public function test_vague_message_asks_for_clarification_without_searching(): void
+    {
+        $totalPublished = Property::query()->where('status', 'published')->count();
+        $this->assertGreaterThan(0, $totalPublished);
+
+        $response = $this->postJson('/api/v1/ai/chat', ['message' => 'أبحث عن عقار']);
+
+        $response->assertOk();
+        $data = $response->json('data');
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame([], $data['properties'], 'رسالة مبهمة عرضت عقارات بدل طلب التوضيح');
+        $this->assertStringContainsString('؟', $data['reply'], 'الرد التوضيحي يجب أن يسأل سؤالًا');
+    }
+
+    /**
+     * ح4) عزل مطابقة المدن: «إب» لا تُطابَق داخل «أبحث» — الرسالة المبهمة
+     * لا تولّد بحثًا في مدينة لم يذكرها المستخدم إطلاقًا.
+     */
+    public function test_city_names_are_not_matched_inside_other_words(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', ['message' => 'أبحث عن عقار']);
+
+        $response->assertOk();
+        $filters = $response->json('data.filters');
+        $this->assertArrayNotHasKey('city', $filters ?? [], '«إب» تُطابقت داخل «أبحث» — خطأ مطابقة');
+    }
+
+    /** ح5) متابعة سياق ثلاثية: شقة → غرفتين → أقل من 100 ألف تُدمج في طلب واحد. */
+    public function test_three_step_context_accumulates_all_filters(): void
+    {
+        $first = $this->postJson('/api/v1/ai/chat', ['message' => 'أريد شقة في صنعاء']);
+        $first->assertOk();
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $second = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'تكون غرفتين',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
+        ]);
+        $second->assertOk();
+
+        $third = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'وأقل من 100 ألف',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
+        ]);
+        $third->assertOk();
+
+        $filters = $third->json('data.filters');
+        $this->assertSame('صنعاء', $filters['city'] ?? null);
+        $this->assertSame('apartment', $filters['property_type'] ?? null);
+        $this->assertSame(2, $filters['bedrooms_min'] ?? null);
+        $this->assertNotNull($filters['max_price'] ?? null);
+
+        // كل النتائج النهائية مطابقة للمعايير المتراكمة الثلاثة معًا.
+        foreach ($third->json('data.properties') as $property) {
+            $this->assertGreaterThanOrEqual(2, $property['bedrooms']);
+            $this->assertLessThanOrEqual(100_000, $property['price']);
+            $this->assertSame('صنعاء', $property['city']);
+        }
+    }
+
     /** ح2) طلب تفاصيل عقار حقيقي بالمعرف يعرض بياناته الفعلية من القاعدة. */
     public function test_details_request_shows_real_property_data(): void
     {
@@ -427,13 +511,14 @@ class AiAssistantTest extends TestCase
     {
         $this->postJson('/api/v1/ai/chat', ['message' => 'شقة للإيجار في صنعاء'])->assertOk();
 
-        $log = \App\Models\AiRequestLog::query()->latest()->firstOrFail();
+        // الترتيب بالمعرّف لا بالوقت: الطلبان قد يقعان في نفس الثانية.
+        $log = \App\Models\AiRequestLog::query()->orderByDesc('id')->firstOrFail();
         $this->assertSame('ok', $log->status);
         $this->assertNull($log->error_code);
 
         // الحالات المحجوبة تحمل رمز الحاجز نفسه.
         $this->postJson('/api/v1/ai/chat', ['message' => 'اكتب لي برنامج Flutter'])->assertOk();
-        $blocked = \App\Models\AiRequestLog::query()->latest()->firstOrFail();
+        $blocked = \App\Models\AiRequestLog::query()->orderByDesc('id')->firstOrFail();
         $this->assertSame('blocked', $blocked->status);
         $this->assertStringContainsString('guard_', (string) $blocked->error_code);
     }

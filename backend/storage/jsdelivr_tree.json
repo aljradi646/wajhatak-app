@@ -1,0 +1,10 @@
+{
+	"type": "gh",
+	"name": "khaled-alshamaa/ar-php",
+	"version": "1e2d3fa335ce57ff261920228dd6e73fe7e49e19",
+	"status": 403,
+	"message": "Package size exceeded the configured limit of 50 MB.",
+	"links": {
+		"stats": "https://data.jsdelivr.com/v1/stats/packages/gh/khaled-alshamaa/ar-php@1e2d3fa335ce57ff261920228dd6e73fe7e49e19"
+	}
+}

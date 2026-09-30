@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,6 +29,25 @@ class ActivityLog extends Model
         'user_id' => 'integer',
         'subject_id' => 'integer',
     ];
+
+    /**
+     * العمود properties مخزَّن كنص JSON؛ هذا المُلحق يُرجعه مصفوفة جاهزة
+     * للاستخدام في الواجهات وسجلات التغييرات (from/to مثلًا).
+     */
+    protected function propertiesArray(): Attribute
+    {
+        return Attribute::make(
+            get: function (): array {
+                if (! is_string($this->properties) || $this->properties === '') {
+                    return [];
+                }
+
+                $decoded = json_decode($this->properties, true);
+
+                return is_array($decoded) ? $decoded : [];
+            },
+        );
+    }
 
     public function user(): BelongsTo
     {

@@ -147,6 +147,22 @@ class AiAssistantService
             // حفظ رسالة المستخدم مرة واحدة مع معاييرها (سياق المحادثة).
             $this->attempt('persist', fn () => $this->conversations->addUserMessage($conversation, $message, $filters));
 
+            // 3.5) لا معيار بحث حقيقي بعد (رسالة عامة/مبهمة) → لا نُنفّذ بحثًا
+            //      يُظهر كل العقارات خطأً. نسأل سؤال توضيح ضمن سقف أسئلة
+            //      المتابعة، ثم نرشد المستخدم — فصل النية عن البحث.
+            if (! $this->hasSearchCriteria($filters)) {
+                $stage = 'clarify';
+                $maxFollowUps = (int) config('ai.limits.max_followups', 2);
+                $followUps = (int) $this->attempt('followups', fn () => $this->conversations->consecutiveFollowUps($conversation), $maxFollowUps);
+                $reply = $this->attempt('clarify', fn () => $this->replies->clarifyReply($followUps, $maxFollowUps));
+                if (! is_string($reply) || $reply === '') {
+                    $reply = 'أخبرني ما الذي تبحث عنه: شقة أم بيت أم أرض، وفي أي مدينة وبأي ميزانية تقريبًا؟';
+                }
+                $this->out($conversation, $user, 'clarify', 'ok', $filters, [], 0, $started, 0, null, $reply);
+
+                return $this->payload($conversation, $reply, 'ok', [], null, $filters);
+            }
+
             // "عقار مشابه لهذا العقار": نستمد الفلاتر من خصائص العقار المرجعي
             // (يجب أن يكون منشورًا فعليًا) ثم نبحث عن الأكثر شبهًا به.
             if (! empty($filters['similar_to'])) {
@@ -386,24 +402,52 @@ class AiAssistantService
         }
     }
 
+    /**
+     * رد عدم توفر نتائج — يبدأ دائمًا برد صادق صريح («لا توجد…») ثم يضيف
+     * سؤال متابعة واحدًا فقط إن كان هناك معيار أساسي ناقص ولم نتجاوز السقف.
+     */
     private function noResultsReply(array $filters, AiConversation $conversation): string
     {
-        $maxFollowups = (int) config('ai.limits.max_followups', 3);
+        $honest = $this->replies->noResultsReply($filters);
 
-        // سؤال متابعة ذكي فقط إذا كانت المعلومات الأساسية ناقصة ولم نتجاوز الحد.
-        $allowFollowups = (bool) $this->attempt('settings', fn () => $this->settings->get('ai_allow_followups', true), true);
-        $followUps = (int) $this->attempt('followups', fn () => $this->conversations->consecutiveFollowUps($conversation), $maxFollowups);
+        $maxFollowUps = (int) config('ai.limits.max_followups', 2);
+        $allowFollowUps = (bool) $this->attempt('settings', fn () => $this->settings->get('ai_allow_followups', true), true);
+        $followUps = (int) $this->attempt('followups', fn () => $this->conversations->consecutiveFollowUps($conversation), $maxFollowUps);
 
-        if ($allowFollowups && $followUps < $maxFollowups) {
-            if (empty($filters['transaction_type'])) {
-                return 'هل تريد شراء العقار أم استئجاره؟ هذا يساعدني في عرض الأنسب لك.';
-            }
-            if (empty($filters['city'])) {
-                return 'لم أجد نتائج مطابقة بعد. في أي مدينة تبحث؟ (صنعاء، عدن، تعز...)';
+        if (! $allowFollowUps || $followUps >= $maxFollowUps) {
+            return $honest;
+        }
+
+        $question = null;
+        if (empty($filters['city']) && empty($filters['district'])) {
+            $question = 'في أي مدينة أو منطقة تفضّل؟ وسأوسّع البحث فورًا.';
+        } elseif (empty($filters['transaction_type'])) {
+            $question = 'هل تفضّل البيع أم الإيجار؟ هذا يساعدني في عرض الأنسب لك.';
+        } elseif (! empty($filters['max_price'])) {
+            $question = 'هل تريد أن أرفع سقف الميزانية قليلًا لعرض خيارات أقرب؟';
+        }
+
+        return $question === null ? $honest : $honest."\n".$question;
+    }
+
+    /**
+     * هل تحمل المعايير معيار بحث حقيقيًا يستحق الاستعلام؟
+     * رسالة مثل «ألو» أو «أبحث عن عقار» بلا معيار لا يجب أن تُنفّذ بحثًا.
+     */
+    private function hasSearchCriteria(array $filters): bool
+    {
+        foreach ([
+            'transaction_type', 'property_type', 'city', 'district', 'neighborhood',
+            'min_price', 'max_price', 'min_area', 'max_area',
+            'bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'furnished', 'is_new',
+            'sort', 'similar_to', 'nearby',
+        ] as $key) {
+            if (isset($filters[$key]) && $filters[$key] !== '' && $filters[$key] !== null) {
+                return true;
             }
         }
 
-        return $this->replies->noResultsReply($filters);
+        return ! empty($filters['keywords']);
     }
 
     private function outOfScopeReply(): string

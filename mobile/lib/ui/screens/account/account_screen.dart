@@ -86,7 +86,12 @@ class AccountScreen extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: Text(
-                        user.isAgent ? 'وكيل عقاري معتمد' : 'حساب عميل',
+                        // الوسم يتبع حالة التوثيق الفعلية من الخادم، لا نوع الحساب.
+                        user.isAgentApproved
+                            ? 'وكيل عقاري موثق'
+                            : user.isAgent
+                            ? 'وكيل عقاري (غير موثق)'
+                            : 'حساب عميل',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,

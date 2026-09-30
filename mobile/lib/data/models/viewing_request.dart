@@ -58,3 +58,42 @@ class ViewingRequestItem {
     );
   }
 }
+
+/// عنصر واحد في سجل تغييرات طلب المعاينة — بيانات حقيقية من الخادم.
+@immutable
+class ViewingRequestHistoryEntry {
+  const ViewingRequestHistoryEntry({
+    required this.id,
+    required this.action,
+    required this.label,
+    this.from,
+    this.to,
+    this.by,
+    this.at,
+  });
+
+  final int id;
+
+  /// مفتاح ثابت للبرمجة: created | status_changed | rescheduled | deleted
+  final String action;
+
+  /// وصف عربي جاهز للعرض.
+  final String label;
+  final String? from;
+  final String? to;
+  final String? by;
+  final DateTime? at;
+
+  factory ViewingRequestHistoryEntry.fromJson(Map<String, dynamic> json) {
+    final by = json['by'] as Map<String, dynamic>?;
+    return ViewingRequestHistoryEntry(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      action: json['action'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      from: json['from'] as String?,
+      to: json['to'] as String?,
+      by: by?['name'] as String?,
+      at: DateTime.tryParse(json['at'] as String? ?? ''),
+    );
+  }
+}

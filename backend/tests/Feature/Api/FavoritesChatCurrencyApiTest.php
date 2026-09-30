@@ -6,6 +6,7 @@ use App\Enums\PropertyStatus;
 use App\Enums\TransactionType;
 use App\Models\Agent;
 use App\Models\Conversation;
+use App\Models\Favorite;
 use App\Models\Message;
 use App\Models\Property;
 use App\Models\PropertyLocation;
@@ -96,7 +97,7 @@ class FavoritesChatCurrencyApiTest extends TestCase
 
         // Second POST must not duplicate (unique constraint + firstOrCreate).
         $this->postJson('/api/v1/favorites', ['property_id' => $property->id])->assertNoContent();
-        $this->assertSame(1, \App\Models\Favorite::query()->where('user_id', $user->id)->count());
+        $this->assertSame(1, Favorite::query()->where('user_id', $user->id)->count());
 
         // DELETE removes it, second DELETE is still 204 (idempotent).
         $this->deleteJson('/api/v1/favorites/'.$property->id)->assertNoContent();
@@ -112,7 +113,7 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $userB = User::factory()->create();
         $userB->assignRole('user');
 
-        \App\Models\Favorite::query()->create(['user_id' => $userA->id, 'property_id' => $property->id]);
+        Favorite::query()->create(['user_id' => $userA->id, 'property_id' => $property->id]);
 
         Sanctum::actingAs($userB);
         $this->getJson('/api/v1/favorites')->assertOk()->assertJsonCount(0, 'data');
@@ -298,7 +299,13 @@ class FavoritesChatCurrencyApiTest extends TestCase
     {
         $agentUser = User::factory()->create(['name' => 'وكيل تجريبي']);
         $agentUser->assignRole('agent');
-        $agent = Agent::query()->create(['user_id' => $agentUser->id, 'is_active' => true]);
+        // وكيل موثق ومعتمد من الإدارة (بوابة النشر تمنع غير الموثق عن إنشاء العقارات).
+        $agent = Agent::query()->create([
+            'user_id' => $agentUser->id,
+            'is_active' => true,
+            'verification_status' => 'approved',
+            'verified_at' => now(),
+        ]);
 
         return [$agentUser, $agent];
     }

@@ -19,6 +19,10 @@ class AgentResource extends JsonResource
             'rating' => (float) $this->rating,
             'reviews_count' => $this->reviews_count,
             'properties_count' => $this->whenCounted('properties'),
+            // حالة حقيقية من الإدارة: لا يُعرض وسم «موثّق» إلا لحساب اعتمدته فعليًا.
+            'verification_status' => $this->verification_status,
+            'is_verified' => $this->verification_status === 'approved' && (bool) $this->is_active,
+            'is_active' => (bool) $this->is_active,
         ];
     }
 }

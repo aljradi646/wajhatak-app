@@ -147,7 +147,7 @@
                             خصائص العقارات
                         </x-admin.nav-link>
 
-                        <x-admin.nav-link href="{{ route('admin.ai.index') }}" :active="request()->routeIs('admin.ai.index', 'admin.ai.update', 'admin.ai.reindex')">
+                        <x-admin.nav-link href="{{ route('admin.ai.index') }}" :active="request()->routeIs('admin.ai.*')">
                             <x-slot name="icon"><x-admin.icon name="ai-assistant" /></x-slot>
                             المساعد الذكي
                         </x-admin.nav-link>

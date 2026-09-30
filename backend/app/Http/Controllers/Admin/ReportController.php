@@ -6,21 +6,34 @@ use App\Http\Controllers\Controller;
 use App\Models\Agent;
 use App\Models\Property;
 use App\Models\PropertyType;
+use App\Models\ReportLog;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\ViewingRequest;
-use ArPHP\I18N\Arabic;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Reports\PdfReportRenderer;
+use App\Services\Reports\ReportExporter;
 use Closure;
-use Illuminate\Support\Facades\Response;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class ReportController extends Controller
 {
-    private const STATUS_KEYS = [
-        'draft', 'pending', 'published', 'rejected', 'archived',
-        'confirmed', 'cancelled', 'completed', 'active', 'inactive',
+    /**
+     * مرشحات كل تقرير — تُستخدم للتحقق من المُدخلات وحفظها في سجل التقارير
+     * حتى يمكن إعادة توليد نفس التقرير لاحقًا.
+     */
+    private const FILTER_KEYS = [
+        'agents' => ['status'],
+        'properties' => ['status', 'type', 'agent'],
+        'requests' => ['status', 'agent'],
+        'users' => ['role', 'user'],
     ];
+
+    public function __construct(
+        private readonly ReportExporter $exporter,
+        private readonly PdfReportRenderer $pdf,
+    ) {}
 
     public function index()
     {
@@ -36,16 +49,87 @@ class ReportController extends Controller
                 'users_active' => User::query()->where('is_active', true)->count(),
             ],
             'propertyTypes' => PropertyType::query()->where('is_active', true)->get(['id', 'slug', 'name_ar']),
+            'recentLogs' => ReportLog::query()->ownedBy(request()->user())->with('user')->latest('id')->limit(5)->get(),
         ]);
     }
 
     public function show(string $type)
     {
+        $format = $this->normalizeFormat(request('format', 'html'));
+        $data = $this->buildReport($type, $this->extractFilters($type, request()->all()));
+        $fmt = $this->formatter($data['currency'] ?? 'YER');
+
+        $response = match ($format) {
+            'pdf' => $this->renderPdf($data, $fmt),
+            'excel' => $this->downloadExcel($data, $fmt),
+            'csv' => $this->downloadCsv($data, $fmt),
+            'json' => $this->downloadJson($data, $fmt),
+            default => view('admin.reports.section', ['report' => $data, 'fmt' => $fmt]),
+        };
+
+        // كل تقرير يُولَّد فعليًا يُسجَّل بمالكه ونوعه وصيغته ومرشحاته.
+        $this->recordLog($type, $format, $data);
+
+        return $response;
+    }
+
+    /** سجل التقارير: تصفح كل التقارير المُولَّدة سابقًا مع إمكانية إعادة فتحها. */
+    public function logs(Request $request)
+    {
+        $query = ReportLog::query()->ownedBy($request->user())->with('user')->latest('id');
+
+        $type = $request->input('type');
+        if (is_string($type) && in_array($type, ReportLog::TYPES, true)) {
+            $query->where('type', $type);
+        }
+
+        return view('admin.reports.logs', [
+            'logs' => $query->paginate(20)->withQueryString(),
+            'typeFilter' => is_string($type) ? $type : null,
+            'summary' => [
+                'total' => ReportLog::query()->count(),
+                'byType' => ReportLog::query()->selectRaw('type, count(*) as aggregate')->groupBy('type')->pluck('aggregate', 'type'),
+                'byFormat' => ReportLog::query()->selectRaw('format, count(*) as aggregate')->groupBy('format')->pluck('aggregate', 'format'),
+            ],
+        ]);
+    }
+
+    /**
+     * إعادة توليد تقرير سابق بنفس صيغته ومرشحاته.
+     * البيانات تُقرأ من قاعدة البيانات لحظة الطلب (لا نُخزّن نسخًا قديمة).
+     */
+    public function download(Request $request, ReportLog $reportLog)
+    {
+        // عزل الملكية: غير المشرف لا يفتح تقارير غيره.
+        $user = $request->user();
+        if ($user && ! $user->hasRole('admin') && $reportLog->user_id !== $user->id) {
+            abort(403, 'لا يمكنك الوصول إلى تقرير أنشأه مستخدم آخر.');
+        }
+
+        // تقارير الوكيل لها مسارها الخاص في الـ API وتُبنى ببيانات الوكيل فقط.
+        abort_unless(in_array($reportLog->type, ReportLog::ADMIN_TYPES, true), 404, 'تقرير غير معروف.');
+
+        $filters = $reportLog->filters ?? [];
+        $data = $this->buildReport($reportLog->type, $filters);
+        $fmt = $this->formatter($data['currency'] ?? 'YER');
+
+        return match ($this->normalizeFormat($reportLog->format)) {
+            'pdf' => $this->renderPdf($data, $fmt),
+            'excel' => $this->downloadExcel($data, $fmt),
+            'csv' => $this->downloadCsv($data, $fmt),
+            'json' => $this->downloadJson($data, $fmt),
+            default => redirect()->route('admin.reports.show', array_merge(['type' => $reportLog->type], $filters)),
+        };
+    }
+
+    /** @param  array<string, mixed>  $params */
+    private function buildReport(string $type, array $params): array
+    {
         $data = match ($type) {
-            'agents' => $this->agentsReport(),
-            'properties' => $this->propertiesReport(),
-            'requests' => $this->requestsReport(),
-            'users' => $this->usersReport(),
+            'agents' => $this->agentsReport($params),
+            'properties' => $this->propertiesReport($params),
+            'requests' => $this->requestsReport($params),
+            'users' => $this->usersReport($params),
             default => abort(404, 'تقرير غير معروف.'),
         };
 
@@ -53,20 +137,71 @@ class ReportController extends Controller
         $data['site'] = $this->siteInfo();
         $data['generated_at'] = now();
 
-        $fmt = $this->formatter($data['currency'] ?? 'YER');
-
-        return match (request('format', 'html')) {
-            'pdf' => $this->renderPdf($data, $fmt),
-            'excel' => $this->downloadExcel($data, $fmt),
-            'csv' => $this->downloadCsv($data, $fmt),
-            'json' => $this->downloadJson($data, $fmt),
-            default => view('admin.reports.section', ['report' => $data, 'fmt' => $fmt]),
-        };
+        return $data;
     }
 
-    private function agentsReport(): array
+    /**
+     * استخراج المرشحات المسموح بها فقط من مُدخلات الطلب.
+     * يمنع تمرير أي مفتاح غير مدعوم إلى الاستعلامات أو إلى سجل التقارير.
+     *
+     * @return array<string, mixed>
+     */
+    private function extractFilters(string $type, array $input): array
     {
-        $isActive = match (request('status')) {
+        $filters = [];
+
+        foreach (self::FILTER_KEYS[$type] ?? [] as $key) {
+            $value = $input[$key] ?? null;
+            if ((is_string($value) && $value !== '') || is_numeric($value)) {
+                $filters[$key] = $value;
+            }
+        }
+
+        return $filters;
+    }
+
+    private function normalizeFormat(?string $format): string
+    {
+        $format = is_string($format) ? strtolower($format) : 'html';
+
+        return in_array($format, ReportLog::FORMATS, true) ? $format : 'html';
+    }
+
+    private function recordLog(string $type, string $format, array $data): void
+    {
+        try {
+            ReportLog::create([
+                'user_id' => request()->user()?->id,
+                'type' => $type,
+                'format' => $format,
+                'filters' => $data['filtersQuery'] ?? [],
+                'row_count' => count($data['rows'] ?? []),
+                'file_name' => $this->exportFileName($type, $format),
+                'ip_address' => request()->ip(),
+                'user_agent' => substr((string) request()->userAgent(), 0, 255),
+            ]);
+        } catch (\Throwable $e) {
+            // فشل التسجيل لا يجوز أن يُفشل توليد التقرير نفسه.
+            report($e);
+        }
+    }
+
+    private function exportFileName(string $type, string $format): ?string
+    {
+        $extension = match ($format) {
+            'pdf' => 'pdf',
+            'excel' => 'xls',
+            'csv' => 'csv',
+            'json' => 'json',
+            default => null,
+        };
+
+        return $extension ? 'wajhatak-'.$type.'-'.now()->format('Y-m-d').'.'.$extension : null;
+    }
+
+    private function agentsReport(array $params): array
+    {
+        $isActive = match ($params['status'] ?? null) {
             'active' => true,
             'inactive' => false,
             default => null,
@@ -102,7 +237,7 @@ class ReportController extends Controller
             'heading' => 'تقرير الوكلاء',
             'description' => 'عرض تفصيلي لجميع الوكلاء المسجلين في منصة وجهتك، مع تقييماتهم وعقاراتهم.',
             'filters' => $filters,
-            'filtersQuery' => request()->only(['status', 'format']),
+            'filtersQuery' => $params,
             'columns' => [
                 ['key' => 'name', 'label' => 'الوكيل', 'type' => 'text'],
                 ['key' => 'email', 'label' => 'البريد الإلكتروني', 'type' => 'text'],
@@ -125,15 +260,15 @@ class ReportController extends Controller
         ];
     }
 
-    private function propertiesReport(): array
+    private function propertiesReport(array $params): array
     {
-        $status = request('status');
+        $status = $params['status'] ?? null;
         if (! in_array($status, ['draft', 'pending', 'published', 'rejected', 'archived'], true)) {
             $status = null;
         }
 
         $filters = [];
-        $typeSlug = request('type');
+        $typeSlug = $params['type'] ?? null;
         $type = $typeSlug ? PropertyType::where('slug', $typeSlug)->first() : null;
         if ($type) {
             $filters[] = ['label' => 'نوع العقار', 'value' => $type->name_ar];
@@ -142,7 +277,7 @@ class ReportController extends Controller
             $filters[] = ['label' => 'الحالة', 'value' => $this->statusLabel($status)];
         }
 
-        $agentId = request('agent');
+        $agentId = $params['agent'] ?? null;
         $agent = $agentId ? Agent::with('user')->find((int) $agentId) : null;
         if ($agent) {
             $filters[] = ['label' => 'الوكيل', 'value' => $agent->user?->name ?? ('#'.$agent->id)];
@@ -180,7 +315,7 @@ class ReportController extends Controller
             'heading' => 'تقرير العقارات',
             'description' => 'عرض تفصيلي لجميع أنواع العقارات (فلل، شقق، أدوار،...) مع أسعارها وحالتها.',
             'filters' => $filters,
-            'filtersQuery' => request()->only(['status', 'type', 'agent', 'format']),
+            'filtersQuery' => $params,
             'columns' => [
                 ['key' => 'reference_code', 'label' => 'الكود', 'type' => 'text'],
                 ['key' => 'title', 'label' => 'العقار', 'type' => 'text'],
@@ -208,9 +343,9 @@ class ReportController extends Controller
         ];
     }
 
-    private function requestsReport(): array
+    private function requestsReport(array $params): array
     {
-        $status = request('status');
+        $status = $params['status'] ?? null;
         if (! in_array($status, ['pending', 'confirmed', 'rejected', 'cancelled', 'completed'], true)) {
             $status = null;
         }
@@ -220,7 +355,7 @@ class ReportController extends Controller
             $filters[] = ['label' => 'الحالة', 'value' => $this->statusLabel($status)];
         }
 
-        $agentId = request('agent');
+        $agentId = $params['agent'] ?? null;
         $agent = $agentId ? Agent::with('user')->find((int) $agentId) : null;
         if ($agent) {
             $filters[] = ['label' => 'الوكيل', 'value' => $agent->user?->name ?? ('#'.$agent->id)];
@@ -251,7 +386,7 @@ class ReportController extends Controller
             'heading' => 'تقرير طلبات المعاينة',
             'description' => 'جميع طلبات معاينة العقارات المرسلة من العملاء إلى الوكلاء مع حالتها ومواعيدها.',
             'filters' => $filters,
-            'filtersQuery' => request()->only(['status', 'agent', 'format']),
+            'filtersQuery' => $params,
             'columns' => [
                 ['key' => 'reference_code', 'label' => 'الكود', 'type' => 'text'],
                 ['key' => 'property', 'label' => 'العقار', 'type' => 'text'],
@@ -275,9 +410,9 @@ class ReportController extends Controller
         ];
     }
 
-    private function usersReport(): array
+    private function usersReport(array $params): array
     {
-        $role = request('role');
+        $role = $params['role'] ?? null;
         if (! in_array($role, ['admin', 'agent', 'user'], true)) {
             $role = null;
         }
@@ -286,7 +421,7 @@ class ReportController extends Controller
             $filters[] = ['label' => 'الدور', 'value' => $this->roleLabel($role)];
         }
 
-        $userId = request('user');
+        $userId = $params['user'] ?? null;
         $target = $userId ? User::find((int) $userId) : null;
         if ($target) {
             $filters[] = ['label' => 'المستخدم', 'value' => $target->name];
@@ -318,7 +453,7 @@ class ReportController extends Controller
             'heading' => 'تقرير المستخدمين',
             'description' => 'جميع مستخدمي منصة وجهتك (مشرفون، وكلاء، عملاء) مع أدوارهم وحالة حساباتهم.',
             'filters' => $filters,
-            'filtersQuery' => request()->only(['role', 'user', 'format']),
+            'filtersQuery' => $params,
             'columns' => [
                 ['key' => 'name', 'label' => 'الاسم', 'type' => 'text'],
                 ['key' => 'email', 'label' => 'البريد الإلكتروني', 'type' => 'text'],
@@ -353,7 +488,7 @@ class ReportController extends Controller
                 'money' => number_format((float) $value, 0).' '.($col['currency'] ?? $currency),
                 'number' => number_format((float) $value, 0),
                 'rating' => number_format((float) $value, 2),
-                'date' => $value && $value !== '—' ? \Illuminate\Support\Carbon::parse($value)->format('Y-m-d') : '—',
+                'date' => $value && $value !== '—' ? Carbon::parse($value)->format('Y-m-d') : '—',
                 'badge' => ($col['values'][$value] ?? $value) ?: $value,
                 default => is_bool($value) ? ($value ? 'نعم' : 'لا') : (string) $value,
             };
@@ -362,175 +497,26 @@ class ReportController extends Controller
 
     private function renderPdf(array $data, Closure $fmt): HttpResponse
     {
-        $html = $this->shapeArabic(view('admin.reports.pdf', ['report' => $data, 'fmt' => $fmt])->render());
-
-        $pdf = Pdf::loadHTML($html);
-        $pdf->setPaper('a4', 'portrait');
-        $pdf->setOptions([
-            'isRemoteEnabled' => false,
-            'isHtml5ParserEnabled' => true,
-            'fontDir' => public_path('fonts'),
-            'fontCache' => storage_path('fonts/cache'),
-            'isFontSubsettingEnabled' => false,
-            'defaultFont' => 'Amiri',
-        ]);
-
-        $dompdf = $pdf->getDompdf();
-        $fontMetrics = $dompdf->getFontMetrics();
-        $fontMetrics->registerFont([
-            'family' => 'Amiri',
-            'style' => 'normal',
-            'weight' => 'normal',
-            'font' => public_path('fonts/Amiri-Regular.ttf'),
-        ]);
-        $fontMetrics->registerFont([
-            'family' => 'Amiri',
-            'style' => 'normal',
-            'weight' => 'bold',
-            'font' => public_path('fonts/Amiri-Bold.ttf'),
-        ]);
-
-        $dompdf->render();
-
-        return $pdf->download('wajhatak-'.$data['type'].'-'.now()->format('Y-m-d').'.pdf');
-    }
-
-    private function shapeArabic(string $html): string
-    {
-        $arabic = new Arabic();
-        $previous = error_reporting(0);
-
-        try {
-            $shaped = preg_replace_callback('/(<[^>]*>)|([^<]+)/s', function (array $m) use ($arabic) {
-                if ($m[1] !== '') {
-                    return $m[1];
-                }
-
-                return $arabic->utf8Glyphs($m[2], 50, false, true);
-            }, $html);
-        } finally {
-            error_reporting($previous);
-        }
-
-        return $shaped ?? $html;
+        return $this->pdf->render(
+            'admin.reports.pdf',
+            ['report' => $data, 'fmt' => $fmt],
+            $this->exporter->fileName($data['type'], 'pdf'),
+        );
     }
 
     private function downloadExcel(array $data, Closure $fmt): HttpResponse
     {
-        $columns = $data['columns'];
-        $totalCols = count($columns);
-        $merge = max($totalCols - 1, 0);
-
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-        $xml .= '<?mso-application progid="Excel.Sheet"?>'."\n";
-        $xml .= '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ';
-        $xml .= 'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" ';
-        $xml .= 'xmlns:x="urn:schemas-microsoft-com:office:excel">'."\n";
-        $xml .= '<Styles>'
-            .'<Style ss:ID="Default"><Font ss:FontName="Calibri" ss:Size="11"/><Alignment ss:Vertical="Center"/></Style>'
-            .'<Style ss:ID="Title"><Font ss:FontName="Calibri" ss:Size="16" ss:Bold="1"/><Alignment ss:Horizontal="Center"/></Style>'
-            .'<Style ss:ID="Meta"><Font ss:FontName="Calibri" ss:Size="10" ss:Color="#6B7280"/><Alignment ss:Horizontal="Center"/></Style>'
-            .'<Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>'
-            .'<Interior ss:Color="#075E4A" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style>'
-            .'<Style ss:ID="Text"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style>'
-            .'<Style ss:ID="Number"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style>'
-            .'<Style ss:ID="Money"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style>'
-            .'<Style ss:ID="Summary"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/>'
-            .'<Interior ss:Color="#E8F5F0" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>'
-            .'</Styles>'."\n";
-        $xml .= '<Worksheet ss:Name="'.$data['type'].'"><Table>'."\n";
-        $xml .= '<Column ss:AutoFitWidth="1"/>'."\n";
-
-        $xml .= '<Row><Cell ss:MergeAcross="'.$merge.'" ss:StyleID="Title"><Data ss:Type="String">'
-            .$this->e($data['site']['name'].' — '.$data['heading']).'</Data></Cell></Row>'."\n";
-        $xml .= '<Row><Cell ss:MergeAcross="'.$merge.'" ss:StyleID="Meta"><Data ss:Type="String">'
-            .$this->e($data['site']['tagline']).'</Data></Cell></Row>'."\n";
-        if ($data['filters']) {
-            foreach ($data['filters'] as $filter) {
-                $xml .= '<Row><Cell ss:MergeAcross="'.$merge.'" ss:StyleID="Meta"><Data ss:Type="String">'
-                    .$this->e($filter['label'].': '.$filter['value']).'</Data></Cell></Row>'."\n";
-            }
-        }
-        $xml .= '<Row><Cell ss:MergeAcross="'.$merge.'" ss:StyleID="Meta"><Data ss:Type="String">'
-            .$this->e('تاريخ الإنشاء: '.$data['generated_at']->format('Y-m-d H:i')).'</Data></Cell></Row>'."\n";
-
-        $xml .= '<Row>';
-        foreach ($columns as $col) {
-            $style = $col['type'] === 'money' || $col['type'] === 'number' || $col['type'] === 'rating' ? 'Number' : 'Text';
-            $xml .= '<Cell ss:StyleID="Header"><Data ss:Type="String">'.$this->e($col['label']).'</Data></Cell>';
-        }
-        $xml .= '</Row>'."\n";
-
-        foreach ($data['rows'] as $row) {
-            $xml .= '<Row>';
-            foreach ($columns as $col) {
-                $raw = $row[$col['key']] ?? null;
-                if ($col['type'] === 'money' || $col['type'] === 'number' || $col['type'] === 'rating') {
-                    $value = is_numeric($raw) ? $raw : 0;
-                    $xml .= '<Cell ss:StyleID="Number"><Data ss:Type="Number">'.$value.'</Data></Cell>';
-                } else {
-                    $xml .= '<Cell ss:StyleID="Text"><Data ss:Type="String">'.$this->e($fmt($col, $raw)).'</Data></Cell>';
-                }
-            }
-            $xml .= '</Row>'."\n";
-        }
-
-        $xml .= '<Row/><Row/>'."\n";
-        foreach ($data['summary'] as $item) {
-            $xml .= '<Row><Cell ss:StyleID="Summary"><Data ss:Type="String">'.$this->e($item['label'])
-                .'</Data></Cell><Cell ss:MergeAcross="'.$merge.'" ss:StyleID="Summary"><Data ss:Type="String">'
-                .$this->e((string) $item['value']).'</Data></Cell></Row>'."\n";
-        }
-
-        $xml .= '</Table></Worksheet></Workbook>';
-
-        $filename = 'wajhatak-'.$data['type'].'-'.now()->format('Y-m-d').'.xls';
-
-        return Response::make($xml, 200, $this->contentDisposition($filename, 'application/vnd.ms-excel'));
+        return $this->exporter->excel($data, $fmt);
     }
 
     private function downloadCsv(array $data, Closure $fmt): HttpResponse
     {
-        $filename = 'wajhatak-'.$data['type'].'-'.now()->format('Y-m-d').'.csv';
-        $handle = fopen('php://temp', 'r+');
-
-        fwrite($handle, "\xEF\xBB\xBF");
-        fputcsv($handle, [$data['site']['name'].' — '.$data['heading']]);
-        foreach ($data['filters'] as $filter) {
-            fputcsv($handle, [$filter['label'].': '.$filter['value']]);
-        }
-        fputcsv($handle, ['تاريخ الإنشاء: '.$data['generated_at']->format('Y-m-d H:i')]);
-        fputcsv($handle, []);
-        fputcsv($handle, array_map(fn ($c) => $c['label'], $data['columns']));
-        foreach ($data['rows'] as $row) {
-            fputcsv($handle, array_map(fn ($c) => $fmt($c, $row[$c['key']] ?? null), $data['columns']));
-        }
-        fputcsv($handle, []);
-        foreach ($data['summary'] as $item) {
-            fputcsv($handle, [$item['label'], $item['value']]);
-        }
-
-        rewind($handle);
-        $body = stream_get_contents($handle);
-        fclose($handle);
-
-        return Response::make($body, 200, $this->contentDisposition($filename, 'text/csv; charset=UTF-8'));
+        return $this->exporter->csv($data, $fmt);
     }
 
     private function downloadJson(array $data, Closure $fmt): HttpResponse
     {
-        return Response::json([
-            'platform' => $data['site']['name'],
-            'report' => $data['heading'],
-            'generated_at' => $data['generated_at']->toIso8601String(),
-            'filters' => collect($data['filters'])->mapWithKeys(fn ($f) => [$f['label'] => $f['value']]),
-            'columns' => collect($data['columns'])->map(fn ($c) => $c['label']),
-            'rows' => array_map(fn ($row) => array_combine(
-                array_column($data['columns'], 'key'),
-                array_map(fn ($c) => $fmt($c, $row[$c['key']] ?? null), $data['columns'])
-            ), $data['rows']),
-            'summary' => $data['summary'],
-        ], 200, $this->contentDisposition('wajhatak-'.$data['type'].'-'.now()->format('Y-m-d').'.json', 'application/json; charset=UTF-8'));
+        return $this->exporter->json($data, $fmt);
     }
 
     private function siteInfo(): array
@@ -579,18 +565,5 @@ class ReportController extends Controller
         }
 
         return $user->hasRole('agent') ? 'agent' : 'user';
-    }
-
-    private function contentDisposition(string $filename, string $contentType): array
-    {
-        return [
-            'Content-Type' => $contentType,
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-        ];
-    }
-
-    private function e(?string $value): string
-    {
-        return htmlspecialchars((string) $value, ENT_QUOTES | ENT_XML1, 'UTF-8');
     }
 }

@@ -1,5 +1,9 @@
 <x-admin.layouts.admin heading="اختبار المساعد الذكي" title="اختبار المساعد" :breadcrumbs="[['label' => 'لوحة التحكم', 'url' => route('admin.dashboard')], ['label' => 'المساعد الذكي', 'url' => route('admin.ai.index')]]">
 
+    <div class="space-y-4">
+        @include('admin.ai._nav')
+    </div>
+
     <div class="max-w-4xl mx-auto space-y-4" x-data="aiPlayground()">
 
         {{-- شريط الحالة --}}
@@ -9,7 +13,7 @@
                 ● المحرك الحتمي جاهز
             </span>
             @unless($enabled)
-                <span class="text-amber-700 dark:text-amber-400 font-bold">⚠ المساعد معطل — فعّله من تبويب الإعدادات</span>
+                <a href="{{ route('admin.ai.settings', ['section' => 'general']) }}" class="text-amber-700 dark:text-amber-400 font-bold underline">⚠ المساعد معطل — فعّله من إعدادات المساعد</a>
             @endunless
             <form method="POST" action="{{ route('admin.ai.playground.clear') }}" class="ms-auto">
                 @csrf

@@ -16,6 +16,7 @@
                                 <div class="font-black text-gray-900 dark:text-gray-100">{{ $agent->user->name }}</div>
                                 <div class="text-xs text-gray-500">{{ $agent->user->email }}</div>
                                 <div class="text-xs text-gray-400">سُجّل {{ $agent->created_at->format('Y/m/d') }}</div>
+                                <a href="{{ route('admin.agents.show', $agent) }}" class="mt-1 inline-block text-xs font-bold text-wajhatak-600 hover:text-wajhatak-700">فتح صفحة المراجعة الكاملة ←</a>
                             </div>
                         </div>
                         <dl class="text-sm space-y-1.5 text-gray-600 dark:text-gray-300">

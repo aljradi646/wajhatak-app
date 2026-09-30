@@ -20,6 +20,7 @@ class AppDrawer extends ConsumerWidget {
     required this.onViewingRequests,
     required this.onNotifications,
     required this.onAgentWorkspace,
+    required this.onAgentReports,
     required this.onSettings,
     required this.onProfile,
   });
@@ -30,6 +31,7 @@ class AppDrawer extends ConsumerWidget {
   final VoidCallback onViewingRequests;
   final VoidCallback onNotifications;
   final VoidCallback onAgentWorkspace;
+  final VoidCallback onAgentReports;
   final VoidCallback onSettings;
   final VoidCallback onProfile;
 
@@ -218,6 +220,13 @@ class AppDrawer extends ConsumerWidget {
                         tone: AccentTone.indigo,
                         label: 'مساحة الوكيل وعقاراتي',
                         onTap: () => _closeThen(context, onAgentWorkspace),
+                      ),
+                    if (user.isAgent)
+                      _DrawerEntry(
+                        icon: Icons.insert_chart_outlined_rounded,
+                        tone: AccentTone.teal,
+                        label: 'التقارير',
+                        onTap: () => _closeThen(context, onAgentReports),
                       ),
                   ],
                   const SizedBox(height: 6),

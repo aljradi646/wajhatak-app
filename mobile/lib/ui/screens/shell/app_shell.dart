@@ -13,6 +13,7 @@ import '../../widgets.dart';
 import '../ai/ai_assistant_sheet.dart';
 import '../account/account_screen.dart';
 import '../agent/agent_dashboard_screen.dart';
+import '../agent/agent_reports_screen.dart';
 import '../auth/auth_screen.dart';
 import '../explore/explore_screen.dart';
 import '../home/home_screen.dart';
@@ -175,6 +176,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         onViewingRequests: () => _push(const ViewingRequestsScreen()),
         onNotifications: () => _push(const NotificationsScreen()),
         onAgentWorkspace: () => _push(const AgentDashboardScreen()),
+        onAgentReports: () => _push(const AgentReportsScreen()),
         onSettings: () => _push(const SettingsScreen()),
         onProfile: () => _push(const AuthScreen()),
       ),

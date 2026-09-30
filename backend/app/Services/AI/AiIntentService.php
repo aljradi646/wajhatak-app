@@ -154,16 +154,18 @@ class AiIntentService
             }
         }
 
-        // المدن والأحياء المعروفة (نمط المدينة يُوحَّد بينما تبقى قيمتها كما في القاعدة).
+        // المدن والأحياء المعروفة — مطابقة *بحدود كلمة* لا بالاحتواء النصي.
+        // بدون ذلك تُطابَق «إب» داخل «أبحث» و«حدة» داخل «الوحدة»، فيظهر
+        // للمستخدم بحث في مدينة لم يذكرها إطلاقًا.
         foreach ($this->cityMap() as $pattern => $city) {
-            if ($this->matches('/'.$pattern.'/u', $text)) {
+            if ($this->matchesWord($pattern, $text)) {
                 $filters['city'] = $city;
                 break;
             }
         }
 
         foreach (['حدة' => 'حدة', 'السافية' => 'الصافية', 'شعوب' => 'شعوب', 'معين' => 'معين', 'آزال' => 'آزال', 'بني الحارث' => 'بني الحارث', 'الثورة' => 'الثورة', 'التحرير' => 'التحرير', 'الوحدة' => 'الوحدة', 'السفارة' => 'السفارة'] as $pattern => $district) {
-            if (mb_strpos($text, $this->normalize($pattern)) !== false) {
+            if ($this->matchesWord($pattern, $text)) {
                 $filters['district'] = $district;
                 break;
             }
@@ -263,6 +265,20 @@ class AiIntentService
     private function matches(string $pattern, string $normalizedText): bool
     {
         return preg_match($this->normalize($pattern), $normalizedText) === 1;
+    }
+
+    /**
+     * مطابقة اسم مكان بحدود كلمة عربية (مع السماح بأداة التعريف «ال»).
+     * تمنع المطابقات الزائفة مثل «إب» داخل «أبحث» أو «حدة» داخل «الوحدة».
+     *
+     * ملاحظة PCRE: صيغة `ال?` خاطئة — تعني «ا + ل اختياري»؛ الصحيح
+     * `(?:ال)?` كوحدة اختيارية واحدة، والـ lookbehind قبلها لا بعدها.
+     */
+    private function matchesWord(string $pattern, string $normalizedText): bool
+    {
+        $needle = preg_quote($this->normalize($pattern), '/');
+
+        return preg_match('/(?<!\p{Arabic})(?:ال)?'.$needle.'(?!\p{Arabic})/u', $normalizedText) === 1;
     }
 
     /** الحقول التي لم تُحدد بعد وتحتاج قرارًا (للمتابعة الذكية). */

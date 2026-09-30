@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AgentController;
+use App\Http\Controllers\Api\V1\AgentReportController;
 use App\Http\Controllers\Api\V1\AiAssistantController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ConversationController;
@@ -80,9 +81,17 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
         Route::get('conversations/{conversation}/messages', [ConversationController::class, 'messages'])->name('conversations.messages.index');
         Route::post('conversations/{conversation}/messages', [ConversationController::class, 'sendMessage'])->name('conversations.messages.store');
 
+        // تقارير الوكيل داخل التطبيق — مقيدة ببيانات الوكيل نفسه.
+        Route::get('agent/reports', [AgentReportController::class, 'index'])->name('agent.reports.index');
+        Route::get('agent/reports/{type}', [AgentReportController::class, 'show'])->name('agent.reports.show');
+        Route::get('agent/reports/history/{reportLog}/download', [AgentReportController::class, 'download'])->name('agent.reports.download');
+
         Route::get('viewing-requests', [ViewingRequestController::class, 'index'])->name('viewing-requests.index');
         Route::post('viewing-requests', [ViewingRequestController::class, 'store'])->name('viewing-requests.store');
+        Route::get('viewing-requests/{viewingRequest}', [ViewingRequestController::class, 'show'])->name('viewing-requests.show');
+        Route::get('viewing-requests/{viewingRequest}/history', [ViewingRequestController::class, 'history'])->name('viewing-requests.history');
         Route::patch('viewing-requests/{viewingRequest}', [ViewingRequestController::class, 'update'])->name('viewing-requests.update');
+        Route::delete('viewing-requests/{viewingRequest}', [ViewingRequestController::class, 'destroy'])->name('viewing-requests.destroy');
 
         Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::post('notifications/{notificationId}/read', [NotificationController::class, 'read'])->name('notifications.read');

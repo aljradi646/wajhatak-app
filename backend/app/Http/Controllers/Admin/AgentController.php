@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Agent;
+use App\Models\Conversation;
+use App\Models\ReportLog;
 use App\Models\User;
+use App\Services\Mail\DynamicMailService;
 use Illuminate\Http\Request;
 
 class AgentController extends Controller
@@ -71,7 +74,7 @@ class AgentController extends Controller
 
         // إشعار بريدي حقيقي (لا يفشل الطلب إن تعذر البريد).
         try {
-            app(\App\Services\Mail\DynamicMailService::class)
+            app(DynamicMailService::class)
                 ->sendTemplate($agent->user->email, 'agent_approved', ['name' => $agent->user->name]);
         } catch (\Throwable $e) {
             report($e);
@@ -98,7 +101,7 @@ class AgentController extends Controller
         ActivityLog::record('agent', "تم رفض توثيق الوكيل «{$agent->user->name}»", $agent);
 
         try {
-            app(\App\Services\Mail\DynamicMailService::class)
+            app(DynamicMailService::class)
                 ->sendTemplate($agent->user->email, 'agent_rejected', [
                     'name' => $agent->user->name,
                     'reason' => $data['reason'],
@@ -113,6 +116,7 @@ class AgentController extends Controller
     public function create()
     {
         $users = User::query()->doesntHave('agentProfile')->get();
+
         return view('admin.agents.create', [
             'users' => $users,
         ]);
@@ -146,10 +150,64 @@ class AgentController extends Controller
         return redirect()->route('admin.agents.index')->with('status', 'تم إنشاء الوكيل بنجاح.');
     }
 
+    /**
+     * صفحة مراجعة الوكيل الكاملة — كل بياناته الحقيقية في تبويبات منظمة
+     * بدل نافذة منبثقة ناقصة.
+     */
     public function show(Agent $agent)
     {
-        $agent->load('user', 'properties');
-        return view('admin.agents.show', compact('agent'));
+        $agent->load([
+            'user',
+            'properties' => fn ($q) => $q->with(['type', 'location'])->latest(),
+        ]);
+
+        $userId = $agent->user_id;
+
+        // عمليات التوثيق المُسجَّلة على هذا الوكيل (قبول/رفض/تحديث).
+        $verificationEvents = ActivityLog::query()
+            ->with('user:id,name')
+            ->where('subject_type', Agent::class)
+            ->where('subject_id', $agent->id)
+            ->latest()
+            ->limit(50)
+            ->get();
+
+        // تقارير وُلّدت بواسطة حساب الوكيل نفسه.
+        $reportLogs = ReportLog::query()
+            ->where('user_id', $userId)
+            ->latest('id')
+            ->limit(50)
+            ->get();
+
+        // محادثات الوكيل مع العملاء (بحسب الصلاحيات — المشرف فقط يدخل هنا).
+        $conversations = Conversation::query()
+            ->with(['client:id,name,email', 'property:id,title,reference_code'])
+            ->where('agent_id', $userId)
+            ->latest('last_message_at')
+            ->limit(50)
+            ->get();
+
+        $viewingRequests = $agent->viewingRequests()
+            ->with(['property:id,title,reference_code', 'client:id,name'])
+            ->latest('scheduled_date')
+            ->limit(50)
+            ->get();
+
+        // سجل أنشطة حساب الوكيل.
+        $activities = ActivityLog::query()
+            ->where('user_id', $userId)
+            ->latest()
+            ->limit(50)
+            ->get();
+
+        return view('admin.agents.show', [
+            'agent' => $agent,
+            'verificationEvents' => $verificationEvents,
+            'reportLogs' => $reportLogs,
+            'conversations' => $conversations,
+            'viewingRequests' => $viewingRequests,
+            'activities' => $activities,
+        ]);
     }
 
     public function edit(Agent $agent)
@@ -196,6 +254,7 @@ class AgentController extends Controller
         }
         $agent->delete();
         ActivityLog::record('agent', "تم حذف وكيل «{$agent->user->name}»", $agent);
+
         return redirect()->route('admin.agents.index')->with('status', 'تم حذف الوكيل بنجاح.');
     }
 }

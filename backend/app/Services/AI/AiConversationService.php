@@ -124,29 +124,40 @@ class AiConversationService
         return $message;
     }
 
-    /** عدد أسئلة المتابعة المتتالية الأخيرة (لحد أسئلة المساعد — سؤالان كحد أقصى). */
+    /**
+     * عدد أسئلة المتابعة المتتالية الأخيرة للمساعد (لحد أسئلة المتابعة — سؤالان).
+     *
+     * نعدّ ردود المساعد المتتالية التي تحمل سؤالًا (؟) من الأحدث إلى الأقدم،
+     * ونتخطّى رسائل المستخدم المفردة التي تسبق كل سؤال. أول رد مساعد غير
+     * سؤالي ينهي السلسلة — هكذا يُحسب السقف عبر الأدوار لا داخل الدور الواحد.
+     */
     public function consecutiveFollowUps(AiConversation $conversation): int
     {
-        // نحسب أطول سلسلة رسائل مساعدة تحتوي «?» تنتهي بآخر رسالة مستخدم.
         $recent = AiMessage::query()
             ->where('ai_conversation_id', $conversation->id)
             ->whereIn('role', [AiMessageRole::Assistant->value, AiMessageRole::User->value])
             ->orderByDesc('id')
-            ->limit(6)
-            ->get(['role', 'content'])
-            ->reverse();
+            ->limit(10)
+            ->get(['role', 'content']);
 
         $streak = 0;
         foreach ($recent as $message) {
-            if ($message->role === AiMessageRole::User->value) {
-                break; // انتهت السلسلة عند آخر رسالة مستخدم.
+            if ($message->role !== AiMessageRole::Assistant->value) {
+                continue; // تخطَّ رسائل المستخدم — السلسلة تُقاس بين الأدوار.
             }
-            if (mb_strpos($message->content, '؟') !== false || mb_strpos($message->content, '?') !== false) {
-                $streak++;
+            if (! self::isQuestion($message->content)) {
+                break; // رد مساعد غير سؤالي ينهي سلسلة أسئلة المتابعة.
             }
+            $streak++;
         }
 
         return $streak;
+    }
+
+    /** هل نص رد المساعد يحتوي سؤالًا؟ */
+    private static function isQuestion(string $content): bool
+    {
+        return mb_strpos($content, '؟') !== false || mb_strpos($content, '?') !== false;
     }
 
     /** مسح محادثة (soft وفق الإعداد) أو أرشفة كل محادثات المستخدم. */

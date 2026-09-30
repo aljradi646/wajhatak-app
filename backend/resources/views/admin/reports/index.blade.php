@@ -1,6 +1,15 @@
 <x-admin.layouts.admin heading="التقارير" title="التقارير" :breadcrumbs="[['label' => 'لوحة التحكم', 'url' => route('admin.dashboard')]]">
 
     <div class="space-y-6">
+        {{-- سجل التقارير --}}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <p class="text-sm text-gray-500 dark:text-gray-400">ولّد تقريرًا جديدًا من البيانات الحقيقية، أو تصفّح التقارير التي وُلّدت سابقًا.</p>
+            <a href="{{ route('admin.reports.logs') }}" class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                <x-admin.icon name="reports" class="h-4 w-4" />
+                سجل التقارير
+            </a>
+        </div>
+
         {{-- Overview --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <x-admin.card>
@@ -126,5 +135,37 @@
                 </form>
             </x-admin.card>
         </div>
+
+        {{-- أحدث التقارير المُولَّدة --}}
+        @if ($recentLogs->isNotEmpty())
+            <x-admin.card :padding="false" title="أحدث التقارير المُولَّدة">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                                <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">التقرير</th>
+                                <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">الصيغة</th>
+                                <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">أنشأه</th>
+                                <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">التاريخ</th>
+                                <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            @foreach ($recentLogs as $log)
+                                <tr class="hover:bg-gray-50 dark:hover:bg-white/5">
+                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-gray-100">{{ $log->typeLabel() }}</td>
+                                    <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ $log->formatLabel() }}</td>
+                                    <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ $log->user?->name ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ $log->created_at->translatedFormat('Y-m-d H:i') }}</td>
+                                    <td class="px-4 py-3">
+                                        <a href="{{ route('admin.reports.logs.download', $log) }}" class="font-bold text-wajhatak-600 hover:text-wajhatak-700">إعادة التوليد</a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </x-admin.card>
+        @endif
     </div>
 </x-admin.layouts.admin>

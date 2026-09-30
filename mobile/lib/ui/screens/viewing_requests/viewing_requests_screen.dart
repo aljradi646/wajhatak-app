@@ -97,6 +97,103 @@ class _ViewingRequestCard extends ConsumerStatefulWidget {
 class _ViewingRequestCardState extends ConsumerState<_ViewingRequestCard> {
   String? _updatingStatus;
 
+  bool get _isClient => !widget.canRespond;
+
+  /// تعديل الموعد — متاح للعميل لطلبه المفتوح فقط (والخادم يتحقق أيضًا).
+  Future<void> _reschedule() async {
+    final item = widget.item;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: item.date.isBefore(DateTime.now()) ? DateTime.now() : item.date,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      locale: const Locale('ar'),
+    );
+    if (picked == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _parseTime(item.time),
+    );
+    if (time == null || !mounted) return;
+
+    setState(() => _updatingStatus = 'reschedule');
+    try {
+      await ref
+          .read(viewingRequestRepositoryProvider)
+          .rescheduleViewingRequest(
+            requestId: item.id,
+            date: picked,
+            time:
+                '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+            notes: item.notes,
+          );
+      ref.invalidate(viewingRequestsProvider);
+      if (mounted) util.notice(context, 'تم تحديث موعد المعاينة.');
+    } on ApiFailure catch (error) {
+      if (mounted) util.notice(context, error.message);
+    } finally {
+      if (mounted) setState(() => _updatingStatus = null);
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف طلب المعاينة؟'),
+        content: const Text('سيتم حذف الطلب نهائيًا ولا يمكن التراجع.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _updatingStatus = 'delete');
+    try {
+      await ref
+          .read(viewingRequestRepositoryProvider)
+          .deleteViewingRequest(widget.item.id);
+      ref.invalidate(viewingRequestsProvider);
+      if (mounted) util.notice(context, 'تم حذف طلب المعاينة.');
+    } on ApiFailure catch (error) {
+      if (mounted) util.notice(context, error.message);
+    } finally {
+      if (mounted) setState(() => _updatingStatus = null);
+    }
+  }
+
+  Future<void> _showHistory() async {
+    try {
+      final entries = await ref
+          .read(viewingRequestRepositoryProvider)
+          .history(widget.item.id);
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetContext) => _HistorySheet(entries: entries),
+      );
+    } on ApiFailure catch (error) {
+      if (mounted) util.notice(context, error.message);
+    }
+  }
+
+  static TimeOfDay _parseTime(String? value) {
+    final parts = (value ?? '09:00').split(':');
+    final hour = int.tryParse(parts.first) ?? 9;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
   Future<void> _respond(String status) async {
     setState(() => _updatingStatus = status);
     try {
@@ -208,6 +305,110 @@ class _ViewingRequestCardState extends ConsumerState<_ViewingRequestCard> {
                 ],
               ),
             ],
+
+            // إدارة العميل لطلبه: تعديل الموعد/الإلغاء/الحذف/سجل التغييرات.
+            if (_isClient) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if (item.status == 'pending' || item.status == 'confirmed') ...[
+                    OutlinedButton.icon(
+                      onPressed: _updatingStatus == null ? _reschedule : null,
+                      icon: const Icon(Icons.edit_calendar_rounded, size: 18),
+                      label: const Text('تعديل الموعد'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _updatingStatus == null
+                          ? () => _respond('cancelled')
+                          : null,
+                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                      label: const Text('إلغاء الطلب'),
+                    ),
+                  ],
+                  if (item.status == 'pending' ||
+                      item.status == 'rejected' ||
+                      item.status == 'cancelled')
+                    OutlinedButton.icon(
+                      onPressed: _updatingStatus == null ? _delete : null,
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                      label: const Text('حذف الطلب'),
+                    ),
+                  TextButton.icon(
+                    onPressed: _showHistory,
+                    icon: const Icon(Icons.history_rounded, size: 18),
+                    label: const Text('سجل التغييرات'),
+                  ),
+                ],
+              ),
+            ] else ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: _showHistory,
+                  icon: const Icon(Icons.history_rounded, size: 18),
+                  label: const Text('سجل التغييرات'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// سجل تغييرات الطلب — من بيانات الخادم الحقيقية.
+class _HistorySheet extends StatelessWidget {
+  const _HistorySheet({required this.entries});
+
+  final List<ViewingRequestHistoryEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'سجل تغييرات الطلب',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (entries.isEmpty)
+              Text('لا توجد تغييرات مسجلة.', style: theme.textTheme.bodySmall)
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    final details = [
+                      if (entry.from != null || entry.to != null)
+                        '${entry.from ?? '—'} ← ${entry.to ?? '—'}',
+                      if (entry.by != null) 'بواسطة ${entry.by}',
+                      if (entry.at != null)
+                        DateFormat('yyyy-MM-dd HH:mm').format(entry.at!),
+                    ].join(' • ');
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.circle, size: 10),
+                      title: Text(entry.label),
+                      subtitle: details.isEmpty ? null : Text(details),
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),

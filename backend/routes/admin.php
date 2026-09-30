@@ -71,9 +71,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Property Features
     Route::resource('property-features', PropertyFeatureController::class)->except(['show']);
 
-    // AI Assistant (الإعدادات + المراقبة + السجل + محادثة اختبار حقيقية)
+    // AI Assistant — كل قسم صفحة مستقلة (لا نموذج ضخم واحد).
     Route::get('ai', [AiAssistantController::class, 'index'])->name('ai.index');
-    Route::post('ai', [AiAssistantController::class, 'update'])->name('ai.update');
+    Route::get('ai/settings/{section}', [AiAssistantController::class, 'settings'])->name('ai.settings');
+    Route::post('ai/settings/{section}', [AiAssistantController::class, 'updateSection'])->name('ai.settings.update');
+    Route::get('ai/monitoring', [AiAssistantController::class, 'monitoring'])->name('ai.monitoring');
+    Route::get('ai/stats', [AiAssistantController::class, 'stats'])->name('ai.stats');
+    Route::get('ai/logs', [AiAssistantController::class, 'logs'])->name('ai.logs');
     Route::post('ai/reindex', [AiAssistantController::class, 'reindex'])->name('ai.reindex');
     // إصلاح ذاتي لمخطط المساعد (جداول/أعمدة ناقصة + فهرس فارغ) من اللوحة.
     Route::post('ai/repair', [AiAssistantController::class, 'repair'])->name('ai.repair');
@@ -97,6 +101,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Reports
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+    // سجل التقارير — يجب تعريفه قبل reports/{type} لتفادي التعارض.
+    Route::get('reports/logs', [ReportController::class, 'logs'])->name('reports.logs');
+    Route::get('reports/logs/{reportLog}/download', [ReportController::class, 'download'])->name('reports.logs.download');
     Route::get('reports/{type}', [ReportController::class, 'show'])
         ->name('reports.show')
         ->whereIn('type', ['agents', 'properties', 'requests', 'users']);

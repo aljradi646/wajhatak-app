@@ -4,6 +4,8 @@ namespace App\Services\AI;
 
 use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * إعدادات المساعد القابلة للإدارة من لوحة التحكم — تُخزن في جدول settings
@@ -13,6 +15,7 @@ use Illuminate\Support\Facades\Cache;
 class AiSettingsService
 {
     private const CACHE_KEY = 'ai_settings_bundle_v1';
+
     private const CACHE_TTL = 300; // ثواني — يجعل تعديلات الإدارة تصل بسرعة مع حماية القاعدة.
 
     // المفاتيح المدعومة وقيمها الافتراضية. أي مفتاح آخر يُتجاهل.
@@ -130,9 +133,22 @@ class AiSettingsService
         return (bool) $this->get('ai_guard_'.$guard, true);
     }
 
-    /** حفظ دفعي من نموذج الإدارة (مفاتيح معروفة فقط). */
-    public function putMany(array $input): void
+    /**
+     * حفظ دفعي من نموذج الإدارة (مفاتيح معروفة فقط).
+     *
+     * `$booleanKeys` = المفاتيح المنطقية التي يحويها النموذج المرسل. أي مفتاح
+     * منها غائب عن الطلب يُعامل على أنه "غير محدد" ويُحفظ بالقيمة 0 — بدون ذلك
+     * لا يمكن للإدارة إلغاء تفعيل خيار (مثل تعطيل المساعد) لأن مربعات الاختيار
+     * غير المحددة لا تُرسل أصلًا.
+     */
+    public function putMany(array $input, array $booleanKeys = []): void
     {
+        foreach ($booleanKeys as $key) {
+            if (! array_key_exists($key, $input)) {
+                $input[$key] = '0';
+            }
+        }
+
         foreach (self::DEFAULTS as $key => [$default, $type]) {
             if (! array_key_exists($key, $input)) {
                 continue;
@@ -151,11 +167,29 @@ class AiSettingsService
         Cache::forget(self::CACHE_KEY);
     }
 
-    /** @return array<string, string> قيم خام للكاش (نصوص كما في القاعدة). */
+    /**
+     * @return array<string, string> قيم خام للكاش (نصوص كما في القاعدة).
+     *
+     * متانة إنتاجية: إن كان جدول `settings` غير موجود (هجرة لم تُنفَّذ بعد)
+     * أو تعذّرت قراءته، نرجع إلى القيم الافتراضية الآمنة بدل إسقاط الطلب
+     * كله. يبقى الحاجز الإلزامي (FORCED_TRUE) مفعّلًا في الحالتين.
+     */
     private function readRaw(): array
     {
-        $rows = Setting::query()->where('key', 'like', 'ai\_%')->get();
+        try {
+            // ملاحظة مهمة: لا نستخدم `like 'ai\_%'` — الشرطة السفلية في LIKE حرف
+            // بديل (wildcard) يحتاج جملة ESCAPE، وبلاها يتصرف السائق بشكل مختلف
+            // بين MySQL وSQLite فتُقرأ صفر صفوف ويُعاد دائمًا إلى القيم الافتراضية.
+            // المفاتيح معروفة ومحدودة في DEFAULTS، فنسأل عنها صراحةً — أدق وأسرع.
+            $rows = Setting::query()->whereIn('key', array_keys(self::DEFAULTS))->get();
 
-        return $rows->mapWithKeys(fn (Setting $s) => [$s->key => (string) $s->value])->all();
+            return $rows->mapWithKeys(fn (Setting $s) => [$s->key => (string) $s->value])->all();
+        } catch (Throwable $e) {
+            Log::warning('ai.settings_unavailable', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 }

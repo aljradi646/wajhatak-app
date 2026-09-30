@@ -70,7 +70,8 @@ class AiGuardrailService
     private function requestsSensitiveData(string $text): bool
     {
         $patterns = [
-            '(كلمة\s*المرور|كلمات\s*المرور|password|passwd)',
+            // كلمة المرور بأشكالها الشائع (كلمة مرور / كلمه المرور / كلمة السر) وبالإنجليزية.
+            '((?:كلمة|كلمه|كلمات)\s*(?:ال)?(?:مرور|سر)|pass(?:word|wd|code))',
             '(التوكن|توكن|token|api[_\s-]?key|مفتاح\s*(الAPI|api)?\s*(السري)?)',
             '(بيانات\s+)?(المستخدمين|مستخدم\s*آخر|مستخدمين\s*آخرين|other\s+users?)',
             '(محادثات\s+)?(الآخرين|مستخدم\s+آخر|other\s+conversations?)',

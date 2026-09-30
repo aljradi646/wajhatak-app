@@ -3,10 +3,15 @@
     <div class="space-y-5">
         {{-- Toolbar: export + back --}}
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <a href="{{ route('admin.reports.index') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-wajhatak-600 dark:text-gray-400">
-                <x-admin.icon name="back" class="h-4 w-4" />
-                كل التقارير
-            </a>
+            <div class="flex flex-wrap items-center gap-3">
+                <a href="{{ route('admin.reports.index') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-wajhatak-600 dark:text-gray-400">
+                    <x-admin.icon name="back" class="h-4 w-4" />
+                    كل التقارير
+                </a>
+                <a href="{{ route('admin.reports.logs') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-wajhatak-600 dark:text-gray-400">
+                    سجل التقارير
+                </a>
+            </div>
             <div class="flex flex-wrap items-center gap-2">
                 <button onclick="window.print()" class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
                     <x-admin.icon name="print" class="h-4 w-4" /> طباعة
@@ -30,8 +35,7 @@
         <div class="print:hidden">
             <x-admin.card>
                 <div class="flex flex-wrap items-center gap-4">
-                    @php($logoPath = public_path('storage/branding/logo.png'))
-                    @if (file_exists($logoPath))
+                    @if (file_exists(public_path('storage/branding/logo.png')))
                         <img src="{{ asset('storage/branding/logo.png') }}" alt="شعار {{ $report['site']['name'] }}" class="h-14 w-14 rounded-xl object-contain bg-wajhatak-50 p-1 dark:bg-wajhatak-500/10">
                     @endif
                     <div class="flex-1">
