@@ -118,7 +118,13 @@
                 @if($settings->isResend())
                     <form method="POST" action="{{ route('admin.mail.test-resend') }}" class="mb-4">
                         @csrf
-                        <x-admin.button type="submit" variant="secondary">🔌 اختبار اتصال Resend API</x-admin.button>
+                        <div class="flex flex-col sm:flex-row gap-3 items-end">
+                            <div class="flex-1 w-full">
+                                <x-admin.input label="بريد لاختبار الاتصال" name="test_email" :value="auth()->user()->email" placeholder="you@example.com" />
+                            </div>
+                            <x-admin.button type="submit" variant="secondary">🔌 اختبار اتصال Resend API</x-admin.button>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">سيُرسل رسالة اختبار إلى هذا البريد للتحقق من صحة المفتاح والإعدادات.</p>
                     </form>
                 @else
                     <form method="POST" action="{{ route('admin.mail.test-smtp') }}" class="mb-4">

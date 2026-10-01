@@ -156,16 +156,28 @@ class MailSettingsController extends Controller
         return back()->with('status', 'تم حذف الشعار.');
     }
 
-    /** اختبار اتصال Resend API. */
-    public function testResendConnection()
+    /** اختبار اتصال Resend API عن طريق إرسال رسالة اختبار. */
+    public function testResendConnection(Request $request)
     {
+        $data = $request->validate([
+            'test_email' => ['required', 'email', 'max:190'],
+        ], [
+            'test_email.required' => 'أدخل بريدًا لاختبار الاتصال.',
+            'test_email.email' => 'البريد الإلكتروني غير صحيح.',
+        ]);
+
         $settings = EmailSetting::current();
 
         if (!$settings->isResend()) {
             return back()->with('error', 'مزود البريد الحالي ليس Resend.');
         }
 
-        $result = $this->resendService->testConnection();
+        // Block test emails
+        if (EmailSetting::isTestEmail($data['test_email'])) {
+            return back()->with('error', 'لا يمكن اختبار الاتصال باستخدام بريد وهمي أو تجريبي. استخدم بريد حقيقي.');
+        }
+
+        $result = $this->resendService->testConnection($data['test_email']);
 
         $settings->recordTestResult($result['success'], $result['success'] ? null : $result['message']);
 

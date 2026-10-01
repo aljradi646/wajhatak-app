@@ -138,11 +138,13 @@ class ResendService
     }
 
     /**
-     * Test Resend API connection and credentials.
+     * Test Resend API connection and credentials by sending a test email.
+     * This uses only the sending endpoint (POST /emails) which works with Sending access.
      *
+     * @param  string  $to  Recipient email address for test
      * @return array{success: bool, message: string, details?: array}
      */
-    public function testConnection(): array
+    public function testConnection(string $to): array
     {
         if (!$this->settings->isResend()) {
             return [
@@ -159,38 +161,34 @@ class ResendService
             ];
         }
 
-        try {
-            // Test by fetching API domains (requires valid API key)
-            $response = $this->httpClient()->get('/domains');
-
-            if ($response->successful()) {
-                $domains = $response->json('data', []);
-                
-                return [
-                    'success' => true,
-                    'message' => 'اتصال Resend API ناجح ✓',
-                    'details' => [
-                        'domains_count' => count($domains),
-                        'domains' => array_map(fn ($d) => $d['name'] ?? 'unknown', $domains),
-                        'sandbox_mode' => $this->settings->resend_sandbox,
-                    ],
-                ];
-            }
-
-            $error = $response->json();
-            $errorMessage = $this->parseApiError($error);
-
+        // Block test email domains
+        if (EmailSetting::isTestEmail($to)) {
             return [
                 'success' => false,
-                'message' => $errorMessage,
-                'details' => $error,
-            ];
-        } catch (\Exception $e) {
-            return [
-                'success' => false,
-                'message' => 'خطأ في الاتصال بـ Resend API: ' . $e->getMessage(),
+                'message' => 'لا يمكن اختبار الاتصال باستخدام بريد وهمي أو تجريبي. استخدم بريد حقيقي.',
             ];
         }
+
+        // Send a test email to verify connection
+        $result = $this->sendTestEmail($to);
+
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'message' => 'اتصال Resend API ناجح ✓ تم إرسال رسالة اختبار إلى ' . $to,
+                'details' => [
+                    'recipient' => $to,
+                    'sandbox_mode' => $this->settings->resend_sandbox,
+                    'sender' => $this->settings->getSenderEmail(),
+                ],
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => $result['message'],
+            'details' => $result['data'] ?? [],
+        ];
     }
 
     /**
