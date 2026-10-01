@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AgentController;
 use App\Http\Controllers\Admin\AiAssistantController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\MailSettingsController;
 use App\Http\Controllers\Admin\PropertyController;
@@ -85,12 +86,20 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('ai/playground/send', [AiAssistantController::class, 'playgroundSend'])->name('ai.playground.send');
     Route::post('ai/playground/clear', [AiAssistantController::class, 'playgroundClear'])->name('ai.playground.clear');
 
-    // إعدادات البريد الإلكتروني (SMTP + قوالب الرسائل)
+    // إعدادات البريد الإلكتروني (SMTP + Resend + قوالب الرسائل + شعار)
     Route::get('mail', [MailSettingsController::class, 'index'])->name('mail.index');
     Route::post('mail', [MailSettingsController::class, 'update'])->name('mail.update');
-    Route::post('mail/test', [MailSettingsController::class, 'testConnection'])->name('mail.test');
+    Route::post('mail/logo', [MailSettingsController::class, 'uploadLogo'])->name('mail.logo');
+    Route::delete('mail/logo', [MailSettingsController::class, 'deleteLogo'])->name('mail.logo.delete');
+    Route::post('mail/test-smtp', [MailSettingsController::class, 'testSmtpConnection'])->name('mail.test-smtp');
+    Route::post('mail/test-resend', [MailSettingsController::class, 'testResendConnection'])->name('mail.test-resend');
     Route::post('mail/send-test', [MailSettingsController::class, 'sendTest'])->name('mail.send-test');
     Route::post('mail/templates', [MailSettingsController::class, 'updateTemplates'])->name('mail.templates');
+
+    // قوالب البريد الإلكتروني (HTML/CSS قابل للتخصيص)
+    Route::resource('email-templates', EmailTemplateController::class)->parameters(['email-templates' => 'emailTemplate']);
+    Route::post('email-templates/{emailTemplate}/preview', [EmailTemplateController::class, 'preview'])->name('email-templates.preview');
+    Route::post('email-templates/{emailTemplate}/duplicate', [EmailTemplateController::class, 'duplicate'])->name('email-templates.duplicate');
 
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');

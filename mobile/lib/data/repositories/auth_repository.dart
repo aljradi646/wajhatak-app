@@ -58,19 +58,48 @@ class AuthRepository {
     required String password,
     required String accountType,
     String? phone,
+    // Agent fields
+    String? agencyName,
+    String? jobTitle,
+    String? agentPhone,
+    String? whatsapp,
+    String? agentCity,
+    String? nationalId,
+    int? experienceYears,
+    String? address,
+    String? bio,
+    String? licenseNumber,
   }) async {
-    final json = await _api.post(
-      '/auth/register',
-      data: {
-        'name': name,
-        'email': email,
-        'password': password,
-        'password_confirmation': password,
-        'account_type': accountType,
-        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
-        'locale': 'ar',
+    final data = {
+      'name': name,
+      'email': email,
+      'password': password,
+      'password_confirmation': password,
+      'account_type': accountType,
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      'locale': 'ar',
+      if (accountType == 'agent') ...{
+        if (agencyName != null && agencyName.trim().isNotEmpty)
+          'agency_name': agencyName.trim(),
+        if (jobTitle != null && jobTitle.trim().isNotEmpty)
+          'job_title': jobTitle.trim(),
+        if (agentPhone != null && agentPhone.trim().isNotEmpty)
+          'agent_phone': agentPhone.trim(),
+        if (whatsapp != null && whatsapp.trim().isNotEmpty)
+          'whatsapp': whatsapp.trim(),
+        if (agentCity != null && agentCity.trim().isNotEmpty)
+          'agent_city': agentCity.trim(),
+        if (nationalId != null && nationalId.trim().isNotEmpty)
+          'national_id': nationalId.trim(),
+        if (experienceYears != null) 'experience_years': experienceYears,
+        if (address != null && address.trim().isNotEmpty)
+          'address': address.trim(),
+        if (bio != null && bio.trim().isNotEmpty) 'bio': bio.trim(),
+        if (licenseNumber != null && licenseNumber.trim().isNotEmpty)
+          'license_number': licenseNumber.trim(),
       },
-    );
+    };
+    final json = await _api.post('/auth/register', data: data);
     return _saveSession(json);
   }
 
@@ -90,11 +119,7 @@ class AuthRepository {
   }) async {
     final json = await _api.patch(
       '/me',
-      data: {
-        'name': name.trim(),
-        'phone': phone?.trim(),
-        'locale': ?locale,
-      },
+      data: {'name': name.trim(), 'phone': phone?.trim(), 'locale': ?locale},
     );
     final user = LuxUser.fromJson(json['data'] as Map<String, dynamic>);
     await _tokenStore.saveUser(user);

@@ -31,12 +31,21 @@ class AiAssistantRepository {
     String message, {
     int? conversationId,
     List<Map<String, String>> history = const [],
+    double? latitude,
+    double? longitude,
   }) async {
     final payload = <String, dynamic>{
       'message': message,
       if (conversationId != null) 'conversation_id': conversationId,
       if (conversationId == null) 'session_token': await _sessionToken(),
       'locale': 'ar',
+      if (latitude != null && longitude != null) ...{
+        'client_context': {
+          'latitude': latitude,
+          'longitude': longitude,
+          'radius_km': 10,
+        },
+      },
     };
 
     final json = await _api.post('/ai/chat', data: payload);
@@ -68,6 +77,26 @@ class AiAssistantRepository {
   Future<void> clearConversation(int conversationId) =>
       _api.delete('/ai/conversations/$conversationId');
 
+  /// قائمة محادثات المستخدم (للمستخدمين المسجلين فقط).
+  Future<List<AiConversationItem>> listConversations() async {
+    final json = await _api.get('/ai/conversations');
+    final data = json['data'] as List<dynamic>? ?? const [];
+    return data
+        .map((e) => AiConversationItem.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// رسائل محادثة محددة.
+  Future<List<AiChatMessage>> getConversationMessages(
+    int conversationId,
+  ) async {
+    final json = await _api.get('/ai/conversations/$conversationId/messages');
+    final data = json['data'] as List<dynamic>? ?? const [];
+    return data
+        .map((e) => AiChatMessage.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   // ------------------------------------------------------------------
 
   Future<String> _sessionToken() async {
@@ -77,7 +106,7 @@ class AiAssistantRepository {
       if (token != null && token.isNotEmpty) return token;
       final fresh =
           DateTime.now().microsecondsSinceEpoch.toRadixString(36) +
-              (DateTime.now().hashCode.toRadixString(36));
+          (DateTime.now().hashCode.toRadixString(36));
       await prefs.setString(_sessionTokenKey, fresh);
       return fresh;
     } on Object {

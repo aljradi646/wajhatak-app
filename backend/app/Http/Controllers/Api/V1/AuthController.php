@@ -58,7 +58,9 @@ class AuthController extends Controller
                     'phone' => $validated['agent_phone'] ?? null,
                     'whatsapp' => $validated['whatsapp'] ?? null,
                     'city' => $validated['agent_city'] ?? null,
+                    'national_id' => $validated['national_id'] ?? null,
                     'experience_years' => $validated['experience_years'] ?? null,
+                    'address' => $validated['address'] ?? null,
                     'is_active' => false,
                     'verification_status' => 'pending',
                 ]);

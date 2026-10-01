@@ -102,8 +102,7 @@ class AiBootstrap {
   factory AiBootstrap.fromJson(Map<String, dynamic> json) => AiBootstrap(
     enabled: json['enabled'] as bool? ?? true,
     assistantName: json['assistant_name'] as String? ?? 'مساعد وجهتك',
-    welcomeMessage:
-        json['welcome_message'] as String? ?? 'كيف أخدمك اليوم؟',
+    welcomeMessage: json['welcome_message'] as String? ?? 'كيف أخدمك اليوم؟',
     suggestions: (json['suggestions'] as List<dynamic>? ?? const [])
         .map((e) => e.toString())
         .toList(growable: false),
@@ -145,6 +144,47 @@ class AiChatMessage {
       properties: properties,
       status: status,
       createdAt: DateTime.now(),
+    );
+  }
+
+  factory AiChatMessage.fromJson(Map<String, dynamic> json) {
+    return AiChatMessage(
+      id: json['id'] as int,
+      role: json['role'] as String,
+      content: json['content'] as String,
+      properties: (json['properties'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(AiPropertyResult.fromJson)
+          .toList(growable: false),
+      status: json['status'] as String? ?? 'ok',
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : null,
+    );
+  }
+}
+
+/// عنصر في قائمة المحادثات.
+@immutable
+class AiConversationItem {
+  const AiConversationItem({
+    required this.id,
+    required this.lastMessage,
+    required this.lastMessageAt,
+    this.messageCount = 0,
+  });
+
+  final int id;
+  final String lastMessage;
+  final DateTime lastMessageAt;
+  final int messageCount;
+
+  factory AiConversationItem.fromJson(Map<String, dynamic> json) {
+    return AiConversationItem(
+      id: json['id'] as int,
+      lastMessage: json['last_message'] as String? ?? '',
+      lastMessageAt: DateTime.parse(json['last_message_at'] as String),
+      messageCount: json['message_count'] as int? ?? 0,
     );
   }
 }

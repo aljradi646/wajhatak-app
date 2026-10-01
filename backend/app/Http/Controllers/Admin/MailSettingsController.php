@@ -4,27 +4,36 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
-use App\Services\Mail\DynamicMailService;
+use App\Models\EmailSetting;
 use App\Services\Mail\MailSettingsService;
+use App\Services\Mail\ResendService;
+use App\Services\Mail\UnifiedMailService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * قسم «إعدادات البريد الإلكتروني» في لوحة التحكم:
- * بيانات SMTP التي يدخلها المدير + زر اختبار اتصال حقيقي
- * + قوالب الرسائل القابلة للتعديل + إرسال رسالة تجريبية.
+ * - دعم SMTP و Resend API
+ * - رفع شعار البريد
+ * - اختبار الاتصال والإرسال
+ * - قوالب الرسائل القابلة للتعديل
  */
 class MailSettingsController extends Controller
 {
     public function __construct(
         private readonly MailSettingsService $mailSettings,
-        private readonly DynamicMailService $mailer,
+        private readonly UnifiedMailService $mailer,
+        private readonly ResendService $resendService,
     ) {}
 
     public function index()
     {
+        $settings = EmailSetting::current();
+
         return view('admin.mail.index', [
-            'values' => $this->mailSettings->all(),
-            'configured' => $this->mailSettings->isConfigured(),
+            'settings' => $settings,
+            'legacyValues' => $this->mailSettings->all(),
+            'legacyConfigured' => $this->mailSettings->isConfigured(),
             'templates' => MailSettingsService::TEMPLATES,
             'templateValues' => collect(array_keys(MailSettingsService::TEMPLATES))
                 ->mapWithKeys(fn ($key) => [$key => $this->mailSettings->template($key)])
@@ -32,45 +41,150 @@ class MailSettingsController extends Controller
         ]);
     }
 
-    /** حفظ بيانات SMTP. */
+    /** حفظ إعدادات البريد (SMTP أو Resend). */
     public function update(Request $request)
     {
+        $settings = EmailSetting::current();
+
         $data = $request->validate([
-            'mail_host' => ['nullable', 'string', 'max:190'],
-            'mail_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
-            'mail_encryption' => ['nullable', 'in:tls,ssl,none'],
-            'mail_username' => ['nullable', 'string', 'max:190'],
-            'mail_password' => ['nullable', 'string', 'max:190'],
-            'mail_timeout' => ['nullable', 'integer', 'min:3', 'max:60'],
-            'mail_from_address' => ['nullable', 'email', 'max:190'],
-            'mail_from_name' => ['nullable', 'string', 'max:120'],
-            'mail_reply_to' => ['nullable', 'email', 'max:190'],
-            'mail_verification_code_ttl' => ['nullable', 'integer', 'min:5', 'max:120'],
-            'mail_verification_max_attempts' => ['nullable', 'integer', 'min:3', 'max:10'],
-            'mail_verification_resend_seconds' => ['nullable', 'integer', 'min:15', 'max:600'],
-            'mail_require_mx_check' => ['nullable', 'boolean'],
+            'provider' => ['required', 'in:smtp,resend'],
+            
+            // SMTP settings
+            'smtp_host' => ['nullable', 'string', 'max:190', 'required_if:provider,smtp'],
+            'smtp_port' => ['nullable', 'integer', 'min:1', 'max:65535', 'required_if:provider,smtp'],
+            'smtp_encryption' => ['nullable', 'in:tls,ssl,none', 'required_if:provider,smtp'],
+            'smtp_username' => ['nullable', 'string', 'max:190', 'required_if:provider,smtp'],
+            'smtp_password' => ['nullable', 'string', 'max:190'],
+            'smtp_timeout' => ['nullable', 'integer', 'min:3', 'max:60'],
+            
+            // Resend settings
+            'resend_api_key' => ['nullable', 'string', 'max:255', 'required_if:provider,resend'],
+            'resend_sandbox' => ['nullable', 'boolean'],
+            
+            // Common settings
+            'from_name' => ['required', 'string', 'max:120'],
+            'from_address' => ['required', 'email', 'max:190'],
+            'reply_to' => ['nullable', 'email', 'max:190'],
+            
+            // Activation
+            'is_active' => ['nullable', 'boolean'],
         ], [
-            'mail_host.max' => 'عنوان الخادم طويل جدًا.',
-            'mail_port.integer' => 'المنفذ يجب أن يكون رقمًا.',
-            'mail_encryption.in' => 'التشفير يجب أن يكون tls أو ssl أو none.',
-            'mail_from_address.email' => 'بريد المُرسل غير صحيح.',
-            'mail_reply_to.email' => 'بريد الرد غير صحيح.',
+            'provider.required' => 'اختر مزود البريد.',
+            'smtp_host.required_if' => 'عنوان خادم SMTP مطلوب.',
+            'smtp_port.required_if' => 'منفذ SMTP مطلوب.',
+            'smtp_encryption.required_if' => 'طريقة التشفير مطلوبة.',
+            'smtp_username.required_if' => 'اسم مستخدم SMTP مطلوب.',
+            'resend_api_key.required_if' => 'مفتاح Resend API مطلوب.',
+            'from_name.required' => 'اسم المرسل مطلوب.',
+            'from_address.required' => 'بريد المرسل مطلوب.',
+            'from_address.email' => 'بريد المرسل غير صحيح.',
+            'reply_to.email' => 'بريد الرد غير صحيح.',
         ]);
 
-        $this->mailSettings->putMany($data);
+        // Update settings
+        $settings->update([
+            'provider' => $data['provider'],
+            'smtp_host' => $data['smtp_host'] ?? null,
+            'smtp_port' => $data['smtp_port'] ?? null,
+            'smtp_encryption' => $data['smtp_encryption'] ?? null,
+            'smtp_username' => $data['smtp_username'] ?? null,
+            // Only update password if provided
+            'smtp_password' => !empty($data['smtp_password']) ? $data['smtp_password'] : $settings->smtp_password,
+            'smtp_timeout' => $data['smtp_timeout'] ?? 15,
+            'resend_api_key' => !empty($data['resend_api_key']) ? $data['resend_api_key'] : $settings->resend_api_key,
+            'resend_sandbox' => $data['resend_sandbox'] ?? false,
+            'from_name' => $data['from_name'],
+            'from_address' => $data['from_address'],
+            'reply_to' => $data['reply_to'] ?? null,
+            'is_active' => $data['is_active'] ?? false,
+        ]);
+
         ActivityLog::record('mail', 'تم تحديث إعدادات البريد الإلكتروني');
 
-        return back()->with('status', 'تم حفظ إعدادات البريد بنجاح. لا تنسَ اختبار الاتصال.');
+        return back()->with('status', 'تم حفظ إعدادات البريد بنجاح.');
     }
 
-    /** POST اختبار الاتصال الحقيقي: EHLO + AUTH + (RCPT اختياري). */
-    public function testConnection(Request $request)
+    /** رفع شعار البريد. */
+    public function uploadLogo(Request $request)
+    {
+        $request->validate([
+            'logo' => ['required', 'image', 'mimes:png,jpg,jpeg,svg', 'max:512'],
+        ], [
+            'logo.required' => 'اختر صورة الشعار.',
+            'logo.image' => 'الملف يجب أن يكون صورة.',
+            'logo.mimes' => 'الصيغ المدعومة: PNG, JPG, JPEG, SVG.',
+            'logo.max' => 'حجم الصورة يجب أن يكون أقل من 512KB.',
+        ]);
+
+        $settings = EmailSetting::current();
+
+        // Delete old logo
+        if ($settings->logo_path && Storage::disk('public')->exists($settings->logo_path)) {
+            Storage::disk('public')->delete($settings->logo_path);
+        }
+
+        // Upload new logo
+        $path = $request->file('logo')->store('email-logos', 'public');
+        $url = Storage::disk('public')->url($path);
+
+        $settings->update([
+            'logo_path' => $path,
+            'logo_url' => $url,
+        ]);
+
+        ActivityLog::record('mail', 'تم تحديث شعار البريد');
+
+        return back()->with('status', 'تم رفع الشعار بنجاح.');
+    }
+
+    /** حذف شعار البريد. */
+    public function deleteLogo()
+    {
+        $settings = EmailSetting::current();
+
+        if ($settings->logo_path && Storage::disk('public')->exists($settings->logo_path)) {
+            Storage::disk('public')->delete($settings->logo_path);
+        }
+
+        $settings->update([
+            'logo_path' => null,
+            'logo_url' => null,
+        ]);
+
+        ActivityLog::record('mail', 'تم حذف شعار البريد');
+
+        return back()->with('status', 'تم حذف الشعار.');
+    }
+
+    /** اختبار اتصال Resend API. */
+    public function testResendConnection()
+    {
+        $settings = EmailSetting::current();
+
+        if (!$settings->isResend()) {
+            return back()->with('error', 'مزود البريد الحالي ليس Resend.');
+        }
+
+        $result = $this->resendService->testConnection();
+
+        $settings->recordTestResult($result['success'], $result['success'] ? null : $result['message']);
+
+        ActivityLog::record('mail', 'اختبار اتصال Resend: '.($result['success'] ? 'ناجح' : 'فاشل'));
+
+        return back()->with(
+            $result['success'] ? 'status' : 'error',
+            $result['message'],
+        );
+    }
+
+    /** اختبار اتصال SMTP (legacy). */
+    public function testSmtpConnection(Request $request)
     {
         $data = $request->validate([
             'test_recipient' => ['nullable', 'email', 'max:190'],
         ]);
 
-        // حفظ القيم المدخلة أولًا لاختبار ما كتبه المدير فعليًا (كلمة المرور مضمّنة).
+        // حفظ القيم المدخلة أولًا
         $this->mailSettings->putMany($request->only(array_keys(MailSettingsService::DEFAULTS)));
 
         $result = $this->mailer->testConnection($data['test_recipient'] ?? null);
@@ -87,7 +201,7 @@ class MailSettingsController extends Controller
         );
     }
 
-    /** POST إرسال رسالة تجريبية حقيقية إلى بريد المدير. */
+    /** إرسال رسالة تجريبية. */
     public function sendTest(Request $request)
     {
         $data = $request->validate([
@@ -97,12 +211,28 @@ class MailSettingsController extends Controller
             'test_email.email' => 'البريد الإلكتروني غير صحيح.',
         ]);
 
+        $settings = EmailSetting::current();
+
+        // Block test emails
+        if (EmailSetting::isTestEmail($data['test_email'])) {
+            return back()->with('error', 'لا يمكن إرسال رسائل إلى عناوين بريد وهمية أو تجريبية.');
+        }
+
         try {
-            $this->mailer->send(
-                $data['test_email'],
-                'رسالة تجريبية من وجهتك ✉️',
-                "أهلًا!\n\nهذه رسالة تجريبية تأكد أن إعدادات البريد في لوحة تحكم وجهتك تعمل بشكل صحيح.\n\nإن وصلتك هذه الرسالة فكل رسائل المنصة (رموز التحقق، إشعارات العقارات، التوثيق) ستصل بنفس الطريقة.\n\nفريق وجهتك.",
-            );
+            if ($settings->isResend()) {
+                $result = $this->resendService->sendTestEmail($data['test_email']);
+                
+                if (!$result['success']) {
+                    return back()->with('error', $result['message']);
+                }
+            } else {
+                // For SMTP, use the legacy DynamicMailService directly for test
+                app(\App\Services\Mail\DynamicMailService::class)->send(
+                    $data['test_email'],
+                    'رسالة تجريبية من وجهتك ✉️',
+                    "أهلًا!\n\nهذه رسالة تجريبية تأكد أن إعدادات البريد في لوحة تحكم وجهتك تعمل بشكل صحيح.\n\nإن وصلتك هذه الرسالة فكل رسائل المنصة (رموز التحقق، إشعارات العقارات، التوثيق) ستصل بنفس الطريقة.\n\nفريق وجهتك.",
+                );
+            }
         } catch (\Throwable $e) {
             return back()->with('error', 'فشل إرسال الرسالة التجريبية: '.$e->getMessage());
         }

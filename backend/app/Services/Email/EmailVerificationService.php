@@ -4,8 +4,8 @@ namespace App\Services\Email;
 
 use App\Models\EmailVerificationCode;
 use App\Models\User;
-use App\Services\Mail\DynamicMailService;
 use App\Services\Mail\MailSettingsService;
+use App\Services\Mail\UnifiedMailService;
 use Illuminate\Support\Facades\Hash;
 use Throwable;
 
@@ -20,7 +20,7 @@ class EmailVerificationService
 {
     public function __construct(
         private readonly MailSettingsService $mailSettings,
-        private readonly DynamicMailService $mailer,
+        private readonly UnifiedMailService $mailer,
         private readonly EmailDeliverabilityService $deliverability,
     ) {}
 

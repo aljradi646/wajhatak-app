@@ -112,6 +112,17 @@ class SessionController extends AsyncNotifier<SessionData?> {
     required String password,
     required String accountType,
     String? phone,
+    // Agent fields
+    String? agencyName,
+    String? jobTitle,
+    String? agentPhone,
+    String? whatsapp,
+    String? agentCity,
+    String? nationalId,
+    int? experienceYears,
+    String? address,
+    String? bio,
+    String? licenseNumber,
   }) async {
     state = const AsyncLoading();
     try {
@@ -129,6 +140,16 @@ class SessionController extends AsyncNotifier<SessionData?> {
               password: password,
               accountType: accountType,
               phone: phone,
+              agencyName: agencyName,
+              jobTitle: jobTitle,
+              agentPhone: agentPhone,
+              whatsapp: whatsapp,
+              agentCity: agentCity,
+              nationalId: nationalId,
+              experienceYears: experienceYears,
+              address: address,
+              bio: bio,
+              licenseNumber: licenseNumber,
             );
       })();
       state = AsyncData(session);

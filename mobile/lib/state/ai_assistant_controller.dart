@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/services/location_service.dart';
 import '../data/api_client.dart';
 import '../data/models/ai_assistant.dart';
 import '../data/models/models.dart';
@@ -19,7 +20,8 @@ final aiBootstrapProvider = FutureProvider<AiBootstrap>((ref) async {
     return const AiBootstrap(
       enabled: false,
       assistantName: 'مساعد وجهتك',
-      welcomeMessage: 'المساعد غير متاح حاليًا، لكن يمكنك استخدام البحث العقاري التقليدي.',
+      welcomeMessage:
+          'المساعد غير متاح حاليًا، لكن يمكنك استخدام البحث العقاري التقليدي.',
       suggestions: [],
     );
   }
@@ -53,8 +55,9 @@ class AiConversationState {
       messages: messages ?? this.messages,
       loading: loading ?? this.loading,
       error: clearError ? null : (error ?? this.error),
-      conversationId:
-          clearConversation ? null : (conversationId ?? this.conversationId),
+      conversationId: clearConversation
+          ? null
+          : (conversationId ?? this.conversationId),
     );
   }
 }
@@ -77,9 +80,17 @@ class AiConversationController extends Notifier<AiConversationState> {
     );
 
     try {
+      // Get user location silently for nearby searches
+      final location = await LocationService.silentPosition();
+
       final reply = await ref
           .read(aiAssistantRepositoryProvider)
-          .sendMessage(trimmed, conversationId: state.conversationId);
+          .sendMessage(
+            trimmed,
+            conversationId: state.conversationId,
+            latitude: location.latitude,
+            longitude: location.longitude,
+          );
       state = state.copyWith(
         messages: [...state.messages, reply],
         loading: false,
@@ -102,7 +113,8 @@ class AiConversationController extends Notifier<AiConversationState> {
     } on Object {
       final fallback = AiChatMessage.local(
         isUser: false,
-        content: 'المساعد غير متاح حاليًا، لكن يمكنك استخدام البحث العقاري التقليدي.',
+        content:
+            'المساعد غير متاح حاليًا، لكن يمكنك استخدام البحث العقاري التقليدي.',
         status: 'error',
       );
       state = state.copyWith(
@@ -151,6 +163,28 @@ class AiConversationController extends Notifier<AiConversationState> {
     await _seedWelcome();
   }
 
+  /// تحميل محادثة موجودة من القائمة.
+  Future<void> loadConversation(int conversationId) async {
+    final session = ref.read(sessionProvider).asData?.value;
+    if (session == null) return;
+
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      final messages = await ref
+          .read(aiAssistantRepositoryProvider)
+          .getConversationMessages(conversationId);
+      state = AiConversationState(
+        messages: messages,
+        loading: false,
+        conversationId: conversationId,
+      );
+    } on ApiFailure catch (error) {
+      state = state.copyWith(loading: false, error: error.message);
+    } on Object {
+      state = state.copyWith(loading: false, error: 'failed_to_load');
+    }
+  }
+
   Future<void> _seedWelcome() async {
     try {
       final bootstrap = await ref.read(aiBootstrapProvider.future);
@@ -163,11 +197,7 @@ class AiConversationController extends Notifier<AiConversationState> {
     } on Object {
       state = const AiConversationState(
         messages: [
-          AiChatMessage(
-            id: 1,
-            role: 'assistant',
-            content: 'كيف أخدمك اليوم؟',
-          ),
+          AiChatMessage(id: 1, role: 'assistant', content: 'كيف أخدمك اليوم؟'),
         ],
       );
     }
@@ -178,5 +208,18 @@ class AiConversationController extends Notifier<AiConversationState> {
 
 final aiConversationProvider =
     NotifierProvider<AiConversationController, AiConversationState>(
-  AiConversationController.new,
-);
+      AiConversationController.new,
+    );
+
+/// قائمة محادثات المستخدم المسجل.
+final aiConversationsListProvider = FutureProvider<List<AiConversationItem>>((
+  ref,
+) async {
+  final session = ref.watch(sessionProvider).asData?.value;
+  if (session == null) return const [];
+  try {
+    return await ref.read(aiAssistantRepositoryProvider).listConversations();
+  } on ApiFailure {
+    return const [];
+  }
+});

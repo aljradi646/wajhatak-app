@@ -140,6 +140,11 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
         ),
         actions: [
           IconButton(
+            tooltip: 'سجل المحادثات',
+            icon: const Icon(Icons.history_rounded),
+            onPressed: () => _showConversationHistory(context),
+          ),
+          IconButton(
             tooltip: 'مسح المحادثة',
             icon: const Icon(Icons.refresh_rounded),
             onPressed: state.loading
@@ -159,8 +164,7 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-              itemCount:
-                  state.messages.length + (state.loading ? 1 : 0),
+              itemCount: state.messages.length + (state.loading ? 1 : 0),
               itemBuilder: (context, index) {
                 if (state.loading && index == state.messages.length) {
                   return const _TypingIndicator();
@@ -189,7 +193,9 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
               child: TextButton.icon(
                 onPressed: state.loading
                     ? null
-                    : () => ref.read(aiConversationProvider.notifier).resendLast(),
+                    : () => ref
+                          .read(aiConversationProvider.notifier)
+                          .resendLast(),
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('إعادة إرسال'),
               ),
@@ -204,8 +210,7 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
     );
   }
 
-  bool get _canFavorite =>
-      ref.read(sessionProvider).asData?.value != null;
+  bool get _canFavorite => ref.read(sessionProvider).asData?.value != null;
 
   void _openProperty(int propertyId) {
     Navigator.of(context).push(
@@ -229,6 +234,22 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
     );
     if (!mounted) return;
     await toggleFavorite(context, ref, lux);
+  }
+
+  void _showConversationHistory(BuildContext context) {
+    final session = ref.read(sessionProvider).asData?.value;
+    if (session == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يجب تسجيل الدخول لعرض سجل المحادثات')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _ConversationHistorySheet(),
+    );
   }
 }
 
@@ -282,7 +303,9 @@ class _MessageBubble extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isUser
                       ? theme.colorScheme.surfaceContainerHigh
-                      : theme.colorScheme.primaryContainer.withValues(alpha: .45),
+                      : theme.colorScheme.primaryContainer.withValues(
+                          alpha: .45,
+                        ),
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(18),
                     topRight: const Radius.circular(18),
@@ -302,18 +325,26 @@ class _MessageBubble extends StatelessWidget {
             if (message.properties.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Column(
-                  children: [
-                    for (final property in message.properties)
-                      _AiPropertyMiniCard(
-                        property: property,
-                        onTap: () => onPropertyTap(property.propertyId),
-                        onFavorite:
-                            onFavoriteTap != null
-                                ? () => onFavoriteTap!(property)
-                                : null,
-                      ),
-                  ],
+                child: SizedBox(
+                  height: 160,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: message.properties.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, index) {
+                      final property = message.properties[index];
+                      return SizedBox(
+                        width: 280,
+                        child: _AiPropertyMiniCard(
+                          property: property,
+                          onTap: () => onPropertyTap(property.propertyId),
+                          onFavorite: onFavoriteTap != null
+                              ? () => onFavoriteTap!(property)
+                              : null,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
           ],
@@ -353,8 +384,8 @@ class _AiPropertyMiniCard extends StatelessWidget {
                 child: SizedBox(
                   width: 74,
                   height: 74,
-                  child: property.imageUrl != null &&
-                          property.imageUrl!.isNotEmpty
+                  child:
+                      property.imageUrl != null && property.imageUrl!.isNotEmpty
                       ? Image.network(
                           property.imageUrl!,
                           fit: BoxFit.cover,
@@ -488,7 +519,9 @@ class _AiPropertyMiniCard extends StatelessWidget {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('نُسخت تفاصيل العقار — يمكنك لصقها في أي تطبيق للمشاركة'),
+          content: Text(
+            'نُسخت تفاصيل العقار — يمكنك لصقها في أي تطبيق للمشاركة',
+          ),
           duration: Duration(seconds: 2),
         ),
       );
@@ -511,11 +544,7 @@ class _AiPropertyMiniCard extends StatelessWidget {
     ),
     child: Text(
       label,
-      style: TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.w800,
-        color: color,
-      ),
+      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
     ),
   );
 }
@@ -683,5 +712,143 @@ class _InputBar extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// سجل المحادثات — قائمة المحادثات السابقة
+// ---------------------------------------------------------------------------
+
+class _ConversationHistorySheet extends ConsumerWidget {
+  const _ConversationHistorySheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final conversationsAsync = ref.watch(aiConversationsListProvider);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (_, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(WajhatakRadius.sheet),
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 16),
+                  Text(
+                    'سجل المحادثات',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: conversationsAsync.when(
+                data: (conversations) {
+                  if (conversations.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 64,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'لا توجد محادثات سابقة',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    controller: scrollController,
+                    itemCount: conversations.length,
+                    itemBuilder: (_, index) {
+                      final conv = conversations[index];
+                      return ListTile(
+                        leading: const Icon(Icons.chat_rounded),
+                        title: Text(
+                          conv.lastMessage,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          _formatDate(conv.lastMessageAt),
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        trailing: Text(
+                          '${conv.messageCount} رسالة',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          ref
+                              .read(aiConversationProvider.notifier)
+                              .loadConversation(conv.id);
+                        },
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, __) => Center(
+                  child: Text(
+                    'حدث خطأ في تحميل المحادثات',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inDays == 0) {
+      if (diff.inHours == 0) {
+        if (diff.inMinutes == 0) return 'الآن';
+        return 'منذ ${diff.inMinutes} دقيقة';
+      }
+      return 'منذ ${diff.inHours} ساعة';
+    } else if (diff.inDays == 1) {
+      return 'أمس';
+    } else if (diff.inDays < 7) {
+      return 'منذ ${diff.inDays} أيام';
+    }
+    return '${date.day}/${date.month}/${date.year}';
   }
 }

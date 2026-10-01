@@ -8,7 +8,7 @@ use App\Models\Agent;
 use App\Models\Conversation;
 use App\Models\ReportLog;
 use App\Models\User;
-use App\Services\Mail\DynamicMailService;
+use App\Services\Mail\UnifiedMailService;
 use Illuminate\Http\Request;
 
 class AgentController extends Controller
@@ -74,7 +74,7 @@ class AgentController extends Controller
 
         // إشعار بريدي حقيقي (لا يفشل الطلب إن تعذر البريد).
         try {
-            app(DynamicMailService::class)
+            app(UnifiedMailService::class)
                 ->sendTemplate($agent->user->email, 'agent_approved', ['name' => $agent->user->name]);
         } catch (\Throwable $e) {
             report($e);
@@ -101,7 +101,7 @@ class AgentController extends Controller
         ActivityLog::record('agent', "تم رفض توثيق الوكيل «{$agent->user->name}»", $agent);
 
         try {
-            app(DynamicMailService::class)
+            app(UnifiedMailService::class)
                 ->sendTemplate($agent->user->email, 'agent_rejected', [
                     'name' => $agent->user->name,
                     'reason' => $data['reason'],
