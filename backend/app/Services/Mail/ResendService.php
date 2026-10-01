@@ -91,9 +91,15 @@ class ResendService
             'subject' => $subject,
         ];
 
-        // Add content
+        // Process logo as inline attachment if exists
+        $logoAttachment = $this->prepareLogoAttachment();
+        if ($logoAttachment) {
+            $attachments[] = $logoAttachment;
+        }
+
+        // Add content with CID reference for logo
         if ($html) {
-            $payload['html'] = $this->injectLogo($html);
+            $payload['html'] = $this->injectLogo($html, $logoAttachment ? $logoAttachment['cid'] : null);
         }
         if ($text) {
             $payload['text'] = $text;
@@ -256,23 +262,27 @@ class ResendService
 
     /**
      * Inject logo into HTML email content.
+     * Uses CID for inline attachment or falls back to URL.
      */
-    private function injectLogo(string $html): string
+    private function injectLogo(string $html, ?string $cid = null): string
     {
         $logoUrl = $this->settings->getLogoUrlForEmail();
 
-        if (!$logoUrl) {
+        if (!$logoUrl && !$cid) {
             return $html;
         }
 
+        // Use CID for inline attachment if available, otherwise use URL
+        $logoSrc = $cid ? "cid:{$cid}" : $logoUrl;
+
         // Replace placeholder or inject at top
         if (str_contains($html, '{{logo}}')) {
-            return str_replace('{{logo}}', $logoUrl, $html);
+            return str_replace('{{logo}}', $logoSrc, $html);
         }
 
         // Inject at the beginning of body
         $logoHtml = '<div style="text-align: center; margin-bottom: 20px;">' .
-                    '<img src="' . $logoUrl . '" alt="وجهتك" style="max-width: 200px; height: auto;">' .
+                    '<img src="' . $logoSrc . '" alt="وجهتك" style="max-width: 200px; height: auto;">' .
                     '</div>';
 
         if (str_contains($html, '<body')) {
@@ -280,6 +290,39 @@ class ResendService
         }
 
         return $logoHtml . $html;
+    }
+
+    /**
+     * Prepare logo as inline attachment with CID.
+     * Returns null if no logo is configured.
+     */
+    private function prepareLogoAttachment(): ?array
+    {
+        $logoPath = $this->settings->logo_path;
+        
+        if (!$logoPath || !Storage::disk('public')->exists($logoPath)) {
+            return null;
+        }
+
+        try {
+            $fileContent = Storage::disk('public')->get($logoPath);
+            $mimeType = Storage::disk('public')->mimeType($logoPath);
+            $fileName = basename($logoPath);
+            $cid = 'logo@wajhatak';
+
+            return [
+                'content' => base64_encode($fileContent),
+                'filename' => $fileName,
+                'type' => $mimeType,
+                'disposition' => 'inline',
+                'content_id' => $cid,
+                'cid' => $cid,
+            ];
+        } catch (\Exception $e) {
+            // Log error but don't fail the email send
+            report($e);
+            return null;
+        }
     }
 
     /**

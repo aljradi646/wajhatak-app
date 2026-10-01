@@ -203,11 +203,53 @@
                                 <label class="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-1">نص الرسالة</label>
                                 <textarea name="templates[{{ $key }}][body]" rows="6" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm leading-relaxed dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">{{ $templateValues[$key]['body'] }}</textarea>
                             </div>
+                            <button type="button" @click="previewTemplate('{{ $key }}')" class="text-sm text-wajhatak-600 hover:text-wajhatak-700 font-bold mt-2">👁️ معاينة الرسالة</button>
                         </div>
                     </x-admin.card>
                 @endforeach
                 <x-admin.button type="submit">حفظ كل القوالب</x-admin.button>
             </form>
+
+            {{-- نافذة معاينة الرسالة --}}
+            <div x-show="showPreview" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showPreview = false">
+                <div class="bg-white dark:bg-gray-800 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-auto m-4">
+                    <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center">
+                        <h3 class="font-bold text-gray-900 dark:text-gray-100">معاينة الرسالة</h3>
+                        <button @click="showPreview = false" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl">&times;</button>
+                    </div>
+                    <div class="p-4">
+                        <div x-html="previewHtml"></div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                function previewTemplate(templateKey) {
+                    fetch('{{ route('admin.mail.preview') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        body: JSON.stringify({ template_key: templateKey })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        Alpine.store('mailPreview').previewHtml = data.html;
+                        Alpine.store('mailPreview').showPreview = true;
+                    })
+                    .catch(error => {
+                        alert('فشل تحميل المعاينة: ' + error.message);
+                    });
+                }
+
+                document.addEventListener('alpine:init', () => {
+                    Alpine.store('mailPreview', {
+                        showPreview: false,
+                        previewHtml: ''
+                    });
+                });
+            </script>
         </div>
     </div>
 </x-admin.layouts.admin>

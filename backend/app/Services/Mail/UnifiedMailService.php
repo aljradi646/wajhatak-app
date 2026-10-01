@@ -102,12 +102,15 @@ class UnifiedMailService
         // Render template with variables
         $rendered = $template->render($variables);
 
-        // Inject logo placeholder
-        $logoUrl = $settings->getLogoUrlForEmail();
-        if ($logoUrl) {
-            $rendered['html'] = str_replace('{{logo}}', '<img src="' . $logoUrl . '" alt="وجهتك" style="max-width: 150px; height: auto;">', $rendered['html']);
-        } else {
-            $rendered['html'] = str_replace('{{logo}}', '', $rendered['html']);
+        // For SMTP: replace {{logo}} with URL or remove it
+        // For Resend: keep {{logo}} placeholder, ResendService will handle CID
+        if (!$settings->isResend()) {
+            $logoUrl = $settings->getLogoUrlForEmail();
+            if ($logoUrl) {
+                $rendered['html'] = str_replace('{{logo}}', '<img src="' . $logoUrl . '" alt="وجهتك" style="max-width: 150px; height: auto;">', $rendered['html']);
+            } else {
+                $rendered['html'] = str_replace('{{logo}}', '', $rendered['html']);
+            }
         }
 
         // Route to appropriate provider

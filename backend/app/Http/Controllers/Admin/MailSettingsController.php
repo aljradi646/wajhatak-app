@@ -270,4 +270,90 @@ class MailSettingsController extends Controller
 
         return back()->with('status', 'تم حفظ قوالب الرسائل بنجاح — تُستخدم في كل الإرسالات القادمة.');
     }
+
+    /** معاينة رسالة البريد. */
+    public function previewEmail(Request $request)
+    {
+        $data = $request->validate([
+            'template_key' => ['required', 'string'],
+        ]);
+
+        $settings = EmailSetting::current();
+
+        // Sample data for preview
+        $sampleData = [
+            'name' => 'أحمد محمد',
+            'code' => '123456',
+            'ttl' => '15',
+            'reason' => 'سبب الرفض',
+            'property' => 'شقة في الرياض',
+            'email' => 'ahmed@example.com',
+        ];
+
+        // Try new template system first
+        $template = \App\Models\EmailTemplate::findByKey($data['template_key']);
+        
+        if ($template) {
+            $rendered = $template->render($sampleData);
+            $html = $rendered['html'];
+            
+            // Inject logo for preview
+            $logoUrl = $settings->getLogoUrlForEmail();
+            if ($logoUrl) {
+                $html = str_replace('{{logo}}', '<img src="' . $logoUrl . '" alt="وجهتك" style="max-width: 150px; height: auto;">', $html);
+            } else {
+                $html = str_replace('{{logo}}', '', $html);
+            }
+        } else {
+            // Fallback to legacy system
+            $legacyTemplate = $this->mailSettings->renderTemplate($data['template_key'], $sampleData);
+            $html = $this->convertToHtml($legacyTemplate['body'], $settings);
+        }
+
+        return response()->json([
+            'html' => $html,
+        ]);
+    }
+
+    /**
+     * Convert plain text to HTML for preview (legacy fallback).
+     */
+    private function convertToHtml(string $text, EmailSetting $settings): string
+    {
+        $logoUrl = $settings->getLogoUrlForEmail();
+        $logoHtml = $logoUrl 
+            ? '<img src="' . $logoUrl . '" alt="وجهتك" style="max-width: 150px; height: auto; margin-bottom: 20px;">' 
+            : '';
+
+        $body = nl2br(e($text));
+
+        return <<<HTML
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>معاينة الرسالة</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5;">
+    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="background: linear-gradient(135deg, #075E4A, #0E8A6D); padding: 30px; text-align: center;">
+            {$logoHtml}
+            <h1 style="color: white; margin: 0; font-size: 24px;">وجهتك</h1>
+        </div>
+        
+        <div style="padding: 30px;">
+            {$body}
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eee;">
+            <p style="margin: 0; color: #666; font-size: 12px;">
+                معاينة رسالة من منصة وجهتك العقارية
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+HTML;
+    }
 }

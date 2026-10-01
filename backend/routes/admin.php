@@ -95,6 +95,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('mail/test-resend', [MailSettingsController::class, 'testResendConnection'])->name('mail.test-resend');
     Route::post('mail/send-test', [MailSettingsController::class, 'sendTest'])->name('mail.send-test');
     Route::post('mail/templates', [MailSettingsController::class, 'updateTemplates'])->name('mail.templates');
+    Route::post('mail/preview', [MailSettingsController::class, 'previewEmail'])->name('mail.preview');
 
     // قوالب البريد الإلكتروني (HTML/CSS قابل للتخصيص)
     Route::resource('email-templates', EmailTemplateController::class)->parameters(['email-templates' => 'emailTemplate']);
