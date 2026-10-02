@@ -19,6 +19,7 @@ class AiMessage extends Model
         return [
             'structured_filters' => 'array',
             'property_ids' => 'array',
+            'content' => 'string',
         ];
     }
 

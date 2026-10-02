@@ -5,7 +5,9 @@ namespace App\Services\AI;
 use App\Enums\AiRequestStatus;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
+use App\Models\Property;
 use App\Models\User;
+use App\Models\ViewingRequest;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -92,7 +94,7 @@ class AiAssistantService
             // 2) الحوار اليومي أولاً: تحية/شكر/قدرات/إحصاء — ردود فورية بلا بحث.
             $stage = 'history';
             $history = (array) $this->attempt($stage, fn () => $this->conversations->historyFor($conversation), []);
-            $previous = (array) $this->attempt($stage, fn () => $this->conversations->accumulatedFilters($conversation), []);
+            $previous = (array) $this->attempt('accumulated_filters', fn () => $this->conversations->accumulatedFilters($conversation), []);
 
             $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
             if ($smallTalk !== null) {
@@ -105,6 +107,41 @@ class AiAssistantService
                     return $this->payload($conversation, $reply, 'ok', [], null, []);
                 }
                 // فشل بناء رد الحوار اليومي → نكمل كبحث عادي بدل إظهار خطأ.
+            }
+
+            // 2.4) طلب معاينة مباشرة لعقار محدد
+            if (preg_match('/(معاينة|حجز|احجز|موعد|أريد\s*معاينة)/u', $message)) {
+                preg_match('/(\d+)/u', $message, $m);
+                $selectedPropertyId = isset($m[1]) ? (int) $m[1] : ($conversation->messages()->whereNotNull('property_ids')->latest('id')->first()?->property_ids[0] ?? null);
+
+                if ($selectedPropertyId) {
+                    if (! $user) {
+                        $reply = 'لطلب معاينة هذا العقار، يرجى تسجيل الدخول إلى حسابك أولاً.';
+                        return $this->payload($conversation, $reply, 'ok', [], null);
+                    }
+
+                    preg_match('/(\d{4}-\d{2}-\d{2})/u', $message, $dateMatch);
+                    $requestedDate = $dateMatch[1] ?? now()->addDay()->toDateString();
+                    $property = Property::query()->find($selectedPropertyId);
+
+                    if ($property) {
+                        ViewingRequest::query()->create([
+                            'client_id' => $user->id,
+                            'agent_id' => $property->agent_id,
+                            'property_id' => $property->id,
+                            'scheduled_date' => $requestedDate,
+                            'scheduled_time' => '10:00:00',
+                            'notes' => 'طلب معاينة من خلال المساعد الذكي',
+                            'status' => \App\Enums\ViewingRequestStatus::Pending,
+                        ]);
+
+                        $reply = 'تم إرسال طلب المعاينة بنجاح!';
+                        $this->conversations->addUserMessage($conversation, $message, ['property_id' => $selectedPropertyId]);
+                        $this->out($conversation, $user, 'viewing_request', 'ok', [], [['tool' => 'create_viewing_request', 'ok' => true]], 1, $started, 0, null, $reply, [$selectedPropertyId]);
+
+                        return $this->payload($conversation, $reply, 'ok', [], null);
+                    }
+                }
             }
 
             // 2.5) سؤال تفاصيل عن عقار محدد: «معلومات عن العقار 5» — من سجل حقيقي.

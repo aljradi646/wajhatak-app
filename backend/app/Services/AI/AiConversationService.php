@@ -77,7 +77,7 @@ class AiConversationService
             ->limit($limit)
             ->get()
             ->sortBy('id')
-            ->map(fn (AiMessage $m) => ['role' => $m->role, 'content' => mb_substr($m->content, 0, 800)])
+            ->map(fn (AiMessage $m) => ['role' => $m->role, 'content' => mb_substr((string) $m->content, 0, 800)])
             ->values()
             ->all();
     }
