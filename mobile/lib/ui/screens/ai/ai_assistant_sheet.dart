@@ -389,7 +389,7 @@ class _AiPropertyMiniCard extends StatelessWidget {
                       ? Image.network(
                           property.imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => _imageFallback(theme),
+                          errorBuilder: (context, error, stackTrace) => _imageFallback(theme),
                         )
                       : _imageFallback(theme),
                 ),
@@ -587,7 +587,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
         ),
         child: AnimatedBuilder(
           animation: _controller,
-          builder: (_, _) => Row(
+          builder: (context, child) => Row(
             mainAxisSize: MainAxisSize.min,
             children: List.generate(3, (i) {
               final phase = (_controller.value * 3 - i).clamp(0.0, 1.0);
@@ -623,7 +623,7 @@ class _SuggestionsBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         itemCount: suggestions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (_, index) => ActionChip(
           label: Text(
             suggestions[index],
@@ -686,9 +686,9 @@ class _InputBar extends StatelessWidget {
             const SizedBox(width: 8),
             AnimatedBuilder(
               animation: controller,
-              builder: (_, _) => ValueListenableBuilder<TextEditingValue>(
+              builder: (context, child) => ValueListenableBuilder<TextEditingValue>(
                 valueListenable: controller,
-                builder: (_, value, _) {
+                builder: (context, value, child) {
                   final hasText = value.text.trim().isNotEmpty;
                   return Opacity(
                     opacity: enabled && hasText ? 1 : 0.5,

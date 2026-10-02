@@ -585,8 +585,8 @@ class _TileImage extends StatelessWidget {
       imageUrl: url,
       fit: BoxFit.cover,
       memCacheWidth: 360,
-      placeholder: (_, _) => const _TileFallback(),
-      errorWidget: (_, _, _) => const _TileFallback(),
+      placeholder: (context, url) => const _TileFallback(),
+      errorWidget: (context, url, error) => const _TileFallback(),
     );
   }
 }
