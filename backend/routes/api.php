@@ -98,6 +98,9 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
 
         // محادثات المساعد (تتطلب حسابًا) — عزل ملكية كامل داخل المتحكم.
         Route::get('ai/conversations', [AiAssistantController::class, 'conversations'])->name('ai.conversations.index');
+        Route::post('ai/conversations', [AiAssistantController::class, 'createConversation'])->name('ai.conversations.store');
+        Route::patch('ai/conversations/{conversation}/pin', [AiAssistantController::class, 'pin'])->whereNumber('conversation')->name('ai.conversations.pin');
+        Route::get('ai/conversations/{conversation}/messages', [AiAssistantController::class, 'show'])->whereNumber('conversation')->name('ai.conversations.messages');
         Route::get('ai/conversations/{conversation}', [AiAssistantController::class, 'show'])->whereNumber('conversation')->name('ai.conversations.show');
         Route::delete('ai/conversations/{conversation}', [AiAssistantController::class, 'destroy'])->whereNumber('conversation')->name('ai.conversations.destroy');
     });
