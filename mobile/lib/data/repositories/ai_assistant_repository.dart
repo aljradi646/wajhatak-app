@@ -27,7 +27,7 @@ class AiAssistantRepository {
   }
 
   /// إرسال رسالة — الخادم يفهم، يبحث في القاعدة، يولّد الرد ويطهّره.
-  Future<AiChatMessage> sendMessage(
+  Future<({AiChatMessage message, int? conversationId, String? sessionToken})> sendMessage(
     String message, {
     int? conversationId,
     List<Map<String, String>> history = const [],
@@ -65,7 +65,11 @@ class AiAssistantRepository {
     final token = data['session_token'] as String?;
     final conversation = data['conversation_id'] as int?;
     if (token != null && token.isNotEmpty) await _saveSessionToken(token);
-    return reply;
+    return (
+      message: reply,
+      conversationId: conversation,
+      sessionToken: token,
+    );
   }
 
   /// مسح محادثة المستخدم المسجل (متطلب اختياري عند وجود حساب).
