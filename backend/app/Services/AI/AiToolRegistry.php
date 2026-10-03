@@ -3,8 +3,6 @@
 namespace App\Services\AI;
 
 use App\Enums\ViewingRequestStatus;
-use App\Models\AgentProfile;
-use App\Models\Conversation;
 use App\Models\Property;
 use App\Models\User;
 use App\Models\ViewingRequest;
@@ -146,10 +144,11 @@ class AiToolRegistry
                 ],
             };
         } catch (Throwable $e) {
+            report($e);
             return [
                 'success' => false,
                 'error' => 'EXECUTION_FAILED',
-                'message' => 'حدث خطأ أثناء تنفيذ أداة المساعد: ' . $e->getMessage(),
+                'message' => 'تعذر تنفيذ الأداة حاليًا. تم تسجيل الخطأ داخليًا.',
             ];
         }
     }
