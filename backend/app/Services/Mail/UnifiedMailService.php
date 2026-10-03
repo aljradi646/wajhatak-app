@@ -122,9 +122,13 @@ class UnifiedMailService
                 $rendered['text'],
             );
         } else {
-            // For SMTP, use text content or strip HTML
-            $body = $rendered['text'] ?: strip_tags($rendered['html']);
-            $this->smtpService->send($to, $rendered['subject'], $body);
+            $html = (string) ($rendered['html'] ?? '');
+            $text = $rendered['text'] ?: strip_tags($html);
+            if ($html !== '') {
+                $this->smtpService->sendHtml($to, $rendered['subject'], $html, $text);
+            } else {
+                $this->smtpService->send($to, $rendered['subject'], $text);
+            }
         }
     }
 
