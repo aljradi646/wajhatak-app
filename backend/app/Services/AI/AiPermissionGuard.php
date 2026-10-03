@@ -3,6 +3,7 @@
 namespace App\Services\AI;
 
 use App\Models\User;
+use App\Models\ViewingRequest;
 
 /**
  * حارس الصلاحيات لعمليات المساعد الذكي AI Permission Guard
@@ -59,8 +60,10 @@ class AiPermissionGuard
             return false;
         }
 
-        // يتحقق الـ backend فعليًا من أن المستخدم هو العميل المستفيد أو الوكيل المكتسب
-        return true;
+        $request=ViewingRequest::query()->find($viewingId);
+        if(!$request) return false;
+        if((int)$request->client_id===(int)$user->id) return true;
+        return $user->agentProfile?->id !== null && (int)$request->agent_id===(int)$user->agentProfile->id;
     }
 
     /**
