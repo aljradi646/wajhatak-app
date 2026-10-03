@@ -19,7 +19,7 @@ class AiLlmAgentFlowTest extends TestCase
         config()->set('ai.allow_rule_fallback', false);
         config()->set('ai.llm.max_tool_rounds', 3);
 
-        $this->seed(\\Database\\Seeders\\RealDataSeeder::class);
+        $this->seed(\Database\Seeders\RealDataSeeder::class);
         $property = Property::query()->where('status', 'published')->firstOrFail();
 
         Http::fakeSequence()
