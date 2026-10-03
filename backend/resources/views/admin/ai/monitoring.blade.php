@@ -23,8 +23,9 @@
                     @else
                         <span class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-bold bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400">● يحتاج إصلاحًا</span>
                     @endif
-                    <span>المحرك: <b>حتمي داخل الخادم (deterministic)</b></span>
-                    <span>الردود: <b>من عقارات وجهتك الحقيقية فقط</b></span>
+                    <span>المحرك: <b>{{ config('ai.llm.enabled') && config('ai.llm.model') ? 'LLM Agent + Tool Calling' : 'Rule Fallback' }}</b></span>
+                    <span>النموذج: <b dir="ltr">{{ config('ai.llm.model') ?: 'غير مُعد' }}</b></span>
+                    <span>Grounding: <b>قاعدة بيانات وجهتك + أدوات الخادم</b></span>
                 </div>
 
                 @if ($health->message)
