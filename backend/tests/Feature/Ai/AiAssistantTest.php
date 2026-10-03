@@ -156,7 +156,7 @@ class AiAssistantTest extends TestCase
      */
     public function test_all_common_greetings_never_trigger_a_search(): void
     {
-        foreach (['ألو', 'الو', 'هلا', 'السلام عليكم', 'كيفك', 'هلا والله', 'صباح الخير', 'شلونك'] as $greeting) {
+        foreach (['ألو', 'الو', 'الوو', 'الووو', 'هلا', 'هلااا', 'السلام عليكم', 'كيفك', 'كيفكك', 'هلا والله', 'صباح الخير', 'شلونك', 'ايش اخبارك'] as $greeting) {
             $response = $this->postJson('/api/v1/ai/chat', ['message' => $greeting]);
 
             $response->assertOk();
@@ -164,6 +164,35 @@ class AiAssistantTest extends TestCase
             $this->assertSame('ok', $data['status'], "التحية فشلت: {$greeting}");
             $this->assertSame([], $data['properties'], "تحية عرضت عقارات: {$greeting}");
             $this->assertNotEmpty($data['reply']);
+        }
+    }
+
+    /**
+     * ح1.1) عزل سياق البحث: بعد بحث سابق، التحية أو الكلام العام لا يعيدان
+     * تنفيذ البحث السابق ولا يعيدان رسالة «لا توجد نتائج».
+     */
+    public function test_small_talk_does_not_reuse_previous_search_filters(): void
+    {
+        $first = $this->postJson('/api/v1/ai/chat', ['message' => 'شقة في صنعاء']);
+        $first->assertOk();
+
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        foreach (['الوو', 'كيفك', 'تمام', 'أريد نتكلم شوي'] as $message) {
+            $response = $this->postJson('/api/v1/ai/chat', [
+                'message' => $message,
+                'conversation_id' => $conversationId,
+                'session_token' => $sessionToken,
+            ]);
+
+            $response->assertOk();
+            $data = $response->json('data');
+
+            $this->assertSame('ok', $data['status'], "فشلت المحادثة: {$message}");
+            $this->assertSame([], $data['properties'], "تم تسريب نتائج البحث القديمة إلى: {$message}");
+            $this->assertStringNotContainsString('لا توجد حاليًا عقارات مطابقة', (string) $data['reply']);
+            $this->assertStringNotContainsString('صنعاء', (string) $data['reply'], "الرد العام أعاد سياق المدينة القديم: {$message}");
         }
     }
 
