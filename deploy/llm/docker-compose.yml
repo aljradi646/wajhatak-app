@@ -6,8 +6,19 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+      - ./Modelfile:/Modelfile:ro
     environment:
       OLLAMA_KEEP_ALIVE: 30m
+    command:
+      - sh
+      - -lc
+      - |
+        ollama serve &
+        pid=$!
+        until ollama list >/dev/null 2>&1; do sleep 1; done
+        ollama pull qwen3:0.6b
+        ollama create wajhatak-qwen3:0.6b -f /Modelfile
+        wait $pid
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 15s
