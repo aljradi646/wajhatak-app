@@ -17,7 +17,7 @@ services:
         pid=$!
         until ollama list >/dev/null 2>&1; do sleep 1; done
         ollama pull qwen3.5:0.8b
-        ollama create wajhatak-qwen3:0.6b -f /Modelfile
+        ollama create wajhatak-qwen3.5:0.8b -f /Modelfile
         wait $pid
     healthcheck:
       test: ["CMD", "ollama", "list"]
