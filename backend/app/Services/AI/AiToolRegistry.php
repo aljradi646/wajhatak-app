@@ -3,6 +3,7 @@
 namespace App\Services\AI;
 
 use App\Enums\ViewingRequestStatus;
+use App\Models\Agent;
 use App\Models\Property;
 use App\Models\User;
 use App\Models\ViewingRequest;
@@ -54,6 +55,18 @@ class AiToolRegistry
                     ],
                 ],
             ],
+            'search_similar_properties' => [
+                'name' => 'search_similar_properties',
+                'description' => 'العثور على عقارات مشابهة لعقار محدد',
+                'parameters' => [
+                    'type' => 'object',
+                    'required' => ['property_id'],
+                    'properties' => [
+                        'property_id' => ['type' => 'integer', 'description' => 'رقم العقار المرجعي'],
+                        'limit' => ['type' => 'integer', 'description' => 'عدد النتائج من 1 إلى 6'],
+                    ],
+                ],
+            ],
             'get_property_details' => [
                 'name' => 'get_property_details',
                 'description' => 'جلب تفاصيل عقار محدد برقم ID الحقيقي',
@@ -98,12 +111,12 @@ class AiToolRegistry
             ],
             'get_agent_info' => [
                 'name' => 'get_agent_info',
-                'description' => 'جلب معلومات وكيل عقاري أو مالك عقار',
+                'description' => 'جلب معلومات الاتصال العامة لوكيل محدد أو لوكيل عقار محدد بواسطة property_id',
                 'parameters' => [
                     'type' => 'object',
-                    'required' => ['agent_id'],
                     'properties' => [
-                        'agent_id' => ['type' => 'integer', 'description' => 'رقم الوكيل'],
+                        'agent_id' => ['type' => 'integer', 'description' => 'معرف الوكيل'],
+                        'property_id' => ['type' => 'integer', 'description' => 'معرف العقار لاستخراج وكيله'],
                     ],
                 ],
             ],
@@ -152,6 +165,7 @@ class AiToolRegistry
         try {
             return match ($toolName) {
                 'search_properties' => $this->executeSearchProperties($arguments),
+                'search_similar_properties' => $this->executeSearchSimilarProperties($arguments),
                 'get_property_details' => $this->executeGetPropertyDetails($arguments),
                 'search_nearby_properties' => $this->executeSearchNearbyProperties($arguments),
                 'create_viewing_request' => $this->executeCreateViewingRequest($user, $arguments),
@@ -197,6 +211,14 @@ class AiToolRegistry
         ];
     }
 
+    private function executeSearchSimilarProperties(array $args): array
+    {
+        $propertyId=(int)($args['property_id']??0);
+        $limit=max(1,min(6,(int)($args['limit']??4)));
+        $items=$this->searchService->similar($propertyId,$limit);
+        return ['success'=>true,'property_id'=>$propertyId,'properties'=>$items,'total'=>count($items)];
+    }
+
     private function executeGetPropertyDetails(array $args): array
     {
         $propertyId = (int) ($args['property_id'] ?? 0);
@@ -238,6 +260,7 @@ class AiToolRegistry
             'success' => true,
             'total' => $results['total'] ?? 0,
             'properties' => $results['items'] ?? [],
+            'filters' => $filters,
             'radius_km' => $radius,
         ];
     }
@@ -281,8 +304,11 @@ class AiToolRegistry
 
     private function executeGetAgentInfo(array $args): array
     {
-        $agentId = (int) ($args['agent_id'] ?? 0);
-        $agent = User::query()->where('role', 'agent')->find($agentId);
+        $propertyId=(int)($args['property_id']??0);
+        $agentId=(int)($args['agent_id']??0);
+        $agent=$propertyId>0
+            ? Property::query()->with('agent.user')->find($propertyId)?->agent
+            : Agent::query()->with('user')->find($agentId);
 
         if (!$agent) {
             return [
@@ -292,12 +318,17 @@ class AiToolRegistry
         }
 
         return [
-            'success' => true,
-            'agent' => [
-                'id' => $agent->id,
-                'name' => $agent->name,
-                'phone' => $agent->phone,
-                'email' => $agent->email,
+            'success'=>true,
+            'agent'=>[
+                'id'=>$agent->id,
+                'user_id'=>$agent->user?->id,
+                'name'=>$agent->user?->name,
+                'agency_name'=>$agent->agency_name,
+                'job_title'=>$agent->job_title,
+                'phone'=>$agent->phone,
+                'whatsapp'=>$agent->whatsapp,
+                'city'=>$agent->city,
+                'verified'=>$agent->isApproved(),
             ],
         ];
     }
