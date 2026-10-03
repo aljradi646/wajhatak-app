@@ -17,7 +17,7 @@ services:
         ollama serve &
         pid=$!
         until ollama list >/dev/null 2>&1; do sleep 1; done
-        ollama pull qwen3.5:0.8b
+        ollama pull qwen3:1.7b
         ollama create wajhatak-qwen3.5:0.8b -f /Modelfile
         wait $pid
     healthcheck:
