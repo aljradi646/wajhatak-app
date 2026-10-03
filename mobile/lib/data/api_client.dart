@@ -55,7 +55,9 @@ class TokenStore {
         key: _loginTimeKey,
         value: DateTime.now().toIso8601String(),
       );
-    } on Object {}
+    } on Object {
+      // Ignore storage write error
+    }
   }
 
   Future<void> clear() async {
@@ -63,7 +65,9 @@ class TokenStore {
       await _storage.delete(key: _tokenKey);
       await _storage.delete(key: _loginTimeKey);
       await _storage.delete(key: _userKey);
-    } on Object {}
+    } on Object {
+      // Ignore storage clear error
+    }
   }
 
   Future<void> refreshSession() async {
@@ -72,7 +76,9 @@ class TokenStore {
         key: _loginTimeKey,
         value: DateTime.now().toIso8601String(),
       );
-    } on Object {}
+    } on Object {
+      // Ignore session refresh error
+    }
   }
 
   // --- بيانات المستخدم المخزّنة محليًا -----------------------------------
@@ -80,7 +86,9 @@ class TokenStore {
   Future<void> saveUser(LuxUser user) async {
     try {
       await _storage.write(key: _userKey, value: jsonEncode(user.toJson()));
-    } on Object {}
+    } on Object {
+      // Ignore save user error
+    }
   }
 
   Future<LuxUser?> readUser() async {
@@ -109,9 +117,6 @@ class LuxApiClient {
            baseUrl: baseUrl ?? AppConfig.apiBaseUrl,
            connectTimeout: AppConfig.connectTimeout,
            receiveTimeout: AppConfig.receiveTimeout,
-           // يجب أن يطابق User-Agent الخاص بطلبات الـ API نظير طلب حلّ
-           // التحدّي؛ يُصدِر السيرفر تحدّيًا مختلفًا لكل UA ويرفض الكوكي
-           // المحسوب تحت UA آخر.
            headers: const {
              'Accept': 'application/json',
              'User-Agent': InfinityFreeChallengeSolver.userAgent,
@@ -121,10 +126,7 @@ class LuxApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // إيقاع هادئ + قاطع دارة يمنع الضغط على الخادم (وهو سبب منع 429).
           await _throttle();
-          // تجاوز تحدي InfinityFree: نضمن وجود كوكي __test صالح قبل كل طلب
-          // (ensureCookie ترجع الكوكي فورًا لو كان طازجًا دون أي طلب إضافي).
           if (_challengeSolver.cookie == null) {
             await _challengeSolver.ensureCookie();
           }
@@ -136,15 +138,12 @@ class LuxApiClient {
           final token = await _tokenStore.read();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
-            // بعض الاستضافات (InfinityFree/LiteSpeed) تحذف رأس Authorization قبل
-            // وصوله لـ PHP؛ نرسل الرمز في رأس مخصص كمسارٍ بديل يعرّفه الخادم.
             options.headers['X-Auth-Token'] = token;
           }
           handler.next(options);
         },
         onResponse: (response, handler) async {
           _recordSuccess();
-          // استجابة صفحة تحدي جديدة → أنشئ الكوكي وأعد المحاولة مرة بعد مرة.
           if (_isChallengeHtml(response.data) &&
               !response.requestOptions.extra.containsKey(_retryTag)) {
             final solved = await _challengeSolver.forceSolve();
@@ -166,10 +165,8 @@ class LuxApiClient {
         onError: (error, handler) async {
           final statusCode = error.response?.statusCode;
 
-          // مهما كانت الحالة، سجّل الفشل لتغذية قاطع الدارة قبل المحاولة.
           _recordFailure();
 
-          // تخفيف الاستضافة (429) — لا نعيد المحاولة إطلاقًا ونورد خطأً واضحًا.
           if (statusCode == 429) {
             handler.reject(
               DioException(
@@ -185,8 +182,6 @@ class LuxApiClient {
             return;
           }
 
-          // تعرّف على تحدي InfinityFree الحقيقي فقط وأعد المحاولة (مرة واحدة
-          // للطلب، وبإيقاع محدود). أي صفحة حماية أخرى لن تُعد.
           if (_isChallengeHtml(error.response?.data) &&
               !error.requestOptions.extra.containsKey(_retryTag)) {
             final solved = await _challengeSolver.forceSolve();
@@ -228,8 +223,6 @@ class LuxApiClient {
     );
   }
 
-  /// علامة تُلصق على الطلبات المُعاد إرسالها بعد تجاوز التحدي لتفادي
-  /// حلقات لا نهائية لو استمر التحدي بالصدفة.
   static const _retryTag = '_wj_challenge_retried';
   static const _rateCooldown = Duration(milliseconds: 350);
   static const _breakerThreshold = 5;
@@ -243,8 +236,6 @@ class LuxApiClient {
   int _rapidFailureStreak = 0;
   DateTime? _breakerLiftedAt;
 
-  /// هل الناقل (قاطع الدارة) مفتوح؟ أي هل نحن في فترة تهدئة بسبب فشل متكرر
-  /// أو مضايقات 429؟ يخضع لها كل طلب لمنع الضغط على الخادم.
   bool get _isBreakerOpen {
     final at = _breakerLiftedAt;
     return at != null && DateTime.now().difference(at) < _breakerCooldown;
@@ -259,7 +250,6 @@ class LuxApiClient {
     }
   }
 
-  /// يفرض فجوة زمنية دنيا بين الطلبات للحفاظ على إيقاع هادئ غير مريب.
   Future<void> _throttle() async {
     await _waitOutBreaker();
     final sinceLast = DateTime.now().difference(_lastSent);
@@ -269,7 +259,6 @@ class LuxApiClient {
     _lastSent = DateTime.now();
   }
 
-  /// يسجّل فشلًا سريعًا؛ يفتح الناقل عند تجاوز العتبة ليهدأ الخادم.
   void _recordFailure() {
     _rapidFailureStreak++;
     if (_rapidFailureStreak >= _breakerThreshold) {
@@ -282,19 +271,15 @@ class LuxApiClient {
     _rapidFailureStreak = 0;
   }
 
-  /// أداة كشف صارمة لتحدّي InfinityFree الفعلي (نصّ AES مع 3 قيم `toNumbers`).
-  /// يرفض أي صفحة حماية/429 أو نصوص أخرى كي لا نعيد المحاولة عبثًا.
   bool _isChallengeHtml(Object? data) {
     if (data is! String) return false;
     final lower = data.toLowerCase();
-    // حماية الاستضافة من الإساءة (429 Scanner) — لا نتعامل معها كتحدٍّ قابل للحل.
     if (lower.contains('too many requests') ||
         lower.contains('429') ||
         lower.contains('scanner activity') ||
         lower.contains('please try again later')) {
       return false;
     }
-    // لا نعتبرها تحدّيًا حقيقيًا إلا إذا وُجدت محاولايتا AES كاملتان.
     final n = RegExp(r'toNumbers\("([0-9a-f]{32,})"').allMatches(lower);
     var count = 0;
     for (final _ in n.take(3)) {
@@ -343,7 +328,6 @@ class LuxApiClient {
     try {
       final isUpload = data is FormData;
       final effectiveOptions = (options ?? Options()).copyWith(
-        // رفع الملفات (صور) يحتاج مهلة أطول على استضافة بطيئة.
         sendTimeout: isUpload ? const Duration(seconds: 120) : null,
         receiveTimeout: isUpload ? const Duration(seconds: 120) : null,
       );

@@ -232,7 +232,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                     padding: EdgeInsets.symmetric(vertical: 10),
                     child: LuxSkeleton(height: 54),
                   ),
-                  error: (error, _) => const Text(
+                  error: (error, stackTrace) => const Text(
                     'تعذر تحميل أنواع العقارات. تحقق من اتصالك بالشبكة ثم أعد المحاولة.',
                     style: TextStyle(color: Colors.red),
                   ),
@@ -355,7 +355,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           padding: EdgeInsets.symmetric(vertical: 10),
                           child: LuxSkeleton(height: 54),
                         ),
-                        error: (_, _) => TextFormField(
+                        error: (err, stack) => TextFormField(
                           initialValue: _currency,
                           decoration: const InputDecoration(
                             labelText: 'العملة',
@@ -446,7 +446,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                     padding: EdgeInsets.symmetric(vertical: 10),
                     child: LuxSkeleton(height: 54),
                   ),
-                  error: (_, _) => const SizedBox.shrink(),
+                  error: (err, stack) => const SizedBox.shrink(),
                 ),
                 if (_country != null) ...[
                   const SizedBox(height: 12),
@@ -468,7 +468,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                       padding: EdgeInsets.symmetric(vertical: 10),
                       child: LuxSkeleton(height: 54),
                     ),
-                    error: (_, _) => const SizedBox.shrink(),
+                    error: (err, stack) => const SizedBox.shrink(),
                   ),
                 ],
                 if (_region != null) ...[
@@ -490,7 +490,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                       padding: EdgeInsets.symmetric(vertical: 10),
                       child: LuxSkeleton(height: 54),
                     ),
-                    error: (_, _) => const SizedBox.shrink(),
+                    error: (err, stack) => const SizedBox.shrink(),
                   ),
                 ],
                 if (_city != null) ...[
@@ -505,7 +505,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           setState(() => _areaLocation = value),
                     ),
                     loading: () => const SizedBox.shrink(),
-                    error: (_, _) => const SizedBox.shrink(),
+                    error: (err, stack) => const SizedBox.shrink(),
                   ),
                 ],
                 const SizedBox(height: 12),

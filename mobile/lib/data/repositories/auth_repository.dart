@@ -119,7 +119,11 @@ class AuthRepository {
   }) async {
     final json = await _api.patch(
       '/me',
-      data: {'name': name.trim(), 'phone': phone?.trim(), 'locale': ?locale},
+      data: {
+        'name': name.trim(),
+        'phone': phone?.trim(),
+        if (locale != null) 'locale': locale,
+      },
     );
     final user = LuxUser.fromJson(json['data'] as Map<String, dynamic>);
     await _tokenStore.saveUser(user);

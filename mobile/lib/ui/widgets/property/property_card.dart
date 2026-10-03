@@ -297,8 +297,6 @@ class _PropertyCardState extends ConsumerState<PropertyCard> {
 }
 
 /// يحمّل صور الدوّار مسبقًا إلى كاش الصور ويراقب نجاح تحميل كل صفحة فعليًا.
-/// لا يُعدّ أي فهرس "جاهزًا" إلا بعد اكتمال فك تشفير الصورة بنجاح؛ عند الفشل
-/// يعيد false حتى لا ينتقل الدوّار التلقائي إلى صفحة فارغة أو أيقونة.
 class _CarouselPreloader {
   _CarouselPreloader(this.urls, this.context);
 
@@ -324,7 +322,7 @@ class _CarouselPreloader {
       CachedNetworkImageProvider(urls[index]),
       context,
       size: const Size(640, 480),
-      onError: (_, _) => failed = true,
+      onError: (exception, stackTrace) => failed = true,
     ).whenComplete(() {
       final ok = !failed;
       if (ok) _ready.add(index);
@@ -403,12 +401,12 @@ class _CachedPropertyImage extends StatelessWidget {
       imageUrl: url,
       fit: BoxFit.cover,
       memCacheWidth: 640,
-      placeholder: (_, _) => const LuxSkeleton(
+      placeholder: (context, imgUrl) => const LuxSkeleton(
         width: double.infinity,
         height: double.infinity,
         radius: 0,
       ),
-      errorWidget: (_, _, _) => const _FallbackImage(),
+      errorWidget: (context, imgUrl, error) => const _FallbackImage(),
     );
   }
 }

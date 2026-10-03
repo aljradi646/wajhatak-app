@@ -362,7 +362,7 @@ class _DetailGalleryState extends State<_DetailGallery> {
             controller: _pageController,
             itemCount: widget.images.length,
             onPageChanged: _onPageChanged,
-            itemBuilder: (_, index) {
+            itemBuilder: (ctx, index) {
               final url = widget.images[index].url;
               if (url.isEmpty) {
                 return Container(color: WajhatakColors.emeraldDeep);
@@ -370,12 +370,12 @@ class _DetailGalleryState extends State<_DetailGallery> {
               return CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => const LuxSkeleton(
+                placeholder: (context, imgUrl) => const LuxSkeleton(
                   radius: 0,
                   width: double.infinity,
                   height: double.infinity,
                 ),
-                errorWidget: (_, _, _) => Container(
+                errorWidget: (context, imgUrl, error) => Container(
                   color: WajhatakColors.emeraldDeep,
                   child: const Center(
                     child: Icon(

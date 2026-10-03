@@ -284,7 +284,7 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                 padding: EdgeInsets.symmetric(vertical: 10),
                 child: LuxSkeleton(height: 54),
               ),
-              error: (error, _) => const Text(
+              error: (error, stackTrace) => const Text(
                 'تعذر تحميل أنواع العقارات. تحقق من اتصالك بالشبكة ثم أعد المحاولة.',
                 style: TextStyle(color: Colors.red),
               ),
@@ -438,7 +438,7 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                   LuxSkeleton(width: 92, height: 34, radius: 18),
                 ],
               ),
-              error: (error, _) => const SizedBox.shrink(),
+              error: (error, stack) => const SizedBox.shrink(),
             ),
             const SizedBox(height: 24),
             Row(
@@ -589,7 +589,6 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
   }
 }
 
-
 /// حقل اختيار العملة — data-driven من GET /api/v1/currencies.
 class _CurrencyField extends ConsumerWidget {
   const _CurrencyField({required this.value, required this.onChanged});
@@ -627,7 +626,7 @@ class _CurrencyField extends ConsumerWidget {
         padding: EdgeInsets.symmetric(vertical: 10),
         child: LuxSkeleton(height: 54),
       ),
-      error: (_, _) => const SizedBox.shrink(),
+      error: (err, stack) => const SizedBox.shrink(),
     );
   }
 }
