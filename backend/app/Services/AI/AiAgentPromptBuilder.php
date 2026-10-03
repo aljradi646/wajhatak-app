@@ -14,6 +14,7 @@ class AiAgentPromptBuilder
         array $knowledge
     ): string {
         $role = $user?->role ?? ($user?->getRoleNames()->first()) ?? 'guest';
+        $registeredUser = ($user?->exists ?? false) ? 'نعم' : 'لا';
 
         $memoryText = collect($memories)
             ->take(8)
@@ -54,7 +55,7 @@ class AiAgentPromptBuilder
 
 الدور: {$role}
 اللغة: {$locale}
-المستخدم المسجل: {$user?->exists ? 'نعم' : 'لا'}
+المستخدم المسجل: {$registeredUser}
 
 حالة المحادثة:
 {$stateJson}
