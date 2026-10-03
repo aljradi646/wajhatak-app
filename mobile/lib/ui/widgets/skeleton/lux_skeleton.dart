@@ -185,7 +185,7 @@ class _LuxShimmerState extends State<_LuxShimmer>
         MediaQuery.maybeOf(context)?.disableAnimations ??
             false;
 
-    final tickerEnabled = TickerMode.of(context);
+    final tickerEnabled = TickerMode.valuesOf(context).enabled;
 
     if (disabled || !tickerEnabled) {
       if (_controller.isAnimating) {
