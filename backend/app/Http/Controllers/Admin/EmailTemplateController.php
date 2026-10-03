@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\EmailTemplate;
 use App\Models\EmailSetting;
+use App\Models\EmailTemplateVersion;
 use Illuminate\Http\Request;
 
 class EmailTemplateController extends Controller
@@ -81,12 +82,58 @@ class EmailTemplateController extends Controller
 
         $data['is_active'] = $data['is_active'] ?? true;
 
+        EmailTemplateVersion::create([
+            'email_template_id'=>$emailTemplate->id,
+            'version'=>(int)$emailTemplate->version,
+            'subject'=>$emailTemplate->subject,
+            'html_content'=>$emailTemplate->html_content,
+            'text_content'=>$emailTemplate->text_content,
+            'css_styles'=>$emailTemplate->css_styles,
+            'variables'=>$emailTemplate->variables,
+            'created_by'=>$request->user()?->id,
+            'change_note'=>$request->input('change_note'),
+        ]);
+
         $emailTemplate->update($data);
         $emailTemplate->incrementVersion();
 
         ActivityLog::record('email_template', "تم تحديث قالب البريد: {$emailTemplate->name}");
 
         return back()->with('status', 'تم تحديث القالب بنجاح.');
+    }
+
+    public function history(EmailTemplate $emailTemplate)
+    {
+        return view('admin.email-templates.history', [
+            'template'=>$emailTemplate,
+            'versions'=>$emailTemplate->versions()->with('creator:id,name')->get(),
+        ]);
+    }
+
+    public function restore(Request $request, EmailTemplate $emailTemplate, EmailTemplateVersion $version)
+    {
+        abort_unless($version->email_template_id === $emailTemplate->id,404);
+        EmailTemplateVersion::create([
+            'email_template_id'=>$emailTemplate->id,
+            'version'=>(int)$emailTemplate->version,
+            'subject'=>$emailTemplate->subject,
+            'html_content'=>$emailTemplate->html_content,
+            'text_content'=>$emailTemplate->text_content,
+            'css_styles'=>$emailTemplate->css_styles,
+            'variables'=>$emailTemplate->variables,
+            'created_by'=>$request->user()?->id,
+            'change_note'=>'حفظ النسخة الحالية قبل الاستعادة',
+        ]);
+        $emailTemplate->update([
+            'subject'=>$version->subject,
+            'html_content'=>$version->html_content,
+            'text_content'=>$version->text_content,
+            'css_styles'=>$version->css_styles,
+            'variables'=>$version->variables,
+        ]);
+        $emailTemplate->incrementVersion();
+        ActivityLog::record('email_template',"تمت استعادة إصدار {$version->version} من قالب البريد: {$emailTemplate->name}");
+        return back()->with('status','تمت استعادة الإصدار كنسخة جديدة.');
     }
 
     public function destroy(EmailTemplate $emailTemplate)
