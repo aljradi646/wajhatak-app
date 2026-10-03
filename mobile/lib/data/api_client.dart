@@ -43,7 +43,8 @@ class TokenStore {
         }
       }
       return token;
-    } on Object {
+    } on Object catch (_) {
+      // فشل قراءة التوكن المحلي لا يمنع استمرار التطبيق.
       return null;
     }
   }
@@ -55,7 +56,9 @@ class TokenStore {
         key: _loginTimeKey,
         value: DateTime.now().toIso8601String(),
       );
-    } on Object {}
+    } on Object catch (_) {
+      // التخزين المحلي اختياري؛ يُستخدم لاحقًا عند نجاح النظام.
+    }
   }
 
   Future<void> clear() async {
