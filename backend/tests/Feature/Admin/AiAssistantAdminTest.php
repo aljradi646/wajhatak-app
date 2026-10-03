@@ -56,15 +56,15 @@ class AiAssistantAdminTest extends TestCase
     {
         $this->admin();
 
-        Illuminate\\Support\\Facades\\Http::fake([
-            '*' => Illuminate\\Support\\Facades\\Http::response([], 500),
+        Illuminate\Support\Facades\Http::fake([
+            '*' => Illuminate\Support\Facades\Http::response([], 500),
         ]);
 
         $this->get('/admin/ai/playground')
             ->assertOk()
             ->assertSee('محادثة اختبار تفاعلية مباشرة');
 
-        Illuminate\\Support\\Facades\\Http::assertNothingSent();
+        Illuminate\Support\Facades\Http::assertNothingSent();
     }
 
     public function test_monitoring_stats_and_logs_pages_render(): void
