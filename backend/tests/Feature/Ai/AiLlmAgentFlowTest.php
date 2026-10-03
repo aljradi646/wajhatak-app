@@ -1,11 +1,11 @@
 <?php
 
-namespace TestsFeatureAi;
+namespace Tests\\Feature\\Ai;
 
-use AppModelsProperty;
-use IlluminateFoundationTestingRefreshDatabase;
-use IlluminateSupportFacadesHttp;
-use TestsTestCase;
+use App\\Models\\Property;
+use Illuminate\\Foundation\\Testing\\RefreshDatabase;
+use Illuminate\\Support\\Facades\\Http;
+use Tests\\TestCase;
 
 class AiLlmAgentFlowTest extends TestCase
 {
@@ -15,16 +15,16 @@ class AiLlmAgentFlowTest extends TestCase
     {
         config()->set('ai.llm.enabled', true);
         config()->set('ai.llm.base_url', 'http://ollama.test/v1');
-        config()->set('ai.llm.model', 'wajhatak-qwen3:0.6b');
+        config()->set('ai.llm.model', 'wajhatak-qwen3:1.7b');
         config()->set('ai.allow_rule_fallback', false);
         config()->set('ai.llm.max_tool_rounds', 3);
 
-        $this->seed(DatabaseSeedersRealDataSeeder::class);
+        $this->seed(\\Database\\Seeders\\RealDataSeeder::class);
         $property = Property::query()->where('status', 'published')->firstOrFail();
 
         Http::fakeSequence()
             ->push([
-                'model' => 'wajhatak-qwen3:0.6b',
+                'model' => 'wajhatak-qwen3:1.7b',
                 'choices' => [[
                     'message' => [
                         'role' => 'assistant',
@@ -45,7 +45,7 @@ class AiLlmAgentFlowTest extends TestCase
                 ]],
             ], 200)
             ->push([
-                'model' => 'wajhatak-qwen3:0.6b',
+                'model' => 'wajhatak-qwen3:1.7b',
                 'choices' => [[
                     'message' => [
                         'role' => 'assistant',
