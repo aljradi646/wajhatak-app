@@ -98,14 +98,26 @@ class AiAgentE2ETest extends TestCase
 
         $second = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
             'message' => "احجز لي معاينة للعقار {$property->id}",
+            'conversation_id' => $convId,
+            'session_token' => $sessionToken,
         ]);
 
         $second->assertOk();
-        $data = $second->json('data');
-        if ($data['status'] === 'error') {
-            dump($data);
-        }
-        $this->assertSame('ok', $data['status']);
+        $this->assertSame('ok', $second->json('data.status'));
+        $this->assertStringContainsString('هل تؤكد', $second->json('data.reply'));
+        $this->assertDatabaseMissing('viewing_requests', [
+            'client_id' => $user->id,
+            'property_id' => $property->id,
+        ]);
+
+        $confirmed = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
+            'message' => 'نعم موافق',
+            'conversation_id' => $convId,
+            'session_token' => $sessionToken,
+        ]);
+
+        $confirmed->assertOk();
+        $this->assertSame('ok', $confirmed->json('data.status'));
         $this->assertDatabaseHas('viewing_requests', [
             'client_id' => $user->id,
             'property_id' => $property->id,
