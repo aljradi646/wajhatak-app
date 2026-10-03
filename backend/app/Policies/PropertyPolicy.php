@@ -15,7 +15,18 @@ class PropertyPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasRole(['agent', 'admin']) && $user->is_active;
+        if (! $user->hasRole(['agent', 'admin']) || ! $user->is_active) {
+            return false;
+        }
+
+        // الوكلاء يضافون عقارات فقط بعد توثيق حسابهم من الإدارة.
+        if ($user->hasRole('agent') && ! $user->hasRole('admin')) {
+            $agent = $user->agentProfile;
+
+            return $agent !== null && $agent->isApproved();
+        }
+
+        return true;
     }
 
     public function update(User $user, Property $property): bool

@@ -11,6 +11,8 @@ import '../../../data/api_client.dart';
 import '../../../data/models/models.dart';
 import '../../../state/providers.dart';
 import '../../widgets.dart';
+import '../auth/email_verification_screen.dart';
+import 'agent_account_verification_screen.dart';
 
 /// تعديل الملف الشخصي — كل الحقول المدعومة فعليًا في الـ API.
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -288,6 +290,57 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
+
+          // توثيق البريد الإلكتروني — رمز حقيقي إلى الصندوق الفعلي.
+          if (widget.user.emailVerified != true) ...[
+            const SizedBox(height: 12),
+            _ActionTile(
+              icon: Icons.mark_email_unread_rounded,
+              tone: AccentTone.amber,
+              label: 'بريدك غير موثق — توثيقه الآن',
+              subtitle: 'سنرسل رمز تحقق إلى بريدك المسجّل',
+              onTap: () async {
+                await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => const EmailVerificationScreen(autoSend: true),
+                  ),
+                );
+              },
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
+            _FieldTile(
+              icon: Icons.verified_rounded,
+              label: 'توثيق البريد الإلكتروني',
+              child: Text(
+                'موثق ✓',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: WajhatakColors.emerald,
+                ),
+              ),
+            ),
+          ],
+
+          // توثيق حساب الوكيل — بيانات الإدارة للقبول (للوكلاء غير الموثقين).
+          if (widget.user.isAgent && widget.user.agentVerificationStatus != 'approved') ...[
+            const SizedBox(height: 12),
+            _ActionTile(
+              icon: Icons.real_estate_agent_rounded,
+              tone: AccentTone.rose,
+              label: widget.user.agentVerificationStatus == 'rejected'
+                  ? 'تم رفض التوثيق — راجع بياناتك'
+                  : 'إكمال بيانات توثيق الوكيل',
+              subtitle: widget.user.agentVerificationStatus == 'pending'
+                  ? 'قيد المراجعة — يمكنك تحديث بياناتك'
+                  : 'مطلوبة لفتح بوابة نشر العقارات',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AgentAccountVerificationScreen(),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 26),
           FilledButton.icon(
             onPressed: _saving ? null : _save,
@@ -307,6 +360,60 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
     ),
   );
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.tone,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final AccentTone tone;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = tone.color(theme.colorScheme);
+    return Material(
+      color: color.withValues(alpha: .07),
+      borderRadius: BorderRadius.circular(WajhatakRadius.input),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(WajhatakRadius.input),
+        child: Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(WajhatakRadius.input),
+            border: Border.all(color: color.withValues(alpha: .4)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: TextStyle(fontWeight: FontWeight.w800, color: color, fontSize: 13.5)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_left_rounded, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _FieldTile extends StatelessWidget {

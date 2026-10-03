@@ -5,6 +5,7 @@
     $siteTagline = \App\Models\Setting::get('site_tagline', 'وجهتك إلى العقار المناسب.');
     $siteLogo = public_path('storage/branding/logo.png');
     $pendingPropertiesCount = \App\Models\Property::query()->where('status', 'pending')->count();
+    $pendingAgentsCount = \App\Models\Agent::query()->where('verification_status', 'pending')->count();
 @endphp
 
 <!DOCTYPE html>
@@ -104,9 +105,14 @@
                             المواقع
                         </x-admin.nav-link>
 
-                        <x-admin.nav-link href="{{ route('admin.agents.index') }}" :active="request()->routeIs('admin.agents.*')">
+                        <x-admin.nav-link href="{{ route('admin.agents.index') }}" :active="request()->routeIs('admin.agents.index', 'admin.agents.show', 'admin.agents.edit', 'admin.agents.create')">
                             <x-slot name="icon"><x-admin.icon name="agents" /></x-slot>
                             الوكلاء
+                        </x-admin.nav-link>
+
+                        <x-admin.nav-link href="{{ route('admin.agents.verifications') }}" :active="request()->routeIs('admin.agents.verifications')" :badge="$pendingAgentsCount">
+                            <x-slot name="icon"><x-admin.icon name="check" /></x-slot>
+                            طلبات توثيق الوكلاء
                         </x-admin.nav-link>
 
                         <x-admin.nav-link href="{{ route('admin.properties.index') }}" :active="request()->routeIs('admin.properties.index', 'admin.properties.show', 'admin.properties.edit', 'admin.properties.create', 'admin.properties.trash')">
@@ -139,6 +145,21 @@
                         <x-admin.nav-link href="{{ route('admin.property-features.index') }}" :active="request()->routeIs('admin.property-features.*')">
                             <x-slot name="icon"><x-admin.icon name="property-features" /></x-slot>
                             خصائص العقارات
+                        </x-admin.nav-link>
+
+                        <x-admin.nav-link href="{{ route('admin.ai.index') }}" :active="request()->routeIs('admin.ai.*')">
+                            <x-slot name="icon"><x-admin.icon name="ai-assistant" /></x-slot>
+                            المساعد الذكي
+                        </x-admin.nav-link>
+
+                        <x-admin.nav-link href="{{ route('admin.ai.playground') }}" :active="request()->routeIs('admin.ai.playground')">
+                            <x-slot name="icon"><x-admin.icon name="chat" /></x-slot>
+                            اختبار المساعد
+                        </x-admin.nav-link>
+
+                        <x-admin.nav-link href="{{ route('admin.mail.index') }}" :active="request()->routeIs('admin.mail.*')">
+                            <x-slot name="icon"><x-admin.icon name="mail" /></x-slot>
+                            إعدادات البريد الإلكتروني
                         </x-admin.nav-link>
 
                         <x-admin.nav-link href="{{ route('admin.settings.index') }}" :active="request()->routeIs('admin.settings.*')">

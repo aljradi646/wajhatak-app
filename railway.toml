@@ -55,3 +55,10 @@ restartPolicyMaxRetries = 5
 # The entrypoint is defensive: it also splits a mysql:// URL out of DB_HOST and
 # will not start unless MySQL is reachable.
 # =============================================================================
+
+# AI Agent inference variables are configured in Railway service variables, not here:
+#   AI_LLM_ENABLED=true
+#   AI_LLM_BASE_URL=https://<private-inference-service>/v1
+#   AI_LLM_API_KEY=<secret-if-required>
+#   AI_LLM_MODEL=<tool-calling-model>
+# Keep inference as a separate service so Laravel deployments remain stateless.

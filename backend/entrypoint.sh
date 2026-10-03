@@ -10,21 +10,20 @@
 #   3. Waits for the database (via `db:show`, which works on a fresh DB).
 #   4. Generates an APP_KEY on first boot when missing.
 #   5. Prepares storage and creates the public storage symlink.
-#   6. ONE-TIME provisioning (guarded by the Setting 'system_initialized'):
-#      creates all tables, seeds roles/permissions/locations, then the REAL
-#      Sana'a dataset (agents عبدالرحمن & مهند + real property listings with
-#      photos downloaded from the internet) and the control-panel admin.
-#      After that flag is set, EVERY later boot skips migrations and seeds so
-#      redeploys or restarts can never modify the database again.
+#   6. Migrations run on EVERY boot (idempotent) so the live database always
+#      matches the deployed code — new tables/columns for the AI assistant,
+#      agent verification and email codes included. Seeds run exactly ONCE,
+#      guarded by the Setting 'system_initialized' (RealDataSeeder).
+#   6b. Runs the AI engine self-test and `ai:doctor --fix` (real health check
+#      of the assistant: schema, settings, index, live search, live chat) so
+#      any assistant problem is visible in the deploy log and self-healed.
 #   7. Caches config/routes/views.
 #   8. For the "app" service: starts the queue worker (deferred notifications)
 #      in the background and serves the app with `php artisan serve` on $PORT.
 #
-# The same image backs three Railway services selected via
-# RAILWAY_SERVICE_TYPE (default: app):
-#   - app       : queue worker (background) + `php artisan serve` on $PORT
-#   - worker    : `php artisan queue:work` (foreground daemon)
-#   - scheduler : `php artisan schedule:run` loop
+# المساعد العقاري الذكي محرك حتمي 100% يعمل داخل Laravel مباشرة:
+# لا نموذج لغوي، لا خادم استدلال، ولا أي ملفات تُحمّل — يعمل فورًا على
+# أي استضافة بأصغر موارد (حجم الصورة أقل من 500MB بلا أي نموذج).
 # =============================================================================
 set -e
 
@@ -82,6 +81,17 @@ if [ ! -f vendor/autoload.php ] || [ -d vendor/laravel/pail ]; then
     composer install --no-interaction --no-progress --prefer-dist --no-dev --no-scripts --no-ansi || true
     rm -rf vendor/laravel/pail 2>/dev/null || true
     composer dump-autoload --optimize --no-dev --no-interaction --no-ansi >/dev/null 2>&1 || true
+fi
+
+# اختبار ذاتي لمحرك المساعد الحتمي (بلا قاعدة بيانات ولا vendor) — يكشف أي
+# تعبير نمطي معطوب أو تراجع في فهم العربية قبل أن يصل للمستخدمين.
+if [ -f scripts/ai_selftest/run.php ]; then
+    if php scripts/ai_selftest/run.php >/dev/null 2>&1; then
+        echo "==> [Wajhatak] AI engine self-test: OK"
+    else
+        echo "!! [Wajhatak] AI engine self-test FAILED — راجع: php scripts/ai_selftest/run.php" >&2
+        php scripts/ai_selftest/run.php 2>&1 | tail -n 25 | sed 's/^/      | /' >&2 || true
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -278,28 +288,45 @@ if [ -d image-bundle/properties ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Only "app" and "worker" services provision the database. Provisioning runs
-# exactly ONCE: RealDataSeeder finishes by writing Setting 'system_initialized'
-# = 1, and every later boot (redeploy or restart) skips migrations AND seeds so
-# the existing data is never touched.
+# Database provisioning:
+#   • Migrations run on EVERY boot — they are idempotent (Laravel tracks the
+#     migrations table), and this is what keeps a previously-provisioned
+#     production database in sync with NEW code (new tables/columns for the
+#     AI assistant, agent verification, email codes...). Skipping them on
+#     later boots left the live DB missing the assistant tables, which made
+#     every chat request fail with a generic error.
+#   • Seeds run exactly ONCE: RealDataSeeder writes Setting
+#     'system_initialized' = 1, and every later boot skips seeds so the
+#     existing data is never touched or duplicated.
 # ---------------------------------------------------------------------------
 if [ "$SERVICE_TYPE" != "static" ]; then
+    # -------------------------------------------------------------------------
+    # المساعد الذكي محرك حتمي داخل Laravel — لا خدمة استدلال خلفية ولا مجلد نماذج.
+    # -------------------------------------------------------------------------
+    echo "==> [Wajhatak] Running migrations (idempotent — syncs new tables/columns with the live database)..."
+    php artisan migrate --force || echo "    migrate reported an issue (non-fatal, continuing)."
+
     SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
     case "$SEEDED_FLAG" in
         *SEEDED*)
-            echo "==> [Wajhatak] Database already provisioned (system_initialized=1)."
-            echo "    Skipping ALL migrations and seeds to protect your existing data."
+            echo "==> [Wajhatak] Data already seeded (system_initialized=1) — skipping seeds to protect existing data."
             ;;
         *)
-            echo "==> [Wajhatak] First-time provisioning: creating schema, then seeding"
+            echo "==> [Wajhatak] First-time provisioning: seeding"
             echo "    roles/permissions/locations, the real Sana'a dataset and the admin account..."
-            php artisan migrate --force
             php artisan db:seed --class=DatabaseSeeder --force
             php artisan db:seed --class=RealDataSeeder --force
             php artisan db:seed --class=AdminUserSeeder --force
             ;;
     esac
+
+    # 6b. صحة المساعد الذكي: فحص حقيقي من داخل التطبيق (مخطط + إعدادات +
+    #     فهرس مقابل العقارات + بحث حقيقي + محادثة حقيقية)، مع إصلاح آلي
+    #     لأي جدول/عمود ناقص أو فهرس فارغ. السبب صار ظاهرًا في سجل النشر
+    #     بلا تخمين. غير قاتل: نُكمل التشغيل حتى لو أبلغ عن مشكلة.
+    echo "==> [Wajhatak] AI assistant health check (ai:doctor --fix)..."
+    php artisan ai:doctor --fix || echo "    ai:doctor reported issues (non-fatal, continuing)."
 
     # 7. Cache config/routes/views (recomputed from current env each boot)
     echo "==> [Wajhatak] Caching config, routes and views..."
@@ -352,6 +379,11 @@ case "$SERVICE_TYPE" in
                 sleep 2
             done
         ) &
+
+        # -------------------------------------------------------------------
+        # المساعد الذكي محرك حتمي داخل Laravel نفسه — لا عملية خلفية إضافية.
+        # -------------------------------------------------------------------
+        echo "==> [Wajhatak] AI assistant: deterministic in-process engine (no model download, no external provider)."
 
         export PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}"
         echo "==> [Wajhatak] Starting Laravel server: php artisan serve on :${PORT:-8080}"

@@ -66,6 +66,9 @@ class PropertyController extends Controller
         $agent = $request->user()->agentProfile;
         abort_unless($agent?->is_active, 403, 'حساب الوكيل غير مفعّل.');
 
+        // بوابة التوثيق: لا إضافة عقارات إلا بعد موافقة الإدارة على حساب الوكيل.
+        abort_unless($agent->isApproved(), 403, 'حسابك قيد المراجعة من الإدارة — سيتمكن من إضافة العقارات بعد توثيقه.');
+
         $property = DB::transaction(function () use ($request, $agent) {
             $location = PropertyLocation::query()->create($request->validated('location'));
             $attributes = $request->safe()->except(['location', 'feature_ids', 'images']);

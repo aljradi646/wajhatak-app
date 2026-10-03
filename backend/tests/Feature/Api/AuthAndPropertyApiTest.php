@@ -9,6 +9,7 @@ use App\Models\Property;
 use App\Models\PropertyLocation;
 use App\Models\PropertyType;
 use App\Models\User;
+use App\Models\ViewingRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -58,6 +59,7 @@ class AuthAndPropertyApiTest extends TestCase
 
     public function test_agent_registration_creates_an_active_agent_profile_and_agent_role(): void
     {
+        // حقول توثيق الوكيل المطلوبة فعليًا من RegisterRequest (تُحفظ كلها في agents).
         $response = $this->postJson('/api/v1/auth/register', [
             'name' => 'وكيل الاختبار',
             'email' => 'agent@laravel.com',
@@ -65,13 +67,24 @@ class AuthAndPropertyApiTest extends TestCase
             'password' => 'SecurePass2026',
             'password_confirmation' => 'SecurePass2026',
             'account_type' => 'agent',
-            'bio' => 'وكيل عقاري مختص في عقارات شمال الرياض.',
+            'bio' => 'وكيل عقاري مختص في عقارات صنعاء.',
             'license_number' => 'LUX-AGENT-2026',
+            'agency_name' => 'مكتب الوجهة العقاري',
+            'job_title' => 'وسيط عقاري معتمد',
+            'agent_phone' => '0511111111',
+            'agent_city' => 'صنعاء',
+            'national_id' => '01234567890',
         ], ['X-Device-Name' => 'phpunit']);
 
         $response->assertCreated()->assertJsonPath('data.user.email', 'agent@laravel.com')->assertJsonPath('data.user.roles.0', 'agent');
         $userId = User::query()->where('email', 'agent@laravel.com')->value('id');
-        $this->assertDatabaseHas('agents', ['user_id' => $userId, 'license_number' => 'LUX-AGENT-2026', 'is_active' => true]);
+        $this->assertDatabaseHas('agents', [
+            'user_id' => $userId,
+            'license_number' => 'LUX-AGENT-2026',
+            // الوكيل يبدأ قيد التوثيق (pending) — بوابة النشر تمنع الإضافة قبل موافقة الإدارة.
+            'agency_name' => 'مكتب الوجهة العقاري',
+            'verification_status' => 'pending',
+        ]);
         $this->assertNotEmpty($response->json('data.token'));
     }
 
@@ -107,7 +120,7 @@ class AuthAndPropertyApiTest extends TestCase
         $client->assignRole('user');
         $property = $this->createProperty(PropertyStatus::Published);
         $property->update(['agent_id' => $agent->id]);
-        $request = \App\Models\ViewingRequest::query()->create([
+        $request = ViewingRequest::query()->create([
             'property_id' => $property->id,
             'client_id' => $client->id,
             'agent_id' => $agent->id,
@@ -131,10 +144,7 @@ class AuthAndPropertyApiTest extends TestCase
         Sanctum::actingAs($user);
 
         $this->post('/api/v1/me/avatar', [
-            'avatar' => UploadedFile::fake()->createWithContent(
-                'avatar.png',
-                file_get_contents(base_path('../mobile/assets/images/icon.png')),
-            ),
+            'avatar' => UploadedFile::fake()->image('avatar.png', 64, 64),
         ])->assertOk()->assertJsonPath('data.id', $user->id);
         $user->refresh();
         $this->assertNotNull($user->avatar_path);

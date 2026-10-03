@@ -638,7 +638,7 @@ class _AgentPanel extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      agent?.name ?? 'وكيل معتمد',
+                      agent?.name ?? 'الوكيل المسؤول',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),

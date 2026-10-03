@@ -10,6 +10,7 @@ import '../../../data/api_client.dart';
 import '../../../state/providers.dart';
 import '../../brand.dart';
 import '../../widgets.dart';
+import 'email_verification_screen.dart';
 
 class AuthRequiredScreen extends StatelessWidget {
   const AuthRequiredScreen({
@@ -48,6 +49,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _password = TextEditingController();
+  // Agent fields
+  final _agencyName = TextEditingController();
+  final _jobTitle = TextEditingController();
+  final _agentPhone = TextEditingController();
+  final _whatsapp = TextEditingController();
+  final _agentCity = TextEditingController();
+  final _nationalId = TextEditingController();
+  final _experienceYears = TextEditingController();
+  final _address = TextEditingController();
+  final _bio = TextEditingController();
+  final _licenseNumber = TextEditingController();
+
   bool _register = false;
   bool _busy = false;
   bool _obscurePassword = true;
@@ -59,6 +72,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     _email.dispose();
     _phone.dispose();
     _password.dispose();
+    _agencyName.dispose();
+    _jobTitle.dispose();
+    _agentPhone.dispose();
+    _whatsapp.dispose();
+    _agentCity.dispose();
+    _nationalId.dispose();
+    _experienceYears.dispose();
+    _address.dispose();
+    _bio.dispose();
+    _licenseNumber.dispose();
     super.dispose();
   }
 
@@ -75,6 +98,31 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               password: _password.text,
               accountType: _accountType,
               phone: _phone.text.trim(),
+              // Agent fields
+              agencyName: _accountType == 'agent'
+                  ? _agencyName.text.trim()
+                  : null,
+              jobTitle: _accountType == 'agent' ? _jobTitle.text.trim() : null,
+              agentPhone: _accountType == 'agent'
+                  ? _agentPhone.text.trim()
+                  : null,
+              whatsapp: _accountType == 'agent' ? _whatsapp.text.trim() : null,
+              agentCity: _accountType == 'agent'
+                  ? _agentCity.text.trim()
+                  : null,
+              nationalId: _accountType == 'agent'
+                  ? _nationalId.text.trim()
+                  : null,
+              experienceYears:
+                  _accountType == 'agent' &&
+                      _experienceYears.text.trim().isNotEmpty
+                  ? int.tryParse(_experienceYears.text.trim())
+                  : null,
+              address: _accountType == 'agent' ? _address.text.trim() : null,
+              bio: _accountType == 'agent' ? _bio.text.trim() : null,
+              licenseNumber: _accountType == 'agent'
+                  ? _licenseNumber.text.trim()
+                  : null,
             );
       } else {
         await ref
@@ -86,8 +134,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             );
       }
       if (mounted) {
+        final user = ref.read(sessionProvider).asData?.value?.user;
         Navigator.of(context).popUntil((route) => route.isFirst);
         util.notice(context, 'تم تسجيل الدخول بنجاح.');
+
+        // التحقق الحقيقي من البريد: بعد التسجيل دائمًا، وبعد الدخول إن كان غير موثق.
+        if (user != null && user.emailVerified != true && mounted) {
+          final autoSend = _register;
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EmailVerificationScreen(autoSend: autoSend),
+            ),
+          );
+        }
       }
     } on ApiFailure catch (error) {
       if (mounted) util.notice(context, error.message);
@@ -213,9 +272,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                           : 'سجّل دخولك لمتابعة عقاراتك وطلباتك ورسائلك.',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        color: theme
-                                            .colorScheme
-                                            .onSurfaceVariant,
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
                                         height: 1.45,
                                       ),
                                     ),
@@ -258,18 +316,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                               title: 'عميل',
                                               body: 'استكشف واحفظ وتواصل',
                                               onTap: () => setState(
-                                                () =>
-                                                    _accountType = 'client',
+                                                () => _accountType = 'client',
                                               ),
                                             ),
                                           ),
                                           const SizedBox(width: 10),
                                           Expanded(
                                             child: _AccountTypeCard(
-                                              selected:
-                                                  _accountType == 'agent',
-                                              icon:
-                                                  Icons.real_estate_agent_rounded,
+                                              selected: _accountType == 'agent',
+                                              icon: Icons
+                                                  .real_estate_agent_rounded,
                                               tone: AccentTone.emerald,
                                               title: 'وكيل عقار',
                                               body: 'انشر وأدر عقاراتك',
@@ -284,8 +340,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                     ],
                                     TextFormField(
                                       controller: _email,
-                                      keyboardType:
-                                          TextInputType.emailAddress,
+                                      keyboardType: TextInputType.emailAddress,
                                       textDirection: ui.TextDirection.ltr,
                                       textInputAction: TextInputAction.next,
                                       autofillHints: const [
@@ -334,6 +389,174 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                               : 'أدخل رقم جوال صحيحًا أو اتركه فارغًا.';
                                         },
                                       ),
+                                      // Agent-specific fields
+                                      if (_accountType == 'agent') ...[
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'بيانات الوكيل المطلوبة',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _agencyName,
+                                          textInputAction: TextInputAction.next,
+                                          decoration: const InputDecoration(
+                                            labelText: 'اسم المكتب العقاري *',
+                                            prefixIcon: Icon(
+                                              Icons.business_outlined,
+                                            ),
+                                          ),
+                                          validator: (value) =>
+                                              (value ?? '').trim().isEmpty
+                                              ? 'اسم المكتب العقاري مطلوب'
+                                              : null,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _jobTitle,
+                                          textInputAction: TextInputAction.next,
+                                          decoration: const InputDecoration(
+                                            labelText: 'المسمى الوظيفي *',
+                                            prefixIcon: Icon(
+                                              Icons.work_outline,
+                                            ),
+                                          ),
+                                          validator: (value) =>
+                                              (value ?? '').trim().isEmpty
+                                              ? 'المسمى الوظيفي مطلوب'
+                                              : null,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _agentPhone,
+                                          keyboardType: TextInputType.phone,
+                                          textDirection: ui.TextDirection.ltr,
+                                          textInputAction: TextInputAction.next,
+                                          decoration: const InputDecoration(
+                                            labelText: 'رقم جوال الوكيل *',
+                                            prefixIcon: Icon(
+                                              Icons.phone_in_talk_outlined,
+                                            ),
+                                          ),
+                                          validator: (value) {
+                                            final phone = (value ?? '').trim();
+                                            if (phone.isEmpty) {
+                                              return 'رقم جوال الوكيل مطلوب';
+                                            }
+                                            return phone.length >= 7
+                                                ? null
+                                                : 'أدخل رقم جوال صحيحًا';
+                                          },
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _whatsapp,
+                                          keyboardType: TextInputType.phone,
+                                          textDirection: ui.TextDirection.ltr,
+                                          textInputAction: TextInputAction.next,
+                                          decoration: const InputDecoration(
+                                            labelText: 'رقم الواتساب (اختياري)',
+                                            prefixIcon: Icon(
+                                              Icons.chat_outlined,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _agentCity,
+                                          textInputAction: TextInputAction.next,
+                                          decoration: const InputDecoration(
+                                            labelText: 'مدينة العمل *',
+                                            prefixIcon: Icon(
+                                              Icons.location_city_outlined,
+                                            ),
+                                          ),
+                                          validator: (value) =>
+                                              (value ?? '').trim().isEmpty
+                                              ? 'مدينة العمل مطلوبة'
+                                              : null,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _nationalId,
+                                          textDirection: ui.TextDirection.ltr,
+                                          textInputAction: TextInputAction.next,
+                                          decoration: const InputDecoration(
+                                            labelText:
+                                                'الرقم الوطني / الهوية *',
+                                            prefixIcon: Icon(
+                                              Icons.badge_outlined,
+                                            ),
+                                          ),
+                                          validator: (value) =>
+                                              (value ?? '').trim().isEmpty
+                                              ? 'الرقم الوطني مطلوب'
+                                              : null,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _experienceYears,
+                                          keyboardType: TextInputType.number,
+                                          textDirection: ui.TextDirection.ltr,
+                                          textInputAction: TextInputAction.next,
+                                          decoration: const InputDecoration(
+                                            labelText: 'سنوات الخبرة (اختياري)',
+                                            prefixIcon: Icon(
+                                              Icons.timeline_outlined,
+                                            ),
+                                          ),
+                                          validator: (value) {
+                                            final text = (value ?? '').trim();
+                                            if (text.isEmpty) return null;
+                                            final years = int.tryParse(text);
+                                            if (years == null ||
+                                                years < 0 ||
+                                                years > 60) {
+                                              return 'أدخل رقمًا صحيحًا بين 0 و 60';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _address,
+                                          textInputAction: TextInputAction.next,
+                                          maxLines: 2,
+                                          decoration: const InputDecoration(
+                                            labelText: 'العنوان (اختياري)',
+                                            prefixIcon: Icon(
+                                              Icons.home_outlined,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _licenseNumber,
+                                          textDirection: ui.TextDirection.ltr,
+                                          textInputAction: TextInputAction.next,
+                                          decoration: const InputDecoration(
+                                            labelText: 'رقم الترخيص (اختياري)',
+                                            prefixIcon: Icon(
+                                              Icons.card_membership_outlined,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          controller: _bio,
+                                          textInputAction: TextInputAction.next,
+                                          maxLines: 3,
+                                          decoration: const InputDecoration(
+                                            labelText: 'نبذة تعريفية (اختياري)',
+                                            prefixIcon: Icon(
+                                              Icons.description_outlined,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                     const SizedBox(height: 12),
                                     TextFormField(
@@ -365,10 +588,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                           ),
                                           icon: Icon(
                                             _obscurePassword
-                                                ? Icons
-                                                      .visibility_outlined
-                                                : Icons
-                                                      .visibility_off_outlined,
+                                                ? Icons.visibility_outlined
+                                                : Icons.visibility_off_outlined,
                                           ),
                                         ),
                                       ),
@@ -384,16 +605,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                           ? const SizedBox(
                                               width: 18,
                                               height: 18,
-                                              child:
-                                                  CircularProgressIndicator(
-                                                    strokeWidth: 2.2,
-                                                    color: Colors.white,
-                                                  ),
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.2,
+                                                color: Colors.white,
+                                              ),
                                             )
                                           : Icon(
                                               _register
-                                                  ? Icons
-                                                        .person_add_alt_rounded
+                                                  ? Icons.person_add_alt_rounded
                                                   : Icons.login_rounded,
                                               size: 20,
                                             ),
@@ -413,9 +632,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             TextButton(
                               onPressed: _busy
                                   ? null
-                                  : () => setState(
-                                      () => _register = !_register,
-                                    ),
+                                  : () =>
+                                        setState(() => _register = !_register),
                               child: Text(
                                 _register
                                     ? 'لدي حساب بالفعل — تسجيل الدخول'
@@ -528,7 +746,9 @@ class _AccountTypeCard extends StatelessWidget {
     final base = tone.color(theme.colorScheme);
     return Material(
       color: selected
-          ? base.withValues(alpha: theme.brightness == Brightness.dark ? .24 : .12)
+          ? base.withValues(
+              alpha: theme.brightness == Brightness.dark ? .24 : .12,
+            )
           : theme.colorScheme.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(

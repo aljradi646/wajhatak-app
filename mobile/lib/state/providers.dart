@@ -31,6 +31,10 @@ final authRepositoryProvider = Provider<AuthRepository>(
   ),
 );
 
+final accountRepositoryProvider = Provider<AccountRepository>(
+  (ref) => AccountRepository(ref.watch(apiClientProvider)),
+);
+
 final propertyRepositoryProvider = Provider<PropertyRepository>(
   (ref) => PropertyRepository(ref.watch(apiClientProvider)),
 );
@@ -49,6 +53,13 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
 
 final taxonomyRepositoryProvider = Provider<TaxonomyRepository>(
   (ref) => TaxonomyRepository(ref.watch(apiClientProvider)),
+);
+
+final agentReportRepositoryProvider = Provider<AgentReportRepository>(
+  (ref) => AgentReportRepository(
+    ref.watch(apiClientProvider),
+    ref.watch(tokenStoreProvider),
+  ),
 );
 
 final previewFixtureRepositoryProvider =
@@ -101,6 +112,17 @@ class SessionController extends AsyncNotifier<SessionData?> {
     required String password,
     required String accountType,
     String? phone,
+    // Agent fields
+    String? agencyName,
+    String? jobTitle,
+    String? agentPhone,
+    String? whatsapp,
+    String? agentCity,
+    String? nationalId,
+    int? experienceYears,
+    String? address,
+    String? bio,
+    String? licenseNumber,
   }) async {
     state = const AsyncLoading();
     try {
@@ -118,6 +140,16 @@ class SessionController extends AsyncNotifier<SessionData?> {
               password: password,
               accountType: accountType,
               phone: phone,
+              agencyName: agencyName,
+              jobTitle: jobTitle,
+              agentPhone: agentPhone,
+              whatsapp: whatsapp,
+              agentCity: agentCity,
+              nationalId: nationalId,
+              experienceYears: experienceYears,
+              address: address,
+              bio: bio,
+              licenseNumber: licenseNumber,
             );
       })();
       state = AsyncData(session);
@@ -155,6 +187,19 @@ class SessionController extends AsyncNotifier<SessionData?> {
   }
 
   Future<void> clearExpiredSession() => _clearAuthenticatedState();
+
+  /// إعادة تحميل بيانات الجلسة من الخادم (بعد توثيق البريد مثلًا).
+  Future<void> restoreSessionAfterVerification() async {
+    if (AppConfig.isUiPreview) return;
+    try {
+      final refreshed = await ref.read(authRepositoryProvider).restore();
+      if (refreshed != null) {
+        state = AsyncData(refreshed);
+      }
+    } on Object {
+      // فشل التحديث لا يُسقط الجلسة الحالية.
+    }
+  }
 
   Future<void> _clearAuthenticatedState() async {
     if (!AppConfig.isUiPreview) {

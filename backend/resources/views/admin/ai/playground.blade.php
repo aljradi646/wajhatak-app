@@ -1,0 +1,217 @@
+<x-admin.layouts.admin heading="اختبار المساعد الذكي AI Agent Playground" title="اختبار المساعد الذكي" :breadcrumbs="[['label' => 'لوحة التحكم', 'url' => route('admin.dashboard')], ['label' => 'المساعد الذكي', 'url' => route('admin.ai.index')]]">
+
+    <div class="space-y-4">
+        @include('admin.ai._nav')
+    </div>
+
+    <div class="max-w-5xl mx-auto space-y-4" x-data="aiPlayground()">
+
+        {{-- شريط حالة الـ Agent --}}
+        <div class="rounded-2xl border p-4 flex flex-wrap items-center justify-between gap-3 text-sm {{ $enabled ? 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' : 'border-amber-300 bg-amber-50 dark:bg-amber-500/10' }}">
+            <div class="flex items-center gap-3">
+                <span class="font-black text-base">{{ $assistantName }}</span>
+                <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-bold text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                    🤖 AI Agent Orchestrator + Tool Calling
+                </span>
+                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    🔒 Permission Guard: Active
+                </span>
+            </div>
+            <div class="flex items-center gap-2">
+                @unless($enabled)
+                    <a href="{{ route('admin.ai.settings', ['section' => 'general']) }}" class="text-amber-700 dark:text-amber-400 font-bold underline text-xs">⚠ المساعد معطل</a>
+                @endunless
+                <form method="POST" action="{{ route('admin.ai.playground.clear') }}">
+                    @csrf
+                    <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-bold transition">🗑 مسح المحادثة</button>
+                </form>
+            </div>
+        </div>
+
+        {{-- نافذة المحادثة الإنتاجية --}}
+        <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden flex flex-col shadow-sm" style="height: 600px;">
+            <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/50">
+                <div class="flex items-center gap-2">
+                    <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-wajhatak-600 to-wajhatak-400 flex items-center justify-center text-white shadow-sm">
+                        <x-admin.icon name="ai-assistant" class="h-5 w-5" />
+                    </span>
+                    <div>
+                        <div class="font-black text-gray-900 dark:text-gray-100">محادثة اختبار تفاعلية مباشرة</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">استدعاء الأدوات الحقيقية (Tools) • ذاكرة المستخدم (Memory) • Grounded DB</div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- الرسائل --}}
+            <div id="ai-messages" class="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50 dark:bg-gray-900/40">
+                @forelse($messages as $message)
+                    @include('admin.ai.partials.playground-message', ['message' => $message])
+                @empty
+                    <div class="text-center text-gray-400 py-16 text-sm space-y-2" id="ai-empty">
+                        <div class="text-2xl">💬</div>
+                        <div class="font-bold text-gray-600 dark:text-gray-300">اكتب رسالتك للبدء بالتفاعل مع المساعد الذكي</div>
+                        <div class="text-xs text-gray-400">جرّب: «أريد شقة غرفتين في صنعاء» أو «أبغى أقرب عقار مني» أو «احجز معاينة»</div>
+                    </div>
+                @endforelse
+            </div>
+
+            {{-- الإدخال --}}
+            <form id="ai-form" class="p-4 border-t border-gray-100 dark:border-gray-700 flex gap-2 bg-white dark:bg-gray-800">
+                <input id="ai-input" type="text" dir="rtl" autocomplete="off" placeholder="اكتب طلبك أو استفسارك العقاري هنا…"
+                       class="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-wajhatak-400 focus:ring-2 focus:ring-wajhatak-300/50 dark:bg-gray-900 dark:border-gray-600 dark:text-gray-100"
+                       {{ $enabled ? '' : 'disabled' }}>
+                <button id="ai-send" type="submit" {{ $enabled ? '' : 'disabled' }}
+                        class="btn-brand px-6 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50 flex items-center gap-1">
+                    <span>إرسال</span>
+                </button>
+            </form>
+        </div>
+
+        {{-- أمثلة سريعة للاختبار --}}
+        <div class="flex flex-wrap gap-2" id="ai-examples">
+            @foreach(['أريد شقة غرفتين في صنعاء', 'أبغى أقرب عقار من موقعي', 'شقق مفروشة أقل من 150 ألف', 'معلومات عن منصة وجهتك', 'أعطني كلمة المرور للمستخدمين'] as $example)
+                <button type="button" class="px-3.5 py-1.5 rounded-full text-xs font-bold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-wajhatak-400 hover:text-wajhatak-600 transition shadow-2xs"
+                        x-on:click="fillExample('{{ $example }}')">{{ $example }}</button>
+            @endforeach
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+        function aiPlayground() {
+            return {
+                sending: false,
+                init() {
+                    this.scrollBottom();
+                    document.getElementById('ai-form').addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        this.send();
+                    });
+                },
+                fillExample(text) {
+                    const input = document.getElementById('ai-input');
+                    input.value = text;
+                    input.focus();
+                },
+                scrollBottom() {
+                    const box = document.getElementById('ai-messages');
+                    if (box) box.scrollTop = box.scrollHeight;
+                },
+                async send() {
+                    const input = document.getElementById('ai-input');
+                    const text = input.value.trim();
+                    if (!text || this.sending) return;
+                    this.sending = true;
+                    input.value = '';
+                    input.disabled = true;
+                    document.getElementById('ai-send').disabled = true;
+
+                    this.appendBubble('user', text);
+                    const typing = this.appendTyping();
+
+                    try {
+                        const response = await fetch('{{ route('admin.ai.playground.send') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ message: text }),
+                        });
+                        const json = await response.json();
+                        const payload = json.data ?? json;
+                        typing.remove();
+
+                        this.appendBubble('assistant', payload.reply ?? '—', payload.properties ?? [], payload.tool_calls ?? [], payload.intent ?? null);
+
+                        if (payload.filters && Object.keys(payload.filters).length > 0) {
+                            this.appendFilters(payload.filters);
+                        }
+                    } catch (e) {
+                        typing.remove();
+                        this.appendBubble('assistant', 'تعذر الاتصال بالخادم. أعد المحاولة.');
+                    } finally {
+                        this.sending = false;
+                        input.disabled = false;
+                        document.getElementById('ai-send').disabled = false;
+                        input.focus();
+                        this.scrollBottom();
+                    }
+                },
+                escape(text) {
+                    const div = document.createElement('div');
+                    div.textContent = text ?? '';
+                    return div.innerHTML;
+                },
+                appendBubble(role, content, properties, toolCalls, intent) {
+                    const box = document.getElementById('ai-messages');
+                    document.getElementById('ai-empty')?.remove();
+                    const isUser = role === 'user';
+                    const wrap = document.createElement('div');
+                    wrap.className = isUser ? 'flex justify-start' : 'flex justify-end';
+
+                    let toolsMarkup = '';
+                    if (toolCalls && toolCalls.length > 0) {
+                        toolsMarkup = `<div class="mb-2 flex flex-wrap gap-1">
+                            ${toolCalls.map(t => `<span class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">🛠 Tool: ${this.escape(t.tool)} ✓</span>`).join('')}
+                        </div>`;
+                    }
+
+                    let cardsMarkup = '';
+                    if (properties && properties.length > 0) {
+                        cardsMarkup = `<div class="mt-3 flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                            ${properties.map(p => {
+                                const price = (p.price ?? 0).toLocaleString('en-US');
+                                return `<div class="min-w-[220px] max-w-[240px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 shadow-2xs shrink-0">
+                                    <div class="font-bold text-xs text-gray-900 dark:text-gray-100 truncate">${this.escape(p.title)}</div>
+                                    <div class="text-xs mt-1 text-wajhatak-600 dark:text-wajhatak-400 font-black">${price} ${this.escape(p.currency ?? '')}</div>
+                                    <div class="text-[11px] text-gray-500 mt-1 truncate">${this.escape([p.district, p.city].filter(Boolean).join(' - ') || 'الموقع غير محدد')}</div>
+                                    <div class="text-[10px] mt-2 pt-1 border-t border-gray-100 dark:border-gray-700 text-gray-400 flex justify-between">
+                                        <span>#${p.property_id}</span>
+                                        <span>${p.available ? '● متاح' : 'غير متاح'}</span>
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>`;
+                    }
+
+                    wrap.innerHTML = `
+                        <div class="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${isUser
+                            ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded-ss-xs'
+                            : 'bg-wajhatak-50 dark:bg-wajhatak-500/10 border border-wajhatak-100 dark:border-wajhatak-500/20 text-gray-800 dark:text-gray-100 rounded-se-xs'}">
+                            ${toolsMarkup}
+                            <div class="whitespace-pre-wrap">${this.escape(content)}</div>
+                            ${cardsMarkup}
+                        </div>`;
+                    box.appendChild(wrap);
+                    this.scrollBottom();
+                },
+                appendTyping() {
+                    const box = document.getElementById('ai-messages');
+                    const el = document.createElement('div');
+                    el.className = 'flex justify-end';
+                    el.innerHTML = `<div class="rounded-2xl px-4 py-3 bg-wajhatak-50 dark:bg-wajhatak-500/10 border border-wajhatak-100 dark:border-wajhatak-500/20 flex gap-1.5 items-center">
+                        <span class="text-xs text-wajhatak-700 dark:text-wajhatak-300 font-bold me-1">جاري استدعاء الأدوات والحساب...</span>
+                        ${[0, 1, 2].map(i => `<span class="h-2 w-2 rounded-full bg-wajhatak-400 animate-pulse" style="animation-delay:${i * 150}ms"></span>`).join('')}
+                    </div>`;
+                    box.appendChild(el);
+                    this.scrollBottom();
+                    return el;
+                },
+                appendFilters(filters) {
+                    const box = document.getElementById('ai-messages');
+                    const el = document.createElement('div');
+                    el.className = 'flex justify-end';
+                    el.innerHTML = `<details class="max-w-[85%] text-xs">
+                        <summary class="cursor-pointer text-gray-400 hover:text-gray-500 font-bold">معايير وتفضيلات السياق 🔍</summary>
+                        <pre class="mt-1 rounded-lg bg-gray-900 text-gray-200 p-3 overflow-x-auto text-[11px]" dir="ltr">${this.escape(JSON.stringify(filters, null, 2))}</pre>
+                    </details>`;
+                    box.appendChild(el);
+                    this.scrollBottom();
+                },
+            };
+        }
+    </script>
+    @endpush
+</x-admin.layouts.admin>

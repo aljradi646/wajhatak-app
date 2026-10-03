@@ -12,6 +12,7 @@ import '../listings/edit_listing_screen.dart';
 import '../messages/messages_screen.dart';
 import '../viewing_requests/viewing_requests_screen.dart';
 import '../property/property_detail_screen.dart';
+import 'agent_reports_screen.dart';
 
 class AgentDashboardScreen extends ConsumerWidget {
   const AgentDashboardScreen({super.key});
@@ -146,6 +147,20 @@ class AgentDashboardScreen extends ConsumerWidget {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverToBoxAdapter(
+                  child: _AgentQuickAction(
+                    icon: Icons.assessment_outlined,
+                    label: 'التقارير',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AgentReportsScreen(),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -355,15 +370,16 @@ class _AgentQuickAction extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13),
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: Theme.of(context).colorScheme.outline),
         ),
-        child: Column(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: WajhatakColors.emerald),
-            const SizedBox(height: 6),
+            const SizedBox(width: 8),
             Text(
               label,
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),

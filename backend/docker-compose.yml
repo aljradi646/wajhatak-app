@@ -65,6 +65,11 @@ services:
       FILESYSTEM_DISK: local
       RAILWAY_SERVICE_TYPE: app
       PORT: ${PORT:-8080}
+      # ---------------------------------------------------------------------
+      # المساعد الذكي محرك حتمي داخل Laravel — لا خدمة استدلال ولا نماذج.
+      # ---------------------------------------------------------------------
+      # سقف ذاكرة الحاوية: PHP + عامل الطابور فقط (بلا نموذج).
+      mem_limit: ${APP_MEM_LIMIT:-1g}
       # Control-panel admin account
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@wajhatak.app}
       ADMIN_NAME: ${ADMIN_NAME:-مدير النظام}

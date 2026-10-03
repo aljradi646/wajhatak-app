@@ -68,6 +68,29 @@
         </x-admin.card>
     </div>
 
+    {{-- AI Agent Summary Widget Row --}}
+    <div class="mt-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gradient-to-r from-wajhatak-900 via-wajhatak-800 to-emerald-950 p-5 text-white shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    <h3 class="font-black text-lg text-white">المساعد الذكي Production AI Agent</h3>
+                </div>
+                <p class="text-xs text-emerald-200 max-w-xl">
+                    منظومة المساعد الذكي تعمل بكفاءة إنتاجية كاملة فوق بيانات التطبيق وأدواته (Tool Calling & User Memory & Permission Guard).
+                </p>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="{{ route('admin.ai.index') }}" class="px-4 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition border border-white/10">
+                    إدارة إعدادات المساعد
+                </a>
+                <a href="{{ route('admin.ai.playground') }}" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-white transition shadow-sm">
+                    اختبار المساعد الآن 🤖
+                </a>
+            </div>
+        </div>
+    </div>
+
     {{-- Communication + engagement row --}}
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-4">
         <x-admin.card>

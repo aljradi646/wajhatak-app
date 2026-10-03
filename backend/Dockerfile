@@ -1,6 +1,11 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
+# المساعد الذكي محرك حتمي داخل Laravel (App\Services\AI\AiReplyEngine) —
+# لا Stage لبناء llama.cpp ولا تنزيل نماذج: صورة أصغر وأسرع بناءً وأقل استهلاكًا.
+# =============================================================================
+
+# =============================================================================
 # Stage 1: PHP dependencies (Composer)
 # =============================================================================
 FROM composer:2 AS composer_stage
@@ -112,7 +117,7 @@ RUN rm -rf vendor/laravel/pail 2>/dev/null || true \
 
 # Production PHP configuration
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
-RUN echo "memory_limit=256M" >> "$PHP_INI_DIR/conf.d/99-app.ini" \
+RUN echo "memory_limit=384M" >> "$PHP_INI_DIR/conf.d/99-app.ini" \
     && echo "upload_max_filesize=20M" >> "$PHP_INI_DIR/conf.d/99-app.ini" \
     && echo "post_max_size=25M" >> "$PHP_INI_DIR/conf.d/99-app.ini" \
     && echo "max_execution_time=120" >> "$PHP_INI_DIR/conf.d/99-app.ini"

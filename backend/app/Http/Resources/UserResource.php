@@ -16,6 +16,11 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'avatar_url' => $this->avatar_path ? asset('storage/'.$this->avatar_path) : null,
             'locale' => $this->locale,
+            'email_verified' => $this->email_verified_at !== null,
+            'agent_verification_status' => $this->when(
+                $this->relationLoaded('agentProfile') || $this->agentProfile !== null,
+                fn () => $this->agentProfile?->verification_status,
+            ),
             'roles' => $this->whenLoaded('roles', fn () => $this->getRoleNames()->values()),
             'capabilities' => $this->whenLoaded('permissions', fn () => $this->getAllPermissions()->pluck('name')->values()),
         ];

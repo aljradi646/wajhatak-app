@@ -1,12 +1,18 @@
 <x-admin.layouts.admin heading="الوكلاء" title="الوكلاء">
     <div class="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
         <form method="GET" class="flex gap-2 sm:w-80">
+            <input type="hidden" name="verification" value="{{ $verificationFilter ?? '' }}">
             <x-admin.input name="search" value="{{ $search }}" placeholder="بحث بالاسم أو الترخيص أو البريد..." />
             <x-admin.button variant="secondary" type="submit">بحث</x-admin.button>
         </form>
-        <a href="{{ route('admin.agents.create') }}" class="inline-flex items-center justify-center px-4 py-2 text-sm font-bold text-white rounded-xl hover:shadow-lg" style="background: linear-gradient(135deg, #075E4A, #0E8A6D, #35C39E); box-shadow: 0 4px 12px rgba(14, 138, 109, 0.25);">
-            + وكيل جديد
-        </a>
+        <div class="flex items-center gap-2">
+            <a href="{{ route('admin.agents.verifications') }}" class="inline-flex items-center justify-center px-4 py-2 text-sm font-bold text-white rounded-xl hover:shadow-lg" style="background: linear-gradient(135deg, #B97D1B, #D9A02B); box-shadow: 0 4px 12px rgba(185, 125, 27, 0.25);">
+                ⏳ طلبات التوثيق @if(($pendingVerification ?? 0) > 0) <span class="ms-1 bg-white/25 rounded-full px-2 text-xs">{{ $pendingVerification }}</span>@endif
+            </a>
+            <a href="{{ route('admin.agents.create') }}" class="inline-flex items-center justify-center px-4 py-2 text-sm font-bold text-white rounded-xl hover:shadow-lg" style="background: linear-gradient(135deg, #075E4A, #0E8A6D, #35C39E); box-shadow: 0 4px 12px rgba(14, 138, 109, 0.25);">
+                + وكيل جديد
+            </a>
+        </div>
     </div>
 
     <x-admin.card :padding="false">
@@ -20,6 +26,7 @@
                         <th class="px-4 py-3 text-right font-semibold text-gray-600">عدد المراجعات</th>
                         <th class="px-4 py-3 text-right font-semibold text-gray-600">العقارات</th>
                         <th class="px-4 py-3 text-right font-semibold text-gray-600">نشط</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600">التوثيق</th>
                         <th class="px-4 py-3 text-right font-semibold text-gray-600">إجراءات</th>
                     </tr>
                 </thead>
@@ -44,6 +51,15 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3">
+                                @if($agent->verification_status === 'approved')
+                                    <span class="inline-flex items-center rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-semibold">موثق ✓</span>
+                                @elseif($agent->verification_status === 'rejected')
+                                    <span class="inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-xs font-semibold">مرفوض</span>
+                                @else
+                                    <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-xs font-semibold">قيد المراجعة</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3">
                                 <div class="flex items-center gap-2">
                                     <a href="{{ route('admin.agents.show', $agent) }}" class="text-wajhatak-600 hover:text-wajhatak-700 text-sm font-medium">عرض</a>
                                     <a href="{{ route('admin.agents.edit', $agent) }}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">تعديل</a>
@@ -57,7 +73,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">لا يوجد وكلاء.</td>
+                            <td colspan="8" class="px-4 py-8 text-center text-gray-500">لا يوجد وكلاء.</td>
                         </tr>
                     @endforelse
                 </tbody>

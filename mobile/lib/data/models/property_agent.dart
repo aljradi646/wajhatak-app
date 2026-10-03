@@ -13,6 +13,8 @@ class PropertyAgent {
     this.bio,
     this.avatarUrl,
     this.isActive = true,
+    this.isVerified = false,
+    this.verificationStatus,
   });
 
   final int id;
@@ -25,6 +27,12 @@ class PropertyAgent {
   final String? avatarUrl;
   final bool isActive;
 
+  /// هل اعتمدت الإدارة توثيق هذا الوكيل فعليًا؟ (تُقرأ من الخادم، لا تُفترض)
+  final bool isVerified;
+
+  /// pending | approved | rejected
+  final String? verificationStatus;
+
   factory PropertyAgent.fromJson(Map<String, dynamic> json) => PropertyAgent(
     id: json['id'] as int,
     name: json['name'] as String? ?? '',
@@ -35,6 +43,8 @@ class PropertyAgent {
     bio: json['bio'] as String?,
     avatarUrl: json['avatar_url'] as String?,
     isActive: json['is_active'] as bool? ?? true,
+    isVerified: json['is_verified'] as bool? ?? false,
+    verificationStatus: json['verification_status'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -47,5 +57,7 @@ class PropertyAgent {
     'bio': bio,
     'avatar_url': avatarUrl,
     'is_active': isActive,
+    'is_verified': isVerified,
+    'verification_status': verificationStatus,
   };
 }

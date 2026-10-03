@@ -248,24 +248,28 @@ class _ProfileHeader extends StatelessWidget {
                           ],
                         ],
                       ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.verified_rounded,
-                          size: 15,
-                          color: WajhatakColors.emerald,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'وكيل معتمد',
-                          style: theme.textTheme.labelMedium?.copyWith(
+                    // وسم «وكيل معتمد» يظهر فقط حين تكون الإدارة قد وثّقت الحساب
+                    // فعلًا (is_verified من الخادم) — لا افتراضًا من نوع الحساب.
+                    if (agent.isVerified) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.verified_rounded,
+                            size: 15,
                             color: WajhatakColors.emerald,
-                            fontWeight: FontWeight.w700,
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'وكيل معتمد',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: WajhatakColors.emerald,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -581,8 +585,8 @@ class _TileImage extends StatelessWidget {
       imageUrl: url,
       fit: BoxFit.cover,
       memCacheWidth: 360,
-      placeholder: (_, _) => const _TileFallback(),
-      errorWidget: (_, _, _) => const _TileFallback(),
+      placeholder: (context, url) => const _TileFallback(),
+      errorWidget: (context, url, error) => const _TileFallback(),
     );
   }
 }
