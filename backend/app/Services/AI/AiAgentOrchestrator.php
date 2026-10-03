@@ -30,6 +30,23 @@ class AiAgentOrchestrator
         $guard=$this->guardrails->inspect($message);
         if(!empty($guard['blocked'])) return $this->blocked($conversation,$message,$guard['reason']??'blocked');
 
+        $pending=$this->stateService->pendingAction($conversation);
+        if($pending && preg_match('/^(نعم|نعم موافق|موافق|أكد|اكّد|confirm|yes|ok)$/iu',trim($message))){
+            $arguments=$pending['arguments'];
+            $arguments['confirmed']=true;
+            $result=$this->toolRegistry->execute($pending['tool'],$arguments,$user);
+            $this->stateService->setPendingAction($conversation,null);
+            $this->conversationService->addUserMessage($conversation,$message,[]);
+            return [
+                'reply'=>$result['success']??false ? ($result['message']??'تم تنفيذ العملية بنجاح.') : ($result['message']??'تعذر تنفيذ العملية.'),
+                'status'=>$result['success']??false ? 'ok' : 'error',
+                'properties'=>[],
+                'filters'=>[],
+                'tool_calls'=>[['tool'=>$pending['tool'],'ok'=>(bool)($result['success']??false)]],
+                'intent'=>'confirmed_action',
+            ];
+        }
+
         $this->conversationService->addUserMessage($conversation,$message,[]);
         if($this->llm->configured()) {
             try { return $this->processWithLlm($user,$message,$conversation,$locale,$clientContext); }
