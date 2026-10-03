@@ -229,11 +229,11 @@ class AiToolRegistry
 
     private function executeCreateViewingRequest(?User $user, array $args): array
     {
-        if (!$user) {
+        if (!$user || ! $user->is_active) {
             return [
                 'success' => false,
                 'error' => 'UNAUTHENTICATED',
-                'message' => 'يلزم تسجيل الدخول لإنشاء طلب معاينة.',
+                'message' => 'يلزم تسجيل الدخول بحساب نشط لإنشاء طلب معاينة.',
             ];
         }
 
