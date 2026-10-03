@@ -136,6 +136,13 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
             onPressed: () => _showConversationHistory(context),
           ),
           IconButton(
+            tooltip: 'محادثة جديدة',
+            icon: const Icon(Icons.add_comment_rounded),
+            onPressed: state.loading
+                ? null
+                : () => ref.read(aiConversationProvider.notifier).newConversation(),
+          ),
+          IconButton(
             tooltip: 'مسح المحادثة',
             icon: const Icon(Icons.refresh_rounded),
             onPressed: state.loading
