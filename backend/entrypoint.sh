@@ -21,9 +21,10 @@
 #   8. For the "app" service: starts the queue worker (deferred notifications)
 #      in the background and serves the app with `php artisan serve` on $PORT.
 #
-# المساعد العقاري الذكي محرك حتمي 100% يعمل داخل Laravel مباشرة:
-# لا نموذج لغوي، لا خادم استدلال، ولا أي ملفات تُحمّل — يعمل فورًا على
-# أي استضافة بأصغر موارد (حجم الصورة أقل من 500MB بلا أي نموذج).
+# AI Agent:
+# Laravel is the secure orchestration boundary. The language model is external
+# to this container and is configured through AI_LLM_* environment variables.
+# A rule-based fallback remains available when the inference service is down.
 # =============================================================================
 set -e
 
