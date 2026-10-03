@@ -21,6 +21,7 @@ return [
 
     'llm' => [
         'enabled' => (bool) env('AI_LLM_ENABLED', false),
+        'mode' => env('AI_LLM_MODE', 'grounded'),
         'base_url' => env('AI_LLM_BASE_URL', 'http://127.0.0.1:11434/v1'),
         'api_key' => env('AI_LLM_API_KEY', ''),
         'model' => env('AI_LLM_MODEL', ''),
