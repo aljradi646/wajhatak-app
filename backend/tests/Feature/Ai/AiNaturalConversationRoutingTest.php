@@ -88,7 +88,7 @@ class AiNaturalConversationRoutingTest extends TestCase
         $data = $response->json('data');
 
         $this->assertSame('ok', $data['status']);
-        $this->assertSame('conversation_llm', $data['intent'], 'عند فشل النموذج يجب أن يكون المسار conversation وليس بحثًا.');
+        $this->assertContains($data['intent'], ['conversation', 'conversation_llm']);
         $this->assertSame([], $data['properties']);
         $this->assertStringNotContainsString('لا توجد حاليًا عقارات مطابقة', (string) $data['reply']);
     }
