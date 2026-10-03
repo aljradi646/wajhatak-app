@@ -101,7 +101,7 @@ class AiAgentOrchestrator
                 $allowedToolNames = array_keys($this->toolRegistry->getToolsSchema($user));
                 if(!in_array($name,$allowedToolNames,true)&&$name!=='') {
                     $result=['success'=>false,'error'=>'UNKNOWN_TOOL','message'=>'الأداة غير متاحة.'];
-                } elseif($name==='create_viewing_request'&&!($args['confirmed']??false)) {
+                } elseif(in_array($name,['create_viewing_request','cancel_viewing_request'],true)&&!($args['confirmed']??false)) {
                     $result=['success'=>false,'confirmation_required'=>true,'message'=>'يلزم تأكيد المستخدم قبل إنشاء طلب المعاينة.'];
                     $this->stateService->setPendingAction($conversation,$name,$args);
                 } else {
