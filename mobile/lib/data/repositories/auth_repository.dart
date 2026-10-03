@@ -117,10 +117,12 @@ class AuthRepository {
     String? phone,
     String? locale,
   }) async {
-    final json = await _api.patch(
-      '/me',
-      data: {'name': name.trim(), 'phone': phone?.trim(), 'locale': ?locale},
-    );
+    final payload = <String, dynamic>{
+      'name': name.trim(),
+      'phone': phone?.trim(),
+    };
+    if (locale != null) payload['locale'] = locale;
+    final json = await _api.patch('/me', data: payload);
     final user = LuxUser.fromJson(json['data'] as Map<String, dynamic>);
     await _tokenStore.saveUser(user);
     return SessionData(user: user, token: session.token);
