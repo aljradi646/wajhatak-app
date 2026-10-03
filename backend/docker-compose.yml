@@ -66,9 +66,15 @@ services:
       RAILWAY_SERVICE_TYPE: app
       PORT: ${PORT:-8080}
       # ---------------------------------------------------------------------
-      # المساعد الذكي محرك حتمي داخل Laravel — لا خدمة استدلال ولا نماذج.
+      # المساعد الذكي — LLM محلي عبر Ollama، والنموذج خارج صورة Laravel.
       # ---------------------------------------------------------------------
-      # سقف ذاكرة الحاوية: PHP + عامل الطابور فقط (بلا نموذج).
+      AI_ENABLED: "true"
+      AI_ALLOW_RULE_FALLBACK: "true"
+      AI_LLM_ENABLED: "true"
+      AI_LLM_BASE_URL: http://ollama:11434/v1
+      AI_LLM_API_KEY: ""
+      AI_LLM_MODEL: wajhatak-qwen3:0.6b
+      # سقف ذاكرة الحاوية: PHP + عامل الطابور فقط (النموذج خدمة مستقلة).
       mem_limit: ${APP_MEM_LIMIT:-1g}
       # Control-panel admin account
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@wajhatak.app}
@@ -81,6 +87,33 @@ services:
     volumes:
       - app_storage:/var/www/html/storage
 
+
+  # خدمة استدلال مجانية محليًا. تحفظ النموذج في volume مستقل.
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ../deploy/llm/Modelfile:/Modelfile:ro
+    command:
+      - sh
+      - -lc
+      - |
+        ollama serve &
+        pid=$!
+        until ollama list >/dev/null 2>&1; do sleep 1; done
+        ollama pull qwen3:0.6b
+        ollama create wajhatak-qwen3:0.6b -f /Modelfile
+        wait $pid
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
 volumes:
   db_data:
   app_storage:
+  ollama_data:
