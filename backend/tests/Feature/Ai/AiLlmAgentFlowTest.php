@@ -1,11 +1,11 @@
 <?php
 
-namespace Tests\\Feature\\Ai;
+namespace Tests\Feature\Ai;
 
-use App\\Models\\Property;
-use Illuminate\\Foundation\\Testing\\RefreshDatabase;
-use Illuminate\\Support\\Facades\\Http;
-use Tests\\TestCase;
+use App\Models\Property;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
 
 class AiLlmAgentFlowTest extends TestCase
 {
