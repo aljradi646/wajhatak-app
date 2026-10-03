@@ -27,7 +27,9 @@ class AiConversationStateService
     {
         if(!$conversation->exists) return;
         $state=$this->state($conversation);
-        $state['pending_action']=$tool?['tool'=>$tool,'arguments'=>$arguments]:null;
+        $state['pending_action']=$tool
+            ? ['tool'=>$tool,'arguments'=>$arguments,'created_at'=>now()->toIso8601String()]
+            : null;
         $conversation->context_state=$state;
         $conversation->save();
     }
@@ -35,7 +37,13 @@ class AiConversationStateService
     public function pendingAction(AiConversation $conversation): ?array
     {
         $pending=$this->state($conversation)['pending_action']??null;
-        return is_array($pending)&&isset($pending['tool'])&&is_array($pending['arguments']??null)?$pending:null;
+        if(!is_array($pending)||!isset($pending['tool'])||!is_array($pending['arguments']??null)) return null;
+        $createdAt=isset($pending['created_at'])?\Illuminate\Support\Carbon::parse($pending['created_at']):null;
+        if($createdAt!==null&&$createdAt->lt(now()->subMinutes(10))){
+            $this->setPendingAction($conversation,null);
+            return null;
+        }
+        return $pending;
     }
 
     private function generateTitle(array $filters,?array $selectedProperty): string

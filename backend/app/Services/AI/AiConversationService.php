@@ -147,6 +147,21 @@ class AiConversationService
         ]);
     }
 
+    public function updateLatestUserFilters(AiConversation $conversation, array $filters): void
+    {
+        if ($filters === []) {
+            return;
+        }
+
+        $message = AiMessage::query()
+            ->where('ai_conversation_id', $conversation->id)
+            ->where('role', AiMessageRole::User->value)
+            ->latest('id')
+            ->first();
+
+        $message?->update(['structured_filters' => $filters]);
+    }
+
     public function addAssistantMessage(
         AiConversation $conversation,
         string $content,

@@ -1,10 +1,10 @@
 <?php
 
-namespace AppServicesAI;
+namespace App\Services\AI;
 
-use AppModelsAiConversation;
-use AppModelsUser;
-use IlluminateSupportFacadesLog;
+use App\Models\AiConversation;
+use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class AiAgentOrchestrator
@@ -39,6 +39,21 @@ class AiAgentOrchestrator
         }
 
         $pending = $this->stateService->pendingAction($conversation);
+
+        if ($pending && $this->isRejection($message)) {
+            $this->stateService->setPendingAction($conversation, null);
+            $this->conversationService->addUserMessage($conversation, $message, []);
+
+            return [
+                'reply' => 'حسنًا، ألغيت العملية ولم يتم تنفيذ أي إجراء.',
+                'status' => 'ok',
+                'properties' => [],
+                'filters' => [],
+                'tool_calls' => [],
+                'intent' => 'action_cancelled',
+            ];
+        }
+
         if ($pending && $this->isConfirmation($message)) {
             $arguments = $pending['arguments'];
             $arguments['confirmed'] = true;
@@ -156,6 +171,7 @@ class AiAgentOrchestrator
                     $reply = 'لم أتمكن من صياغة رد مفيد على الطلب.';
                 }
 
+                $this->conversationService->updateLatestUserFilters($conversation, $filters);
                 $this->stateService->updateState(
                     $conversation,
                     $filters,
@@ -290,9 +306,9 @@ class AiAgentOrchestrator
                 ];
             }
 
-            $this->stateService->updateState($conversation, [
-                'last_property_id' => $detailsTarget,
-            ], $item);
+            $detailsFilters = ['last_property_id' => $detailsTarget];
+            $this->conversationService->updateLatestUserFilters($conversation, $detailsFilters);
+            $this->stateService->updateState($conversation, $detailsFilters, $item);
 
             return [
                 'reply' => $this->replyEngine->detailsReply($detailsTarget) ?? 'تعذر تحميل تفاصيل العقار.',
@@ -311,11 +327,9 @@ class AiAgentOrchestrator
 
         if (!empty($filters['similar_to'])) {
             $items = $this->searchService->similar((int) $filters['similar_to'], 6);
-            $this->stateService->updateState(
-                $conversation,
-                ['similar_to' => (int) $filters['similar_to']],
-                $items[0] ?? null
-            );
+            $similarFilters = array_merge($filters, ['similar_to' => (int) $filters['similar_to']]);
+            $this->conversationService->updateLatestUserFilters($conversation, $similarFilters);
+            $this->stateService->updateState($conversation, $similarFilters, $items[0] ?? null);
 
             return [
                 'reply' => $this->replyEngine->similarReply($items),
@@ -343,6 +357,7 @@ class AiAgentOrchestrator
             ], $user);
 
             $properties = $result['properties'] ?? [];
+            $this->conversationService->updateLatestUserFilters($conversation, $filters);
             $this->stateService->updateState($conversation, $filters, $properties[0] ?? null);
 
             return [
@@ -408,6 +423,10 @@ class AiAgentOrchestrator
                 'notes' => 'طلب معاينة من خلال المساعد الذكي',
             ];
 
+            $this->conversationService->updateLatestUserFilters($conversation, [
+                'last_property_id' => $propertyId,
+            ]);
+
             $this->stateService->setPendingAction(
                 $conversation,
                 'create_viewing_request',
@@ -423,6 +442,8 @@ class AiAgentOrchestrator
                 'intent' => 'viewing_request_confirmation',
             ];
         }
+
+        $this->conversationService->updateLatestUserFilters($conversation, $filters);
 
         if (!$this->hasSearchCriteria($filters)) {
             $reply = $this->replyEngine->clarifyReply(
@@ -460,6 +481,7 @@ class AiAgentOrchestrator
         ], $user);
 
         $properties = $result['properties'] ?? [];
+        $this->conversationService->updateLatestUserFilters($conversation, $filters);
         $this->stateService->updateState($conversation, $filters, $properties[0] ?? null);
 
         if ($user && !empty($filters['city'])) {
@@ -524,6 +546,14 @@ class AiAgentOrchestrator
             'intent' => 'blocked',
             'failed_stage' => 'guard_'.$reason,
         ];
+    }
+
+    private function isRejection(string $message): bool
+    {
+        return (bool) preg_match(
+            '/^(?:لا|لا شكرًا|لا شكرا|الغاء|إلغاء|لا موافق|cancel|no|رفض)$/iu',
+            trim($message)
+        );
     }
 
     private function isConfirmation(string $message): bool
