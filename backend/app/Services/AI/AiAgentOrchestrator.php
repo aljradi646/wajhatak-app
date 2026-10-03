@@ -2,15 +2,11 @@
 
 namespace App\Services\AI;
 
-use App\Enums\ViewingRequestStatus;
 use App\Models\AiConversation;
-use App\Models\Property;
 use App\Models\User;
-use App\Models\ViewingRequest;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
-/**
- * المنسق الرئيسي لمنظومة الذكاء الاصطناعي AI Agent Orchestrator
- */
 class AiAgentOrchestrator
 {
     public function __construct(
@@ -25,238 +21,141 @@ class AiAgentOrchestrator
         private readonly AiPropertySearchService $searchService,
         private readonly AiConversationService $conversationService,
         private readonly AiSettingsService $settingsService,
+        private readonly AiLlmClient $llm,
+        private readonly AiAgentPromptBuilder $promptBuilder,
     ) {}
 
-    /**
-     * معالجة مدخلات المستخدم من خلال دورة حياة الـ AI Agent الكاملة.
-     */
-    public function process(
-        ?User $user,
-        string $message,
-        AiConversation $conversation,
-        string $locale = 'ar',
-        array $clientContext = []
-    ): array {
-        // 1. فحص حواجز الأمان والحماية ضد Prompt Injection
-        $guardResult = $this->guardrails->inspect($message);
-        if (!empty($guardResult['blocked'])) {
-            $reason = $guardResult['reason'] ?? 'blocked';
-            $reply = $reason === 'out_of_domain'
-                ? 'أنا مساعد وجهتك الذكي، ومتخصص في عقارات المنصة وخدماتها فقط.'
-                : 'عذرًا، لا أستطيع المساعدة في هذا الطلب.';
+    public function process(?User $user,string $message,AiConversation $conversation,string $locale='ar',array $clientContext=[]): array
+    {
+        $guard=$this->guardrails->inspect($message);
+        if(!empty($guard['blocked'])) return $this->blocked($conversation,$message,$guard['reason']??'blocked');
 
-            $this->conversationService->addUserMessage($conversation, $message, []);
-
-            return [
-                'reply' => $reply,
-                'status' => 'blocked',
-                'properties' => [],
-                'filters' => [],
-                'tool_calls' => [],
-                'intent' => 'blocked',
-                'failed_stage' => 'guard_' . $reason,
-            ];
+        $this->conversationService->addUserMessage($conversation,$message,[]);
+        if($this->llm->configured()) {
+            try { return $this->processWithLlm($user,$message,$conversation,$locale,$clientContext); }
+            catch(Throwable $e) {
+                Log::warning('ai.llm_agent_failed_using_fallback',['exception'=>class_basename($e),'message'=>$e->getMessage()]);
+                if(!(bool)config('ai.allow_rule_fallback',true)) throw $e;
+            }
         }
 
-        // 2. التحقق من الحوار اليومي / التحية
-        $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
-        if ($smallTalk !== null) {
-            $reply = $this->replyEngine->smallTalkReply($message, $smallTalk);
-            $this->conversationService->addUserMessage($conversation, $message, []);
+        return $this->processWithRules($user,$message,$conversation,$locale,$clientContext);
+    }
 
-            return [
-                'reply' => $reply,
-                'status' => 'ok',
-                'properties' => [],
-                'filters' => [],
-                'tool_calls' => [],
-                'intent' => 'small_talk',
-            ];
+    private function processWithLlm(?User $user,string $message,AiConversation $conversation,string $locale,array $clientContext): array
+    {
+        $state=$this->stateService->state($conversation);
+        $memories=$this->memoryService->getMemories($user,$message);
+        $knowledge=$this->knowledgeService->searchKnowledge($message,$user?->role??'client');
+        $history=$this->conversationService->historyFor($conversation);
+
+        $messages=[['role'=>'system','content'=>$this->promptBuilder->system($user,$locale,$state,$memories,$knowledge)]];
+        foreach($history as $item) $messages[]=['role'=>$item['role']==='assistant'?'assistant':'user','content'=>$item['content']];
+        $messages[]=['role'=>'user','content'=>$message];
+
+        if(isset($clientContext['latitude'],$clientContext['longitude'])&&$clientContext['latitude']!==null&&$clientContext['longitude']!==null) {
+            $messages[]=['role'=>'system','content'=>'موقع المستخدم متاح للأداة search_nearby_properties: latitude='.((float)$clientContext['latitude']).', longitude='.((float)$clientContext['longitude']).', radius_km='.((float)($clientContext['radius_km']??10)).'. استخدمه فقط عند طلب البحث القريب.'];
         }
 
-        // 3. طلب تفاصيل عن عقار محدد
-        $detailsTarget = AiChatIntentDetector::detectDetailsTarget($message);
-        if ($detailsTarget !== null) {
-            $reply = $this->replyEngine->detailsReply($detailsTarget);
-            $item = $this->searchService->details($detailsTarget);
-            $this->conversationService->addUserMessage($conversation, $message, ['last_property_id' => $detailsTarget]);
+        $tools=$this->openAiTools($user);
+        $toolCalls=[];
+        $properties=[];
+        $filters=[];
+        $rounds=0;
 
-            return [
-                'reply' => $reply,
-                'status' => 'ok',
-                'properties' => $item ? [$item] : [],
-                'filters' => ['last_property_id' => $detailsTarget],
-                'tool_calls' => [['tool' => 'get_property_details', 'ok' => true]],
-                'intent' => 'details',
-            ];
-        }
+        while($rounds++<(int)config('ai.llm.max_tool_rounds',5)) {
+            $response=$this->llm->chat($messages,$tools);
+            $assistant=$response['message'];
+            $messages[]=$assistant;
+            $calls=$assistant['tool_calls']??[];
 
-        // 4. طلب معاينة
-        if (preg_match('/(معاينة|حجز|احجز|موعد|أريد\s*معاينة)/u', $message)) {
-            preg_match('/(\d+)/u', $message, $m);
-            $selectedPropertyId = isset($m[1]) ? (int) $m[1] : ($conversation->messages()->whereNotNull('property_ids')->latest('id')->first()?->property_ids[0] ?? null);
+            if($calls===[]) {
+                $reply=trim((string)($assistant['content']??''));
+                if($reply==='') $reply='لم أتمكن من صياغة رد مفيد على الطلب.';
+                return ['reply'=>$reply,'status'=>'ok','properties'=>$properties,'filters'=>$filters,'tool_calls'=>$toolCalls,'intent'=>'llm_agent','memories_used'=>array_keys($memories)];
+            }
 
-            if ($selectedPropertyId) {
-                if (!$user) {
-                    $this->conversationService->addUserMessage($conversation, $message, []);
-                    return [
-                        'reply' => 'لطلب معاينة هذا العقار، يرجى تسجيل الدخول إلى حسابك أولاً.',
-                        'status' => 'ok',
-                        'properties' => [],
-                        'filters' => [],
-                        'tool_calls' => [],
-                        'intent' => 'viewing_request',
-                    ];
+            foreach($calls as $call) {
+                $name=(string)data_get($call,'function.name');
+                $raw=(string)data_get($call,'function.arguments','{}');
+                $args=json_decode($raw,true);
+                if(!is_array($args)) $args=[];
+
+                if(!isset($tools[$name])&&$name!=='') {
+                    $result=['success'=>false,'error'=>'UNKNOWN_TOOL','message'=>'الأداة غير متاحة.'];
+                } elseif($name==='create_viewing_request'&&!($args['confirmed']??false)) {
+                    $result=['success'=>false,'confirmation_required'=>true,'message'=>'يلزم تأكيد المستخدم قبل إنشاء طلب المعاينة.'];
+                    $this->stateService->setPendingAction($conversation,$name,$args);
+                } else {
+                    $result=$this->toolRegistry->execute($name,$args,$user);
+                    if($name==='search_properties') {
+                        $properties=$result['properties']??[];
+                        $filters=$result['filters']??[];
+                    }
                 }
 
-                preg_match('/(\d{4}-\d{2}-\d{2})/u', $message, $dateMatch);
-                $requestedDate = $dateMatch[1] ?? now()->addDay()->toDateString();
-                $property = Property::query()->find($selectedPropertyId);
-
-                if ($property) {
-                    ViewingRequest::query()->create([
-                        'client_id' => $user->id,
-                        'agent_id' => $property->agent_id,
-                        'property_id' => $property->id,
-                        'scheduled_date' => $requestedDate,
-                        'scheduled_time' => '10:00:00',
-                        'notes' => 'طلب معاينة من خلال المساعد الذكي',
-                        'status' => ViewingRequestStatus::Pending,
-                    ]);
-
-                    $this->conversationService->addUserMessage($conversation, $message, ['property_id' => $selectedPropertyId]);
-
-                    return [
-                        'reply' => 'تم إرسال طلب المعاينة بنجاح!',
-                        'status' => 'ok',
-                        'properties' => [$selectedPropertyId],
-                        'filters' => ['property_id' => $selectedPropertyId],
-                        'tool_calls' => [['tool' => 'create_viewing_request', 'ok' => true]],
-                        'intent' => 'viewing_request',
-                    ];
-                }
+                $toolCalls[]=['tool'=>$name,'ok'=>(bool)($result['success']??false),'confirmation_required'=>(bool)($result['confirmation_required']??false)];
+                $messages[]=['role'=>'tool','tool_call_id'=>(string)($call['id']??uniqid('tool_',false)),'name'=>$name,'content'=>json_encode($result,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)];
             }
         }
 
-        // 5. استرجاع ذاكرة وسياق المستخدم التاريخي والتراكمي
-        $userMemories = $this->memoryService->getMemories($user, $message);
-        $permissions = $this->permissionGuard->getUserPermissions($user);
-        $history = $this->conversationService->historyFor($conversation);
-        $previous = $this->conversationService->accumulatedFilters($conversation);
+        throw new \RuntimeException('Maximum LLM tool rounds exceeded.');
+    }
 
-        // 6. تحليل النية واستخراج الكيانات والأداة المطلوبة
-        $parsedIntent = $this->intentService->parse($message, $history, $previous);
-        $intent = $parsedIntent['intent'] ?? 'search';
-        $filters = $parsedIntent['filters'] ?? [];
-
-        // دمقرطة إحداثيات الموقع الحقيقي القادمة من العميل
-        if (isset($clientContext['latitude'], $clientContext['longitude'])) {
-            $filters['client_latitude'] = (float) $clientContext['latitude'];
-            $filters['client_longitude'] = (float) $clientContext['longitude'];
-            if (isset($clientContext['radius_km'])) {
-                $filters['radius_km'] = (float) $clientContext['radius_km'];
-            }
+    private function processWithRules(?User $user,string $message,AiConversation $conversation,string $locale,array $clientContext): array
+    {
+        $history=$this->conversationService->historyFor($conversation);
+        $previous=$this->conversationService->accumulatedFilters($conversation);
+        $parsed=$this->intentService->parse($message,$history,$previous);
+        $filters=$parsed['filters']??[];
+        if(isset($clientContext['latitude'],$clientContext['longitude'])&&$clientContext['latitude']!==null&&$clientContext['longitude']!==null){
+            $filters['client_latitude']=(float)$clientContext['latitude'];
+            $filters['client_longitude']=(float)$clientContext['longitude'];
+            $filters['radius_km']=(float)($clientContext['radius_km']??10);
         }
 
-        // حفظ رسالة المستخدم مع المعايير المستخرجة
-        $this->conversationService->addUserMessage($conversation, $message, $filters);
-
-        // 7. إذا لم توجد معايير بحث واضحة (رسالة عامة/مبهمة) -> سؤال توضيح
-        if (!$this->hasSearchCriteria($filters)) {
-            $maxFollowUps = (int) config('ai.limits.max_followups', 2);
-            $followUps = $this->conversationService->consecutiveFollowUps($conversation);
-            $reply = $this->replyEngine->clarifyReply($followUps, $maxFollowUps);
-            if (empty($reply)) {
-                $reply = 'أخبرني ما الذي تبحث عنه: شقة أم بيت أم أرض، وفي أي مدينة وبأي ميزانية تقريبًا؟';
-            }
-
-            return [
-                'reply' => $reply,
-                'status' => 'ok',
-                'properties' => [],
-                'filters' => $filters,
-                'tool_calls' => [],
-                'intent' => 'clarify',
-            ];
+        if(!$this->hasSearchCriteria($filters)){
+            $reply=$this->replyEngine->clarifyReply($this->conversationService->consecutiveFollowUps($conversation),(int)config('ai.limits.max_followups',2));
+            return ['reply'=>$reply?:'أخبرني ما الذي تبحث عنه: شقة أم بيت أم أرض، وفي أي مدينة وبأي ميزانية تقريبًا؟','status'=>'ok','properties'=>[],'filters'=>$filters,'tool_calls'=>[],'intent'=>'clarify'];
         }
 
-        // 8. تنفيذ الأداة الحقيقية للبحث
-        $toolResult = $this->toolRegistry->execute('search_properties', [
-            'city' => $filters['city'] ?? null,
-            'district' => $filters['district'] ?? null,
-            'property_type' => $filters['property_type'] ?? null,
-            'transaction_type' => $filters['transaction_type'] ?? null,
-            'bedrooms' => $filters['bedrooms_min'] ?? null,
-            'min_price' => $filters['min_price'] ?? null,
-            'max_price' => $filters['max_price'] ?? null,
-            'furnished' => $filters['furnished'] ?? null,
-        ], $user);
+        $result=$this->toolRegistry->execute('search_properties',[
+            'city'=>$filters['city']??null,'district'=>$filters['district']??null,'property_type'=>$filters['property_type']??null,
+            'transaction_type'=>$filters['transaction_type']??null,'bedrooms'=>$filters['bedrooms_min']??null,
+            'min_price'=>$filters['min_price']??null,'max_price'=>$filters['max_price']??null,'furnished'=>$filters['furnished']??null,
+        ],$user);
+        $properties=$result['properties']??[];
+        $this->stateService->updateState($conversation,$filters,$properties[0]??null);
+        if($user&&!empty($filters['city'])) $this->memoryService->remember($user,'preferred_city',(string)$filters['city']);
+        return ['reply'=>$properties!==[]?$this->replyEngine->summaryReply($message,$properties,$filters,$history):$this->replyEngine->noResultsReply($filters),'status'=>'ok','properties'=>$properties,'filters'=>$filters,'tool_calls'=>[['tool'=>'search_properties','ok'=>(bool)($result['success']??false)]],'intent'=>$parsed['intent']??'search'];
+    }
 
-        $properties = $toolResult['properties'] ?? [];
-        $toolCallsExecuted = [['tool' => 'search_properties', 'ok' => $toolResult['success']]];
-
-        if (count($properties) > 0) {
-            $reply = $this->replyEngine->summaryReply($message, $properties, $filters, $history);
-        } else {
-            $reply = $this->noResultsReply($filters, $conversation);
+    private function openAiTools(?User $user): array
+    {
+        $result=[];
+        foreach($this->toolRegistry->getToolsSchema($user) as $name=>$schema){
+            $result[$name]=true;
         }
-
-        // 9. حفظ وتحديث حالة المحادثة
-        $this->stateService->updateState($conversation, $filters, count($properties) > 0 ? $properties[0] : null);
-
-        // 10. حفظ التفضيلات طويلة الأجل
-        if ($user && !empty($filters['city'])) {
-            $this->memoryService->remember($user, 'preferred_city', (string) $filters['city']);
+        $tools=[];
+        foreach(array_keys($result) as $name){
+            $schema=$this->toolRegistry->getToolsSchema($user)[$name];
+            $tools[$name]=['type'=>'function','function'=>[
+                'name'=>$name,'description'=>$schema['description'],
+                'parameters'=>$schema['parameters'],
+            ]];
         }
+        return $tools;
+    }
 
-        return [
-            'reply' => $reply,
-            'status' => 'ok',
-            'properties' => $properties,
-            'filters' => $filters,
-            'tool_calls' => $toolCallsExecuted,
-            'intent' => $intent,
-            'memories_used' => array_keys($userMemories),
-        ];
+    private function blocked(AiConversation $conversation,string $message,string $reason): array
+    {
+        return ['reply'=>$reason==='out_of_domain'?'أنا مساعد وجهتك الذكي، ومتخصص في عقارات المنصة وخدماتها فقط.':'عذرًا، لا أستطيع المساعدة في هذا الطلب.','status'=>'blocked','properties'=>[],'filters'=>[],'tool_calls'=>[],'intent'=>'blocked','failed_stage'=>'guard_'.$reason];
     }
 
     private function hasSearchCriteria(array $filters): bool
     {
-        foreach ([
-            'transaction_type', 'property_type', 'city', 'district', 'neighborhood',
-            'min_price', 'max_price', 'min_area', 'max_area',
-            'bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'furnished', 'is_new',
-            'sort', 'similar_to', 'nearby',
-        ] as $key) {
-            if (isset($filters[$key]) && $filters[$key] !== '' && $filters[$key] !== null) {
-                return true;
-            }
-        }
-
+        foreach(['transaction_type','property_type','city','district','neighborhood','min_price','max_price','min_area','max_area','bedrooms_min','bedrooms_max','bathrooms_min','furnished','is_new','sort','similar_to','nearby'] as $key)
+            if(isset($filters[$key])&&$filters[$key]!==''&&$filters[$key]!==null) return true;
         return !empty($filters['keywords']);
-    }
-
-    private function noResultsReply(array $filters, AiConversation $conversation): string
-    {
-        $honest = $this->replyEngine->noResultsReply($filters);
-
-        $maxFollowUps = (int) config('ai.limits.max_followups', 2);
-        $allowFollowUps = (bool) $this->settingsService->get('ai_allow_followups', true);
-        $followUps = $this->conversationService->consecutiveFollowUps($conversation);
-
-        if (!$allowFollowUps || $followUps >= $maxFollowUps) {
-            return $honest;
-        }
-
-        $question = null;
-        if (empty($filters['city']) && empty($filters['district'])) {
-            $question = 'في أي مدينة أو منطقة تفضّل؟ وسأوسّع البحث فورًا.';
-        } elseif (empty($filters['transaction_type'])) {
-            $question = 'هل تفضّل البيع أم الإيجار؟ هذا يساعدني في عرض الأنسب لك.';
-        } elseif (!empty($filters['max_price'])) {
-            $question = 'هل تريد أن أرفع سقف الميزانية قليلًا لعرض خيارات أقرب؟';
-        }
-
-        return $question === null ? $honest : $honest . "\n" . $question;
     }
 }
