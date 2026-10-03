@@ -81,7 +81,8 @@ class AiAgentOrchestrator
                 $args=json_decode($raw,true);
                 if(!is_array($args)) $args=[];
 
-                if(!isset($tools[$name])&&$name!=='') {
+                $allowedToolNames = array_keys($this->toolRegistry->getToolsSchema($user));
+                if(!in_array($name,$allowedToolNames,true)&&$name!=='') {
                     $result=['success'=>false,'error'=>'UNKNOWN_TOOL','message'=>'الأداة غير متاحة.'];
                 } elseif($name==='create_viewing_request'&&!($args['confirmed']??false)) {
                     $result=['success'=>false,'confirmation_required'=>true,'message'=>'يلزم تأكيد المستخدم قبل إنشاء طلب المعاينة.'];
@@ -132,15 +133,11 @@ class AiAgentOrchestrator
 
     private function openAiTools(?User $user): array
     {
-        $result=[];
-        foreach($this->toolRegistry->getToolsSchema($user) as $name=>$schema){
-            $result[$name]=true;
-        }
         $tools=[];
-        foreach(array_keys($result) as $name){
-            $schema=$this->toolRegistry->getToolsSchema($user)[$name];
-            $tools[$name]=['type'=>'function','function'=>[
-                'name'=>$name,'description'=>$schema['description'],
+        foreach($this->toolRegistry->getToolsSchema($user) as $name=>$schema){
+            $tools[]=['type'=>'function','function'=>[
+                'name'=>$name,
+                'description'=>$schema['description'],
                 'parameters'=>$schema['parameters'],
             ]];
         }
