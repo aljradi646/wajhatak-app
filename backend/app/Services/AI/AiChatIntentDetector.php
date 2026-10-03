@@ -3,8 +3,10 @@
 namespace App\Services\AI;
 
 /**
- * كاشف نية الحوار اليومي — حتمي بالكامل (قوائم كلمات + أنماط).
- * يعمل قبل محلل البحث: يحوّل "أي كلام عادي" إلى نية واضحة بلا أي نموذج.
+ * كاشف نية الحوار اليومي — حتمي بالكامل.
+ *
+ * يعمل قبل محلل البحث حتى لا تتحول الرسائل المحادثية إلى استعلامات عقارية،
+ * خصوصًا داخل محادثة لديها معايير بحث محفوظة من رسالة سابقة.
  */
 class AiChatIntentDetector
 {
@@ -13,13 +15,11 @@ class AiChatIntentDetector
     {
         $normalized = self::normalize($text);
 
-        // التفاصيل تتطلب سياق عقار صريح: كلمة عقارية + رقم.
-        if (preg_match('/(معلومات|تفاصيل|وصف|اعرض لي|هات|أخبرني عن)/u', $normalized) === 1
+        if (preg_match('/(معلومات|تفاصيل|وصف|اعرض لي|هات|اخبرني عن)/u', $normalized) === 1
             && preg_match('/(?:عقار|شقه|فيلا|بيت|ارض|محل|دور|المعرف|رقم)\s*(?:رقم|#)?\s*(\d{1,10})/u', $normalized, $m) === 1) {
             return (int) $m[1];
         }
 
-        // «العقار 5» / «شقة 12» كطلب تفاصيل مباشر قصير.
         if (mb_strlen($normalized) <= 25
             && preg_match('/^(?:عقار|شقه|فيلا|بيت|ارض|محل|دور)\s*(?:رقم|#)?\s*(\d{1,10})$/u', $normalized, $m) === 1) {
             return (int) $m[1];
@@ -37,43 +37,51 @@ class AiChatIntentDetector
             return null;
         }
 
-        // تحية في بداية الرسالة القصيرة (بحدود كلمة دقيقة كي لا تلتقط كلمات
-        // مثل «الوحدة» أو «مرحبا بكم في موقعنا العقاري» كتحية فقط).
-        if (mb_strlen($normalized) <= 40 && self::isGreeting($normalized)) {
+        // عالج إطالة الحروف الشائعة في الدردشة مثل: «الووو»، «هلااا»، «كيفكك».
+        $chatText = self::collapseRepeatedCharacters($normalized);
+
+        if (mb_strlen($chatText) <= 80 && self::isGreeting($chatText)) {
             return 'greeting';
         }
 
-        // شكر في رسالة قصيرة.
-        if (mb_strlen($normalized) <= 80
-            && preg_match('/(شكرا|ممتن|يعطيك العافيه|تسلم|ربي يحفظك|جزاك الله|thank)/u', $normalized) === 1) {
+        if (mb_strlen($chatText) <= 100
+            && preg_match('/(شكرا|ممتن|يعطيك العافيه|تسلم|ربي يحفظك|جزاك الله|thank|thx)/u', $chatText) === 1) {
             return 'thanks';
         }
 
-        // «وش تقدر تسوي» / «مين انت» / «كيف تساعدني».
-        if (mb_strlen($normalized) <= 60
-            && preg_match('/(مين انت|من انت|وش تقدر|ايش تقدر|شن تقدر|كيف تساعد|وش تسوي|ايش تسوي|قدراتك|مميزاتك|من انت بالضبط|who are you|what can you)/u', $normalized) === 1) {
+        if (mb_strlen($chatText) <= 90
+            && preg_match('/(مين انت|من انت|وش تقدر|ايش تقدر|شن تقدر|كيف تساعد|وش تسوي|ايش تسوي|قدراتك|مميزاتك|من انت بالضبط|who are you|what can you|كيف استخدم|كيف ابدأ|كيف ابداء|ماذا تستطيع)/u', $chatText) === 1
+            && ! self::looksLikeSearchRequest($chatText)) {
             return 'capabilities';
         }
 
-        // «كم عقار عندكم» / «ما المتوفر».
-        if (mb_strlen($normalized) <= 60
-            && preg_match('/(كم عقار|كم شقه|ما المتوفر|وش عندكم|ايش عندكم|شن عندكم|كم العدد|احصائيات|عدد العقارات|عدد العقارات المتوفره)/u', $normalized) === 1) {
+        if (mb_strlen($chatText) <= 70
+            && preg_match('/(كم عقار|كم شقه|ما المتوفر|وش عندكم|ايش عندكم|شن عندكم|كم العدد|احصائيات|عدد العقارات|عدد العقارات المتوفره)/u', $chatText) === 1) {
             return 'stats';
         }
 
-        // وداع.
-        if (mb_strlen($normalized) <= 30
-            && preg_match('/^(باي|مع السلامه|الى اللقاء|تصبح على خير|وداعا|bye)/u', $normalized) === 1) {
+        if (mb_strlen($chatText) <= 50
+            && preg_match('/(وداعا|الى اللقاء|مع السلامه|تصبح على خير|تصبحي على خير|باي|باي باي|bye|goodbye)/u', $chatText) === 1) {
             return 'farewell';
+        }
+
+        if (mb_strlen($chatText) <= 70
+            && preg_match('/(كيفك|كيف حالك|كيف امورك|كيف الامور|كيف احوالك|كيف الدنيا|طمني عليك|طمنيني عليك|اخبارك|شخبارك|وش اخبارك|ايش اخبارك|شن اخبارك|what.*up|how are you)/u', $chatText) === 1
+            && ! self::looksLikeSearchRequest($chatText)) {
+            return 'wellbeing';
+        }
+
+        if (mb_strlen($chatText) <= 35
+            && preg_match('/^(تمام|تماما|طيب|كويس|ممتاز|حلو|جميل|رائع|اوكي|اوك|يس|yes|ok|okay|thanks)$/u', $chatText) === 1
+            && ! self::looksLikeSearchRequest($chatText)) {
+            return 'acknowledgement';
         }
 
         return null;
     }
 
     /**
-     * كشف التحية/السلام — نمط حتمي بحدود كلمة، يقبل الأشكال الشائعة:
-     * ألو/الو، هلا/يا هلا/هلا والله، السلام عليكم، مرحبا، اهلين، صباح/مساء الخير،
-     * كيفك/كيف الحال/شلونك/شخبارك…
+     * كشف التحية/السلام — يقبل صيغ الدردشة الشائعة وإطالة الحروف.
      */
     private static function isGreeting(string $normalized): bool
     {
@@ -84,11 +92,20 @@ class AiChatIntentDetector
             .'|مرحبا|مرحبتين|هلا(?:\s+والله)?|يا\s+هلا|هاي|hello|hi|hey'
             .'|اهلا(?:\s+وسهلا)?|اهلين|حياك(?:م)?(?:\s+الله)?'
             .'|صباح\s*(?:الخير|النور)|مساء\s*(?:الخير|النور)'
-            .'|كيف(?:ك|ك\s*الحال|\s*حالك|\s*الحال)|شلونك|شخبارك|اخبارك|عساك\s*بخير|ازيك'
+            .'|كيف(?:ك|\s+حالك|\s+الحال|\s+امورك)|شلونك|شخبارك|اخبارك|عساك\s*بخير|ازيك'
             .'|منور(?:ه)?|نورت'
             .')(?:[\s،,.!؟?~]|$)';
 
         return preg_match('/'.$pattern.'/u', $normalized) === 1;
+    }
+
+    /** منع «تمام شقة...» ونحوها من أن تتحول إلى حوار عام. */
+    private static function looksLikeSearchRequest(string $normalized): bool
+    {
+        return preg_match(
+            '/(عقار|عقارات|شقه|شقق|فيلا|فلل|بيت|بيوت|منزل|ارض|محل|مكتب|عماره|للبيع|ايجار|للايجار|شراء|تمليك|ابحث|بحث|دور لي|اعرض|اريد|احتاج|ميزانيه|غرف|حمام|متر|من صنعاء|في صنعاء|في عدن|في تعز)/u',
+            $normalized
+        ) === 1;
     }
 
     /** «وين موقعي» / «قريب مني» — يحتاج إحداثيات العميل الحقيقية. */
@@ -99,12 +116,20 @@ class AiChatIntentDetector
         return preg_match('/(قريب مني|قريبه مني|بالقرب مني|حولي|على بعد|من موقعي|موقعي الحالي|وين انا|وين موقعي|nearby|near me|بعيد كم|المسافه مني)/u', $normalized) === 1;
     }
 
-    /** توحيد النص العربي (تشكيل + همزات + تاء مربوطة) للمطابقة. */
+    /** توحيد النص العربي وإزالة التشكيل والتكرار الشكلي في الدردشة. */
     private static function normalize(string $text): string
     {
         $text = mb_strtolower(trim($text));
         $text = preg_replace('/[\x{064B}-\x{0652}\x{0670}]/u', '', $text) ?? $text;
+        $text = str_replace(['أ', 'إ', 'آ', 'ة', 'ى'], ['ا', 'ا', 'ا', 'ه', 'ي'], $text);
+        $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
 
-        return str_replace(['أ', 'إ', 'آ', 'ة', 'ى'], ['ا', 'ا', 'ا', 'ه', 'ي'], $text);
+        return trim($text);
+    }
+
+    /** ضغط إطالة الحروف المتكررة المستخدمة في الدردشة غير الرسمية. */
+    private static function collapseRepeatedCharacters(string $text): string
+    {
+        return preg_replace('/(.)\1+/us', '$1', $text) ?? $text;
     }
 }
