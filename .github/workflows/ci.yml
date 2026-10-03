@@ -2,7 +2,7 @@ name: Wajhatak CI
 
 on:
   push:
-    branches: ["main", "jules-*", "ai-agent-*", "feature/**"]
+    branches: ["main", "jules-*", "ai-agent-*", "feature/**", "fix/**"]
   pull_request:
     branches: ["main"]
 
