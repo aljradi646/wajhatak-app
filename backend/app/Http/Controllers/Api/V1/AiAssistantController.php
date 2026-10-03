@@ -13,7 +13,6 @@ use App\Services\AI\AiSettingsService;
 use App\Services\AI\AiLlmClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
@@ -127,12 +126,21 @@ class AiAssistantController extends Controller
     /** POST /api/v1/ai/conversations — إنشاء محادثة جديدة صريحة. */
     public function createConversation(Request $request): JsonResponse
     {
-        $user=$request->user();
-        abort_unless($user,401,'يلزم تسجيل الدخول.');
-        $conversation=$this->conversations->currentFor($user,(string)$request->input('locale','ar'));
-        $conversation->update(['status'=>'archived','last_message_at'=>now()]);
-        $fresh=$this->conversations->currentFor($user,(string)$request->input('locale','ar'));
-        return response()->json(['data'=>['id'=>$fresh->id,'title'=>$fresh->title,'is_pinned'=>(bool)$fresh->is_pinned]],201);
+        $user = $request->user();
+        abort_unless($user, 401, 'يلزم تسجيل الدخول.');
+
+        $fresh = $this->conversations->createNew(
+            $user,
+            (string) $request->input('locale', 'ar')
+        );
+
+        return response()->json([
+            'data' => [
+                'id' => $fresh->id,
+                'title' => $fresh->title,
+                'is_pinned' => (bool) $fresh->is_pinned,
+            ],
+        ], 201);
     }
 
     /** PATCH /api/v1/ai/conversations/{id}/pin — تثبيت/إلغاء تثبيت. */
@@ -201,7 +209,9 @@ class AiAssistantController extends Controller
 
         return response()->json(['data' => [
             'assistant_enabled' => $this->settings->enabled(),
-            'healthy' => $missing === [] && $this->settings->enabled(),
+            'healthy' => $missing === []
+                && $this->settings->enabled()
+                && (! $this->llm->configured() || (bool) ($this->llm->health()['reachable'] ?? false)),
             'tables_ready' => $missing === [],
             'missing' => $missing,
             'indexed_properties' => $indexed,
