@@ -1,10 +1,10 @@
 <?php
 
-namespace AppServicesAI;
+namespace App\\Services\\AI;
 
-use AppModelsAiConversation;
-use AppModelsUser;
-use IlluminateSupportFacadesLog;
+use App\\Models\\AiConversation;
+use App\\Models\\User;
+use Illuminate\\Support\\Facades\\Log;
 use Throwable;
 
 class AiAgentOrchestrator
