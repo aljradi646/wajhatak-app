@@ -9,7 +9,6 @@ services:
       LLAMA_CACHE: /models
       LLAMA_ARG_HF_REPO: tensorblock/SmolLM2-135M-Instruct-GGUF:Q8_0
       LLAMA_ARG_HF_FILE: SmolLM2-135M-Instruct-Q8_0.gguf
-      LLAMA_ARG_MODEL: ""
       LLAMA_ARG_HOST: 0.0.0.0
       LLAMA_ARG_PORT: 8080
       LLAMA_ARG_ALIAS: wajhatak-smollm2-135m-instruct-q8_0
