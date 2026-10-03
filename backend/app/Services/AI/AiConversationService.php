@@ -76,7 +76,6 @@ class AiConversationService
                 $oldest = AiConversation::query()
                     ->where('user_id', $user->id)
                     ->where('status', 'active')
-                    ->orderByRaw('last_message_at IS NULL ASC')
                     ->orderBy('last_message_at')
                     ->first();
 
