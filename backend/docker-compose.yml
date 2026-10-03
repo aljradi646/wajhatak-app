@@ -1,23 +1,5 @@
-# =============================================================================
-# Wajhatak local development / full-stack run
-#
-#   docker compose up --build
-#
-# This brings up a real MySQL 8 database, runs all Laravel migrations and
-# seeds the control-panel admin account automatically, then serves the app at
-# http://localhost:8080 with Caddy + PHP-FPM.
-#
-# Control panel:  http://localhost:8080/admin
-#   login         admin@wajhatak.app  /  admin123   (override via .env)
-#
-# Note: On Railway the database is provisioned as its own managed service
-# (MySQL or Postgres), and only the "app" service below is deployed - see the
-# Dockerfile, entrypoint.sh and railway.toml for the platform configuration.
-# =============================================================================
+# Wajhatak full stack: MySQL + Laravel + tiny real open-source LLM.
 services:
-  # ---------------------------------------------------------------------------
-  # Database (local stand-in for Railway's managed MySQL service)
-  # ---------------------------------------------------------------------------
   db:
     image: mysql:8.0
     restart: unless-stopped
@@ -26,29 +8,51 @@ services:
       MYSQL_USER: ${DB_USERNAME:-wajhatak}
       MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
-    ports:
-      - "3306:3306"
-    volumes:
-      - db_data:/var/lib/mysql
+    ports: ["3306:3306"]
+    volumes: [db_data:/var/lib/mysql]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${DB_PASSWORD:-secret}"]
+      test: ["CMD","mysqladmin","ping","-h","127.0.0.1","-p${DB_PASSWORD:-secret}"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-  # ---------------------------------------------------------------------------
-  # Laravel application (PHP-FPM + Caddy)
-  # ---------------------------------------------------------------------------
+  llm:
+    build:
+      context: ../deploy/llm
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      LLAMA_CACHE: /models
+      LLAMA_ARG_HF_REPO: tensorblock/SmolLM2-135M-Instruct-GGUF:Q8_0
+      LLAMA_ARG_HF_FILE: SmolLM2-135M-Instruct-Q8_0.gguf
+      LLAMA_ARG_MODEL: ""
+      LLAMA_ARG_HOST: 0.0.0.0
+      LLAMA_ARG_PORT: 8080
+      LLAMA_ARG_ALIAS: wajhatak-smollm2-135m-instruct-q8_0
+      LLAMA_ARG_CTX_SIZE: 4096
+      LLAMA_ARG_N_PREDICT: 256
+      LLAMA_ARG_THREADS: ${LLM_THREADS:-2}
+      LLAMA_ARG_PARALLEL: 1
+    ports:
+      - "127.0.0.1:11434:8080"
+    volumes:
+      - llm_models:/models
+    mem_limit: ${LLM_MEM_LIMIT:-1g}
+    healthcheck:
+      test: ["CMD-SHELL","curl -fsS http://127.0.0.1:8080/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 45s
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
+      db: {condition: service_healthy}
+      llm: {condition: service_healthy}
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
@@ -67,57 +71,25 @@ services:
       FILESYSTEM_DISK: local
       RAILWAY_SERVICE_TYPE: app
       PORT: ${PORT:-8080}
-      # ---------------------------------------------------------------------
-      # المساعد الذكي — LLM محلي عبر Ollama، والنموذج خارج صورة Laravel.
-      # ---------------------------------------------------------------------
       AI_ENABLED: "true"
       AI_ALLOW_RULE_FALLBACK: "true"
       AI_LLM_ENABLED: "true"
-      AI_LLM_BASE_URL: http://ollama:11434/v1
+      AI_LLM_MODE: grounded
+      AI_LLM_BASE_URL: http://llm:8080/v1
       AI_LLM_API_KEY: ""
-      AI_LLM_MODEL: wajhatak-qwen3:1.7b
-      # سقف ذاكرة الحاوية: PHP + عامل الطابور فقط (النموذج خدمة مستقلة).
+      AI_LLM_MODEL: wajhatak-smollm2-135m-instruct-q8_0
+      AI_LLM_MAX_OUTPUT_TOKENS: 256
       mem_limit: ${APP_MEM_LIMIT:-1g}
-      # Control-panel admin account
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@wajhatak.app}
       ADMIN_NAME: ${ADMIN_NAME:-مدير النظام}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
-      # Demo/trial dataset (properties, agents, clients, chat, viewings)
       LUX_ALLOW_DEMO_SEED: "true"
     ports:
       - "${PORT:-8080}:8080"
     volumes:
       - app_storage:/var/www/html/storage
 
-
-  # خدمة استدلال مجانية محليًا. تحفظ النموذج في volume مستقل.
-  ollama:
-    image: ollama/ollama:latest
-    restart: unless-stopped
-    environment:
-      OLLAMA_HOST: 0.0.0.0:11434
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-      - ../deploy/llm/Modelfile:/Modelfile:ro
-    command:
-      - sh
-      - -lc
-      - |
-        ollama serve &
-        pid=$!
-        until ollama list >/dev/null 2>&1; do sleep 1; done
-        ollama pull qwen3:0.6b
-        ollama create wajhatak-qwen3:0.6b -f /Modelfile
-        wait $pid
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 15s
-      timeout: 5s
-      retries: 20
-
 volumes:
   db_data:
   app_storage:
-  ollama_data:
+  llm_models:
