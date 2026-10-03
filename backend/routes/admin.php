@@ -101,6 +101,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::resource('email-templates', EmailTemplateController::class)->parameters(['email-templates' => 'emailTemplate']);
     Route::post('email-templates/{emailTemplate}/preview', [EmailTemplateController::class, 'preview'])->name('email-templates.preview');
     Route::post('email-templates/{emailTemplate}/duplicate', [EmailTemplateController::class, 'duplicate'])->name('email-templates.duplicate');
+    Route::get('email-templates/{emailTemplate}/history', [EmailTemplateController::class, 'history'])->name('email-templates.history');
+    Route::post('email-templates/{emailTemplate}/history/{version}/restore', [EmailTemplateController::class, 'restore'])->name('email-templates.restore');
 
     // Settings
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
