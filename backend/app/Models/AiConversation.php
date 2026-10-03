@@ -11,22 +11,13 @@ class AiConversation extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'session_token', 'locale', 'status', 'last_message_at'];
+    protected $fillable = ['user_id','session_token','locale','status','last_message_at','title','context_state','is_pinned'];
 
     protected function casts(): array
     {
-        return [
-            'last_message_at' => 'datetime',
-        ];
+        return ['last_message_at'=>'datetime','context_state'=>'array','is_pinned'=>'boolean'];
     }
 
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function messages(): HasMany
-    {
-        return $this->hasMany(AiMessage::class)->oldest();
-    }
+    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function messages(): HasMany { return $this->hasMany(AiMessage::class)->oldest(); }
 }
