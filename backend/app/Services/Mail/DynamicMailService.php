@@ -63,6 +63,27 @@ class DynamicMailService
         });
     }
 
+    public function sendHtml(string $toEmail,string $subject,string $html,?string $text=null,array $headers=[]): void
+    {
+        $this->assertConfigured();
+        $check=$this->deliverability->verify($toEmail);
+        if(!$check['deliverable']) throw new \RuntimeException($check['reason']??'البريد المستهدف غير قابل للتسليم.');
+        $from=$this->mailSettings->all();
+        $replyTo=$from['mail_reply_to']!==''?$from['mail_reply_to']:$from['mail_from_address'];
+        config()->set('mail.mailers.dynamic_smtp',[
+            'transport'=>'smtp','host'=>$from['mail_host'],'port'=>$from['mail_port'],
+            'encryption'=>$from['mail_encryption']==='none'?null:$from['mail_encryption'],
+            'username'=>$from['mail_username'],'password'=>$from['mail_password'],'timeout'=>$from['mail_timeout'],
+            'local_domain'=>config('mail.mailers.smtp.local_domain','localhost'),
+        ]);
+        Mail::purge('dynamic_smtp');
+        Mail::mailer('dynamic_smtp')->html($html,function($message)use($toEmail,$subject,$from,$replyTo,$headers,$text){
+            $message->to($toEmail)->from($from['mail_from_address'],$from['mail_from_name'])->replyTo($replyTo)->subject($subject);
+            foreach($headers as $name=>$value) $message->getHeaders()->addTextHeader($name,$value);
+            if($text!==null&&method_exists($message,'text')) $message->text($text);
+        });
+    }
+
     /** إرسال قالب من اللوحة بعد رندرة المتغيرات. */
     public function sendTemplate(string $toEmail, string $templateKey, array $variables = []): void
     {
