@@ -10,6 +10,7 @@ use App\Services\AI\AiAssistantService;
 use App\Services\AI\AiConversationService;
 use App\Services\AI\AiSchemaService;
 use App\Services\AI\AiSettingsService;
+use App\Services\AI\AiLlmClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -23,6 +24,7 @@ class AiAssistantController extends Controller
         private readonly AiConversationService $conversations,
         private readonly AiSettingsService $settings,
         private readonly AiSchemaService $schema,
+        private readonly AiLlmClient $llm,
     ) {}
 
     /** POST /api/v1/ai/chat — رسالة كاملة مع توليد رد ونتائج حقيقية. */
@@ -110,10 +112,12 @@ class AiAssistantController extends Controller
             ->withCount('messages as messages_count')
             ->orderByDesc('last_message_at')
             ->limit((int) config('ai.limits.max_conversations', 50))
-            ->get(['id', 'locale', 'status', 'last_message_at', 'created_at']);
+            ->get(['id', 'locale', 'status', 'title', 'is_pinned', 'last_message_at', 'created_at']);
 
         return response()->json(['data' => $items->map(fn (AiConversation $c) => [
             'id' => $c->id,
+            'title' => $c->title ?: 'محادثة جديدة',
+            'is_pinned' => (bool) $c->is_pinned,
             'messages_count' => $c->messages_count,
             'last_message_at' => optional($c->last_message_at)->toISOString(),
             'created_at' => optional($c->created_at)->toISOString(),
@@ -181,7 +185,8 @@ class AiAssistantController extends Controller
             'missing' => $missing,
             'indexed_properties' => $indexed,
             'latency_ms' => null,
-            'engine' => 'deterministic',
+            'engine' => $this->llm->configured() ? 'llm_agent' : 'rule_fallback',
+            'llm' => $this->llm->health(),
         ]]);
     }
 
