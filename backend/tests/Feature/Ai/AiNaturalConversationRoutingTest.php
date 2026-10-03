@@ -52,6 +52,47 @@ class AiNaturalConversationRoutingTest extends TestCase
         $this->assertStringNotContainsString('لا توجد حاليًا عقارات مطابقة', (string) $data['reply']);
     }
 
+    public function test_wellbeing_variants_are_not_blocked_by_domain_guard(): void
+    {
+        foreach (['كيفك', 'كيفكك', 'ايش اخبارك', 'وش الاخبار', 'كيف يومك'] as $message) {
+            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+
+            $response->assertOk();
+            $data = $response->json('data');
+
+            $this->assertSame('ok', $data['status'], $message);
+            $this->assertSame('small_talk', $data['intent'], $message);
+            $this->assertSame([], $data['properties'], $message);
+            $this->assertStringNotContainsString('لا توجد حاليًا عقارات مطابقة', (string) $data['reply'], $message);
+        }
+    }
+
+    public function test_generic_conversation_never_reuses_an_old_search(): void
+    {
+        $first = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'شقة للبيع في صنعاء',
+        ]);
+
+        $first->assertOk();
+
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'خلنا نتكلم شوي',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame('conversation_llm', $data['intent'], 'عند فشل النموذج يجب أن يكون المسار conversation وليس بحثًا.');
+        $this->assertSame([], $data['properties']);
+        $this->assertStringNotContainsString('لا توجد حاليًا عقارات مطابقة', (string) $data['reply']);
+    }
+
     public function test_acknowledgement_is_conversational_not_a_search(): void
     {
         $response = $this->postJson('/api/v1/ai/chat', ['message' => 'تمام']);
