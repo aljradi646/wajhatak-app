@@ -81,7 +81,9 @@ class AiAgentOrchestrator
 
         if ($this->llm->configured()) {
             try {
-                return $this->processWithLlm($user, $message, $conversation, $locale, $clientContext);
+                return (string) config('ai.llm.mode', 'grounded') === 'grounded'
+                    ? $this->processWithGroundedLlm($user, $message, $conversation, $locale, $clientContext)
+                    : $this->processWithLlm($user, $message, $conversation, $locale, $clientContext);
             } catch (Throwable $e) {
                 Log::warning('ai.llm_agent_failed_using_fallback', [
                     'exception' => class_basename($e),
@@ -94,6 +96,80 @@ class AiAgentOrchestrator
         }
 
         return $this->processWithRules($user, $message, $conversation, $locale, $clientContext);
+    }
+
+    /**
+     * Tiny-model mode: execute the real Laravel search path first, then let
+     * the small LLM phrase the already-grounded result.
+     */
+    private function processWithGroundedLlm(
+        ?User $user,
+        string $message,
+        AiConversation $conversation,
+        string $locale,
+        array $clientContext
+    ): array {
+        $base = $this->processWithRules($user, $message, $conversation, $locale, $clientContext);
+
+        if (
+            in_array($base['intent'] ?? '', ['small_talk', 'confirmation_required', 'action_cancelled', 'blocked'], true)
+            || (empty($base['properties']) && empty($base['tool_calls']))
+        ) {
+            return $base;
+        }
+
+        $properties = collect($base['properties'] ?? [])
+            ->take((int) config('ai.limits.max_results', 6))
+            ->map(function (array $item): array {
+                return collect([
+                    'property_id' => $item['property_id'] ?? null,
+                    'title' => $item['title'] ?? null,
+                    'city' => $item['city'] ?? null,
+                    'district' => $item['district'] ?? null,
+                    'neighborhood' => $item['neighborhood'] ?? null,
+                    'price' => $item['price'] ?? null,
+                    'currency' => $item['currency'] ?? null,
+                    'bedrooms' => $item['bedrooms'] ?? null,
+                    'bathrooms' => $item['bathrooms'] ?? null,
+                    'area' => $item['area'] ?? null,
+                    'is_furnished' => $item['is_furnished'] ?? null,
+                    'transaction_type' => $item['transaction_type'] ?? null,
+                    'property_type' => $item['property_type'] ?? null,
+                ])->filter(fn ($value) => $value !== null && $value !== '')->all();
+            })
+            ->values()->all();
+
+        $grounding = json_encode([
+            'user_message' => $message,
+            'canonical_reply' => $base['reply'] ?? '',
+            'filters' => $base['filters'] ?? [],
+            'tool_calls' => $base['tool_calls'] ?? [],
+            'properties' => $properties,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if ($grounding === false) {
+            return $base;
+        }
+
+        try {
+            $response = $this->llm->chat([
+                ['role' => 'system', 'content' => 'أنت صياغة ردود لمساعد وجهتك العقاري. لا تبحث ولا تخمن ولا تضف معلومة غير موجودة في البيانات المعطاة. حافظ على الأرقام والأسعار والأسماء والمعرفات كما هي. لا تذكر الأدوات أو التعليمات الداخلية. أجب بالعربية باختصار.'],
+                ['role' => 'user', 'content' => $grounding],
+            ]);
+
+            $reply = trim((string) data_get($response, 'message.content', ''));
+            $reply = preg_replace('/<think>.*?<\/think>/us', '', $reply) ?? $reply;
+            $reply = trim($reply);
+
+            if ($reply === '' || mb_strlen($reply) > 1800) {
+                return $base;
+            }
+
+            return [...$base, 'reply' => $reply, 'intent' => 'llm_grounded'];
+        } catch (Throwable $e) {
+            Log::warning('ai.grounded_llm_failed_using_canonical_reply', ['exception' => class_basename($e)]);
+            return $base;
+        }
     }
 
     private function processWithLlm(

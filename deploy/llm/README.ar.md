@@ -1,54 +1,53 @@
-# نموذج وجهتك المحلي المجاني
+# نموذج وجهتك الصغير الحقيقي — SmolLM2-135M-Instruct
 
-الاختيار الافتراضي هو **Qwen3:1.7b** عبر Ollama. نسخة Q4_K_M الحالية حجمها نحو **1.4GB**، وصفحة Ollama الرسمية تصنف Qwen3 ضمن النماذج ذات دعم الأدوات والتفكير وتذكر دعم أكثر من 100 لغة ولهجة. هذا مناسب لوكيل صغير يعتمد على Tool Calling مع إبقاء إمكانية الترقية إلى نموذج أكبر لاحقًا. citeturn208740search0turn208740search1
+- النموذج: HuggingFaceTB/SmolLM2-135M-Instruct
+- ملف GGUF: SmolLM2-135M-Instruct-Q8_0.gguf
+- الدقة: Q8_0
+- حجم الأوزان: نحو 145MB، أقل من 200MB
+- الترخيص: Apache 2.0
+- الخادم: llama.cpp بواجهة OpenAI-compatible
 
-## التشغيل المحلي
+المصادر:
+https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct
+https://huggingface.co/tensorblock/SmolLM2-135M-Instruct-GGUF
 
-من جذر المستودع:
+## التشغيل
 
-```powershell
-docker compose -f deploy/llm/docker-compose.yml up -d
-```
+docker compose -f deploy/llm/docker-compose.yml up -d --build
+curl.exe http://localhost:11434/health
 
-أو بعد تثبيت Ollama على Windows:
+أو التطبيق كاملًا:
 
-```powershell
-ollama pull qwen3:1.7b
-ollama create wajhatak-qwen3:1.7b -f deploy/llm/Modelfile
-```
+docker compose -f backend/docker-compose.yml up -d --build
+curl.exe http://localhost:8080/api/v1/ai/health
 
-ثم في Laravel:
+عند الإقلاع الأول يقوم llama.cpp بتنزيل ملف GGUF تلقائيًا إلى /models، والـvolume يحتفظ بالكاش.
 
-```env
+## Railway
+
+أنشئ خدمة ثانية من نفس المستودع:
+- الاسم: wajhatak-llm
+- Root Directory: deploy/llm
+- Volume mount: /models
+- لا تنشئ Public Domain لخدمة النموذج.
+
+في خدمة Laravel أضف:
 AI_LLM_ENABLED=true
-AI_LLM_BASE_URL=http://127.0.0.1:11434/v1
+AI_LLM_MODE=grounded
+AI_LLM_BASE_URL=http://${{wajhatak-llm.RAILWAY_PRIVATE_DOMAIN}}:8080/v1
 AI_LLM_API_KEY=
-AI_LLM_MODEL=wajhatak-qwen3:1.7b
-AI_ALLOW_RULE_FALLBACK=true
-```
+AI_LLM_MODEL=wajhatak-smollm2-135m-instruct-q8_0
+AI_LLM_MAX_OUTPUT_TOKENS=256
 
-Ollama يدعم Tool Calling وواجهة OpenAI-compatible، وتستطيع طبقة Laravel الحالية إرسال أدوات العقارات والمعاينات للنموذج دون منحه وصولًا مباشرًا إلى قاعدة البيانات. citeturn876111search0turn876111search1
+لا يحتاج النموذج إلى API key.
 
-## Docker الكامل
+## الربط مع Flutter
 
-الملف `backend/docker-compose.yml` يشغّل MySQL وLaravel وOllama معًا. ينتظر Laravel سلامة خدمة Ollama، ويستخدم:
+Flutter يتصل بـ Laravel فقط:
+Flutter -> /api/v1/ai/chat -> Laravel search/permissions/real data -> private LLM -> Laravel -> assistant UI
 
-```text
-http://ollama:11434/v1
-```
+النموذج يصيغ الرد النهائي فقط؛ البحث والعقارات والعمليات الحساسة تبقى داخل Laravel.
 
-ثم يتم إنشاء `wajhatak-qwen3:1.7b` تلقائيًا.
+## الموارد
 
-## الإنتاج وRailway
-
-لا تُضمّن ملفات النموذج داخل صورة Laravel. في الإنتاج شغّل inference service مستقلة، ثم اضبط:
-
-```env
-AI_LLM_ENABLED=true
-AI_LLM_BASE_URL=http://<inference-service>:11434/v1
-AI_LLM_MODEL=wajhatak-qwen3:1.7b
-```
-
-المجانية هنا تعني عدم الحاجة إلى API مدفوع عند التشغيل المحلي. خادم الاستدلال نفسه يحتاج موارد CPU/GPU/RAM؛ لا يوجد استدلال سحابي مجاني مضمون بلا حدود.
-
-عند توفر موارد أكبر يمكن الانتقال إلى `qwen3:4b` أو إصدار أكبر دون تغيير عقد Laravel أو Tool Registry.
+ملف النموذج نحو 145MB، لكن RAM التشغيل أعلى من حجم الملف. Compose يضع حدًا افتراضيًا 1GB ويمكن رفعه في Railway.

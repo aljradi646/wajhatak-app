@@ -14,6 +14,7 @@ class AiLlmAgentFlowTest extends TestCase
     public function test_llm_tool_call_executes_real_property_search_and_returns_grounded_result(): void
     {
         config()->set('ai.llm.enabled', true);
+        config()->set('ai.llm.mode', 'agent');
         config()->set('ai.llm.base_url', 'http://ollama.test/v1');
         config()->set('ai.llm.model', 'wajhatak-qwen3:1.7b');
         config()->set('ai.allow_rule_fallback', false);
