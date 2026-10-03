@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\\Unit\\Ai;
+namespace Tests\Unit\Ai;
 
-use App\\Services\\AI\\AiLlmClient;
-use Illuminate\\Support\\Facades\\Http;
-use Tests\\TestCase;
+use App\Services\AI\AiLlmClient;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
 
 class AiLlmClientTest extends TestCase
 {
