@@ -1,49 +1,33 @@
-# =============================================================================
-# خادم استدلال GLM المحلي — vLLM على GPU
-# تشغيل مستقل عن خادم Laravel (نفس الشبكة الخاصة، لا تعرض للإنترنت).
-#
-#   docker compose up -d
-#
-# بعد التشغيل في Laravel (.env):
-#   AI_INFERENCE_BASE_URL=http://ai-server:8000/v1
-#   AI_MODEL=glm-4.6
-#   AI_INFERENCE_API_KEY=مفتاح-اختياري-داخلي
-# =============================================================================
-
+# Compatibility deployment: old Ollama/vLLM definitions are removed.
 services:
-  vllm:
-    image: vllm/vllm-openai:v0.8.5
-    container_name: wajhatak-ai-inference
+  llm:
+    build:
+      context: ../llm
+      dockerfile: Dockerfile
     restart: unless-stopped
-    command: >
-      --model zai-org/glm-4.6
-      --served-model-name glm-4.6
-      --max-model-len 16384
-      --gpu-memory-utilization 0.90
-      --disable-log-requests
-    ports:
-      # استبدل بـ "127.0.0.1:8000:8000" إن كان Laravel على نفس الجهاز،
-      # أو استخدم شبكة Docker مشتركة بدل كشف المنفذ إطلاقًا.
-      - "8000:8000"
-    volumes:
-      - hf-cache:/root/.cache/huggingface
     environment:
-      # رقم GPU واحد يكفي لنموذج 7B-9B؛ GLM-4.6 يفضل 2×24GB أو A100.
-      - NVIDIA_VISIBLE_DEVICES=all
-      - HF_TOKEN=${HF_TOKEN:-}
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      LLAMA_CACHE: /models
+      LLAMA_ARG_HF_REPO: tensorblock/SmolLM2-135M-Instruct-GGUF:Q8_0
+      LLAMA_ARG_HF_FILE: SmolLM2-135M-Instruct-Q8_0.gguf
+      LLAMA_ARG_MODEL: ""
+      LLAMA_ARG_HOST: 0.0.0.0
+      LLAMA_ARG_PORT: 8080
+      LLAMA_ARG_ALIAS: wajhatak-smollm2-135m-instruct-q8_0
+      LLAMA_ARG_CTX_SIZE: 4096
+      LLAMA_ARG_N_PREDICT: 256
+      LLAMA_ARG_THREADS: ${LLM_THREADS:-2}
+      LLAMA_ARG_PARALLEL: 1
+    ports:
+      - "127.0.0.1:11434:8080"
+    volumes:
+      - llm_models:/models
+    mem_limit: ${LLM_MEM_LIMIT:-1g}
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/v1/models"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 180s   # تحميل الأوزان أول مرة يستغرق دقائق
+      test: ["CMD-SHELL","curl -fsS http://127.0.0.1:8080/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 45s
 
 volumes:
-  hf-cache:
+  llm_models:
