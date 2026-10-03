@@ -797,7 +797,7 @@ class _ConversationHistorySheet extends ConsumerWidget {
                       return ListTile(
                         leading: const Icon(Icons.chat_rounded),
                         title: Text(
-                          conv.lastMessage,
+                          conv.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -805,9 +805,13 @@ class _ConversationHistorySheet extends ConsumerWidget {
                           _formatDate(conv.lastMessageAt),
                           style: theme.textTheme.bodySmall,
                         ),
-                        trailing: Text(
-                          '${conv.messageCount} رسالة',
-                          style: theme.textTheme.bodySmall,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (conv.isPinned) const Icon(Icons.push_pin_rounded, size: 16),
+                            const SizedBox(width: 6),
+                            Text('${conv.messageCount} رسالة', style: theme.textTheme.bodySmall),
+                          ],
                         ),
                         onTap: () {
                           Navigator.of(context).pop();
