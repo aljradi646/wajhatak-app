@@ -1,0 +1,81 @@
+<?php
+
+namespace TestsUnitAi;
+
+use AppServicesAIAiLlmClient;
+use IlluminateSupportFacadesHttp;
+use TestsTestCase;
+
+class AiLlmClientTest extends TestCase
+{
+    public function test_openai_compatible_chat_completion_is_parsed(): void
+    {
+        config()->set('ai.llm.enabled', true);
+        config()->set('ai.llm.base_url', 'http://ollama.test/v1');
+        config()->set('ai.llm.model', 'wajhatak-qwen3:0.6b');
+
+        Http::fake([
+            'http://ollama.test/v1/chat/completions' => Http::response([
+                'model' => 'wajhatak-qwen3:0.6b',
+                'choices' => [[
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => 'وجدت لك خيارات حقيقية من المنصة.',
+                    ],
+                ]],
+                'usage' => [
+                    'prompt_tokens' => 10,
+                    'completion_tokens' => 8,
+                    'total_tokens' => 18,
+                ],
+            ], 200),
+        ]);
+
+        $result = app(AiLlmClient::class)->chat([
+            ['role' => 'user', 'content' => 'ابحث عن شقة في صنعاء'],
+        ], [
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'search_properties',
+                    'description' => 'البحث عن العقارات',
+                    'parameters' => ['type' => 'object', 'properties' => []],
+                ],
+            ],
+        ]);
+
+        $this->assertSame('assistant', $result['message']['role']);
+        $this->assertSame('وجدت لك خيارات حقيقية من المنصة.', $result['message']['content']);
+        $this->assertSame(18, $result['usage']['total_tokens']);
+
+        Http::assertSent(function ($request) {
+            $payload = $request->data();
+
+            return $request->url() === 'http://ollama.test/v1/chat/completions'
+                && $payload['model'] === 'wajhatak-qwen3:0.6b'
+                && isset($payload['tools'])
+                && $payload['stream'] === false;
+        });
+    }
+
+    public function test_health_never_exposes_api_key(): void
+    {
+        config()->set('ai.llm.enabled', true);
+        config()->set('ai.llm.base_url', 'http://ollama.test/v1');
+        config()->set('ai.llm.model', 'wajhatak-qwen3:0.6b');
+        config()->set('ai.llm.api_key', 'super-secret-test-key');
+
+        Http::fake([
+            'http://ollama.test/v1/models' => Http::response([
+                'data' => [['id' => 'wajhatak-qwen3:0.6b']],
+            ], 200),
+        ]);
+
+        $health = app(AiLlmClient::class)->health();
+
+        $this->assertTrue($health['configured']);
+        $this->assertTrue($health['reachable']);
+        $this->assertArrayNotHasKey('api_key', $health);
+        $this->assertNotContains('super-secret-test-key', json_encode($health, JSON_THROW_ON_ERROR));
+    }
+}
