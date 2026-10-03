@@ -28,7 +28,7 @@ class AiChatIntentDetector
         return null;
     }
 
-    /** تصنيف الكلام اليومي: greeting/thanks/capabilities/stats/farewell أو null. */
+    /** تصنيف الكلام اليومي: تحية/شكر/قدرات/إحصاءات/وداع/حالة/موافقة أو null. */
     public static function detectSmallTalk(string $text): ?string
     {
         $normalized = self::normalize($text);
@@ -49,8 +49,8 @@ class AiChatIntentDetector
             return 'thanks';
         }
 
-        if (mb_strlen($chatText) <= 90
-            && preg_match('/(مين انت|من انت|وش تقدر|ايش تقدر|شن تقدر|كيف تساعد|وش تسوي|ايش تسوي|قدراتك|مميزاتك|من انت بالضبط|who are you|what can you|كيف استخدم|كيف ابدأ|كيف ابداء|ماذا تستطيع)/u', $chatText) === 1
+        if (mb_strlen($chatText) <= 100
+            && preg_match('/(مين انت|من انت|وش تقدر|ايش تقدر|شن تقدر|كيف تساعد|ساعدني|ممكن تساعدني|احتاج مساعده|وش تسوي|ايش تسوي|قدراتك|مميزاتك|من انت بالضبط|who are you|what can you|كيف استخدم|كيف ابدأ|كيف ابداء|ماذا تستطيع)/u', $chatText) === 1
             && ! self::looksLikeSearchRequest($chatText)) {
             return 'capabilities';
         }
@@ -65,8 +65,8 @@ class AiChatIntentDetector
             return 'farewell';
         }
 
-        if (mb_strlen($chatText) <= 70
-            && preg_match('/(كيفك|كيف حالك|كيف امورك|كيف الامور|كيف احوالك|كيف الدنيا|طمني عليك|طمنيني عليك|اخبارك|شخبارك|وش اخبارك|ايش اخبارك|شن اخبارك|what.*up|how are you)/u', $chatText) === 1
+        if (mb_strlen($chatText) <= 90
+            && preg_match('/(كيفك+|كيف حالك|كيف امورك|كيف الامور|كيف احوالك|كيف الدنيا|كيف يومك|طمني عليك|طمنيني عليك|اخبارك|شخبارك|وش اخبارك|ايش اخبارك|شن اخبارك|ايش الاخبار|وش الاخبار|ما الاخبار|ما الاخبار اليوم|what(?:up| is up)|how are you)/u', $chatText) === 1
             && ! self::looksLikeSearchRequest($chatText)) {
             return 'wellbeing';
         }
@@ -100,12 +100,20 @@ class AiChatIntentDetector
     }
 
     /** منع «تمام شقة...» ونحوها من أن تتحول إلى حوار عام. */
-    private static function looksLikeSearchRequest(string $normalized): bool
+    public static function looksLikePropertyRequest(string $text): bool
     {
+        $normalized = self::collapseRepeatedCharacters(self::normalize($text));
+
         return preg_match(
-            '/(عقار|عقارات|شقه|شقق|فيلا|فلل|بيت|بيوت|منزل|ارض|محل|مكتب|عماره|للبيع|ايجار|للايجار|شراء|تمليك|ابحث|بحث|دور لي|اعرض|اريد|احتاج|ميزانيه|غرف|حمام|متر|من صنعاء|في صنعاء|في عدن|في تعز)/u',
+            '/(عقار|عقارات|شقه|شقق|فيلا|فلل|بيت|بيوت|منزل|منازل|ارض|اراضي|محل|محلات|مكتب|مكاتب|عماره|عمارات|برج|دور|ادوار|تاون\s*هاوس|للبيع|بيع|ايجار|للايجار|شراء|اشتري|تمليك|استئجار|ابحث|بحث|دور لي|اعرض|وريني|ميزانيه|غرف|حمام|متر|مساحه|سعر|اسعار|ريال|مليون|الف|ك\b|قريب مني|قريبه مني|بالقرب مني|مشابه|شبيه|المفضله|مفضلتي|معاينه|حجز|زيارة|عقار رقم|في صنعاء|في عدن|في تعز|في الحديدة|في المكلا|في إب|في مارب|في سيئون|في ذمار|في حجة)/u',
             $normalized
         ) === 1;
+    }
+
+    /** إبقاء الدالة الداخلية للتصنيف مع نفس العقد السابق. */
+    private static function looksLikeSearchRequest(string $normalized): bool
+    {
+        return self::looksLikePropertyRequest($normalized);
     }
 
     /** «وين موقعي» / «قريب مني» — يحتاج إحداثيات العميل الحقيقية. */
@@ -130,6 +138,7 @@ class AiChatIntentDetector
     /** ضغط إطالة الحروف المتكررة المستخدمة في الدردشة غير الرسمية. */
     private static function collapseRepeatedCharacters(string $text): string
     {
-        return preg_replace('/(.)\1+/us', '$1', $text) ?? $text;
+        // نعالج الإطالة الواضحة فقط، حتى لا نفسد كلمات عربية تحتوي حرفين متتاليين مثل «الله».
+        return preg_replace('/(.)\1{2,}/us', '$1', $text) ?? $text;
     }
 }
