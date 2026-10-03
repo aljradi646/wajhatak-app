@@ -100,6 +100,15 @@ class AiToolRegistry
                 'description' => 'جلب معلومات الملف الشخصي للمستخدم الحالي',
                 'parameters' => ['type' => 'object', 'properties' => []],
             ],
+            'cancel_viewing_request' => [
+                'name' => 'cancel_viewing_request',
+                'description' => 'إلغاء طلب معاينة يملكه المستخدم الحالي بعد تأكيده',
+                'parameters' => [
+                    'type'=>'object',
+                    'required'=>['viewing_id'],
+                    'properties'=>['viewing_id'=>['type'=>'integer','description'=>'رقم طلب المعاينة']],
+                ],
+            ],
             'get_app_knowledge' => [
                 'name' => 'get_app_knowledge',
                 'description' => 'الاستعلام عن كيفية استخدام التطبيق وصفحاته وسياساته',
@@ -136,6 +145,7 @@ class AiToolRegistry
                 'create_viewing_request' => $this->executeCreateViewingRequest($user, $arguments),
                 'get_agent_info' => $this->executeGetAgentInfo($arguments),
                 'get_user_profile' => $this->executeGetUserProfile($user),
+                'cancel_viewing_request' => $this->executeCancelViewingRequest($user, $arguments),
                 'get_app_knowledge' => $this->executeGetAppKnowledge($user, $arguments),
                 default => [
                     'success' => false,
@@ -293,6 +303,19 @@ class AiToolRegistry
                 'role' => $user->role,
             ],
         ];
+    }
+
+    private function executeCancelViewingRequest(?User $user,array $args): array
+    {
+        if(!$user) return ['success'=>false,'error'=>'UNAUTHENTICATED','message'=>'يلزم تسجيل الدخول.'];
+        $id=(int)($args['viewing_id']??0);
+        $viewing=ViewingRequest::query()->find($id);
+        if(!$viewing||$viewing->client_id!==$user->id) return ['success'=>false,'error'=>'FORBIDDEN','message'=>'طلب المعاينة غير موجود أو لا تملكه.'];
+        if(!($viewing->status?->isOpen())) return ['success'=>false,'message'=>'لا يمكن إلغاء طلب المعاينة في حالته الحالية.'];
+        if(!($args['confirmed']??false)) return ['success'=>false,'confirmation_required'=>true,'message'=>'يلزم تأكيد المستخدم قبل إلغاء طلب المعاينة.'];
+        $viewing->status=ViewingRequestStatus::Cancelled;
+        $viewing->save();
+        return ['success'=>true,'viewing_id'=>$viewing->id,'message'=>'تم إلغاء طلب المعاينة بنجاح.'];
     }
 
     private function executeGetAppKnowledge(?User $user, array $args): array
