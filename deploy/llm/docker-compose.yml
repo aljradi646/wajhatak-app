@@ -8,6 +8,7 @@ services:
       - ollama_data:/root/.ollama
       - ./Modelfile:/Modelfile:ro
     environment:
+      OLLAMA_HOST: 0.0.0.0:11434
       OLLAMA_KEEP_ALIVE: 30m
     command:
       - sh
