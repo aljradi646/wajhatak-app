@@ -40,11 +40,9 @@ class AiAssistantRepository {
       if (conversationId == null) 'session_token': await _sessionToken(),
       'locale': 'ar',
       if (latitude != null && longitude != null) ...{
-        'client_context': {
-          'latitude': latitude,
-          'longitude': longitude,
-          'radius_km': 10,
-        },
+        'latitude': latitude,
+        'longitude': longitude,
+        'radius_km': 10,
       },
     };
 
@@ -66,10 +64,7 @@ class AiAssistantRepository {
     // حفظ مفتاح الجلسة (للزوار) لمتابعة السياق لاحقًا.
     final token = data['session_token'] as String?;
     final conversation = data['conversation_id'] as int?;
-    if (conversation == null && token != null && token.isNotEmpty) {
-      await _saveSessionToken(token);
-    }
-
+    if (token != null && token.isNotEmpty) await _saveSessionToken(token);
     return reply;
   }
 
@@ -91,10 +86,9 @@ class AiAssistantRepository {
     int conversationId,
   ) async {
     final json = await _api.get('/ai/conversations/$conversationId/messages');
-    final data = json['data'] as List<dynamic>? ?? const [];
-    return data
-        .map((e) => AiChatMessage.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
+    final root = json['data'] as Map<String, dynamic>? ?? const {};
+    final data = root['messages'] as List<dynamic>? ?? const [];
+    return data.map((e) => AiChatMessage.fromJson(e as Map<String, dynamic>)).toList(growable: false);
   }
 
   // ------------------------------------------------------------------
@@ -123,3 +117,13 @@ class AiAssistantRepository {
     }
   }
 }
+
+
+  Future<int> createConversation() async {
+    final json = await _api.post('/ai/conversations', data: {'locale': 'ar'});
+    final data = json['data'] as Map<String, dynamic>? ?? const {};
+    return data['id'] as int;
+  }
+
+  Future<void> pinConversation(int conversationId, bool pinned) =>
+      _api.patch('/ai/conversations/$conversationId/pin', data: {'pinned': pinned});
