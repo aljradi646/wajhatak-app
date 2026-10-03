@@ -80,21 +80,27 @@ class AiConversationController extends Notifier<AiConversationState> {
     );
 
     try {
-      // Get user location silently for nearby searches
-      final location = await LocationService.silentPosition();
+      double? latitude;
+      double? longitude;
+      if (RegExp(r'(قريب|بالقرب|حول[ي|ك]|بجانبي|موقعي|near|nearby)', caseSensitive: false).hasMatch(trimmed)) {
+        final location = await LocationService.silentPosition();
+        latitude = location.latitude;
+        longitude = location.longitude;
+      }
 
-      final reply = await ref
+      final result = await ref
           .read(aiAssistantRepositoryProvider)
           .sendMessage(
             trimmed,
             conversationId: state.conversationId,
-            latitude: location.latitude,
-            longitude: location.longitude,
+            latitude: latitude,
+            longitude: longitude,
           );
+      final reply = result.message;
       state = state.copyWith(
         messages: [...state.messages, reply],
         loading: false,
-        conversationId: state.conversationId ?? _resolvedConversation(reply),
+        conversationId: state.conversationId ?? result.conversationId,
       );
     } on ApiFailure catch (error) {
       // Fallback لطيف دائمًا — التطبيق لا ينكسر بدون AI.
@@ -203,7 +209,6 @@ class AiConversationController extends Notifier<AiConversationState> {
     }
   }
 
-  int? _resolvedConversation(AiChatMessage reply) => state.conversationId;
 }
 
 final aiConversationProvider =
