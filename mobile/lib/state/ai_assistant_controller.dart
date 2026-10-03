@@ -160,6 +160,28 @@ class AiConversationController extends Notifier<AiConversationState> {
       }
     }
     ref.invalidate(aiBootstrapProvider);
+    state = const AiConversationState();
+    await _seedWelcome();
+  }
+
+  Future<void> newConversation() async
+  {
+    if (state.loading) return;
+
+    final session = ref.read(sessionProvider).asData?.value;
+    if (session != null) {
+      try {
+        final id = await ref.read(aiAssistantRepositoryProvider).createConversation();
+        state = AiConversationState(conversationId: id);
+        await _seedWelcome();
+        ref.invalidate(aiConversationsListProvider);
+        return;
+      } on Object catch (_) {
+        // عند تعذر إنشاء المحادثة على الخادم، نستمر بمحادثة جديدة محلية.
+      }
+    }
+
+    state = const AiConversationState();
     await _seedWelcome();
   }
 

@@ -3,6 +3,7 @@
 namespace App\Services\AI;
 
 use App\Enums\ViewingRequestStatus;
+use App\Models\Agent;
 use App\Models\Property;
 use App\Models\User;
 use App\Models\ViewingRequest;
@@ -35,14 +36,34 @@ class AiToolRegistry
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [
-                        'city' => ['type' => 'string', 'description' => 'اسم المدينة (مثل صنعاء، عدن)'],
-                        'district' => ['type' => 'string', 'description' => 'اسم الحي/المنطقة (مثل حدة، الروضة)'],
-                        'property_type' => ['type' => 'string', 'description' => 'نوع العقار (apartment, villa, land, office, house)'],
-                        'transaction_type' => ['type' => 'string', 'description' => 'نوع العملية (rent, sale)'],
-                        'bedrooms' => ['type' => 'integer', 'description' => 'عدد الغرف'],
+                        'city' => ['type' => 'string', 'description' => 'اسم المدينة'],
+                        'district' => ['type' => 'string', 'description' => 'اسم الحي أو المنطقة'],
+                        'neighborhood' => ['type' => 'string', 'description' => 'اسم الحي الفرعي أو الشارع'],
+                        'property_type' => ['type' => 'string', 'description' => 'نوع العقار مثل apartment أو villa أو land'],
+                        'transaction_type' => ['type' => 'string', 'description' => 'sale أو rent'],
+                        'bedrooms_min' => ['type' => 'integer', 'description' => 'الحد الأدنى لعدد غرف النوم'],
+                        'bedrooms_max' => ['type' => 'integer', 'description' => 'الحد الأعلى لعدد غرف النوم'],
+                        'bathrooms_min' => ['type' => 'integer', 'description' => 'الحد الأدنى للحمامات'],
                         'min_price' => ['type' => 'number', 'description' => 'الحد الأدنى للسعر'],
-                        'max_price' => ['type' => 'number', 'description' => 'الحد الأقصى للسعر'],
-                        'furnished' => ['type' => 'boolean', 'description' => 'مفروشة أم لا'],
+                        'max_price' => ['type' => 'number', 'description' => 'الحد الأعلى للسعر'],
+                        'min_area' => ['type' => 'number', 'description' => 'الحد الأدنى للمساحة بالمتر المربع'],
+                        'max_area' => ['type' => 'number', 'description' => 'الحد الأعلى للمساحة بالمتر المربع'],
+                        'furnished' => ['type' => 'boolean', 'description' => 'هل العقار مفروش'],
+                        'is_new' => ['type' => 'boolean', 'description' => 'هل العقار جديد'],
+                        'sort' => ['type' => 'string', 'enum' => ['relevance','price_asc','price_desc','area_desc'], 'description' => 'ترتيب النتائج'],
+                        'q' => ['type' => 'string', 'description' => 'عبارات إضافية للبحث النصي'],
+                    ],
+                ],
+            ],
+            'search_similar_properties' => [
+                'name' => 'search_similar_properties',
+                'description' => 'العثور على عقارات مشابهة لعقار محدد',
+                'parameters' => [
+                    'type' => 'object',
+                    'required' => ['property_id'],
+                    'properties' => [
+                        'property_id' => ['type' => 'integer', 'description' => 'رقم العقار المرجعي'],
+                        'limit' => ['type' => 'integer', 'description' => 'عدد النتائج من 1 إلى 6'],
                     ],
                 ],
             ],
@@ -67,6 +88,10 @@ class AiToolRegistry
                         'latitude' => ['type' => 'number', 'description' => 'خط العرض'],
                         'longitude' => ['type' => 'number', 'description' => 'خط الطول'],
                         'radius_km' => ['type' => 'number', 'description' => 'نصف قطر البحث بالكم'],
+                        'property_type' => ['type' => 'string', 'description' => 'نوع العقار اختياريًا'],
+                        'transaction_type' => ['type' => 'string', 'description' => 'sale أو rent اختياريًا'],
+                        'max_price' => ['type' => 'number', 'description' => 'أقصى سعر اختياريًا'],
+                        'bedrooms_min' => ['type' => 'integer', 'description' => 'أقل عدد غرف اختياريًا'],
                     ],
                 ],
             ],
@@ -86,12 +111,12 @@ class AiToolRegistry
             ],
             'get_agent_info' => [
                 'name' => 'get_agent_info',
-                'description' => 'جلب معلومات وكيل عقاري أو مالك عقار',
+                'description' => 'جلب معلومات الاتصال العامة لوكيل محدد أو لوكيل عقار محدد بواسطة property_id',
                 'parameters' => [
                     'type' => 'object',
-                    'required' => ['agent_id'],
                     'properties' => [
-                        'agent_id' => ['type' => 'integer', 'description' => 'رقم الوكيل'],
+                        'agent_id' => ['type' => 'integer', 'description' => 'معرف الوكيل'],
+                        'property_id' => ['type' => 'integer', 'description' => 'معرف العقار لاستخراج وكيله'],
                     ],
                 ],
             ],
@@ -140,6 +165,7 @@ class AiToolRegistry
         try {
             return match ($toolName) {
                 'search_properties' => $this->executeSearchProperties($arguments),
+                'search_similar_properties' => $this->executeSearchSimilarProperties($arguments),
                 'get_property_details' => $this->executeGetPropertyDetails($arguments),
                 'search_nearby_properties' => $this->executeSearchNearbyProperties($arguments),
                 'create_viewing_request' => $this->executeCreateViewingRequest($user, $arguments),
@@ -170,10 +196,10 @@ class AiToolRegistry
         if (!empty($args['district'])) $filters['district'] = (string) $args['district'];
         if (!empty($args['property_type'])) $filters['property_type'] = (string) $args['property_type'];
         if (!empty($args['transaction_type'])) $filters['transaction_type'] = (string) $args['transaction_type'];
-        if (!empty($args['bedrooms'])) $filters['bedrooms_min'] = (int) $args['bedrooms'];
-        if (!empty($args['min_price'])) $filters['min_price'] = (float) $args['min_price'];
-        if (!empty($args['max_price'])) $filters['max_price'] = (float) $args['max_price'];
-        if (isset($args['furnished'])) $filters['furnished'] = (bool) $args['furnished'];
+        foreach (['neighborhood','sort','q'] as $key) if (!empty($args[$key])) $filters[$key]=(string)$args[$key];
+        foreach (['bedrooms_min','bedrooms_max','bathrooms_min'] as $key) if (isset($args[$key])) $filters[$key]=(int)$args[$key];
+        foreach (['min_price','max_price','min_area','max_area'] as $key) if (isset($args[$key])) $filters[$key]=(float)$args[$key];
+        foreach (['furnished','is_new'] as $key) if (isset($args[$key])) $filters[$key]=(bool)$args[$key];
 
         $results = $this->searchService->search($filters);
 
@@ -183,6 +209,14 @@ class AiToolRegistry
             'properties' => $results['items'] ?? [],
             'filters' => $filters,
         ];
+    }
+
+    private function executeSearchSimilarProperties(array $args): array
+    {
+        $propertyId=(int)($args['property_id']??0);
+        $limit=max(1,min(6,(int)($args['limit']??4)));
+        $items=$this->searchService->similar($propertyId,$limit);
+        return ['success'=>true,'property_id'=>$propertyId,'properties'=>$items,'total'=>count($items)];
     }
 
     private function executeGetPropertyDetails(array $args): array
@@ -216,6 +250,9 @@ class AiToolRegistry
                 'radius_km' => $radius,
             ],
         ];
+        foreach (['property_type','transaction_type'] as $key) if (!empty($args[$key])) $filters[$key]=(string)$args[$key];
+        if(isset($args['max_price'])) $filters['max_price']=(float)$args['max_price'];
+        if(isset($args['bedrooms_min'])) $filters['bedrooms_min']=(int)$args['bedrooms_min'];
 
         $results = $this->searchService->search($filters);
 
@@ -223,6 +260,7 @@ class AiToolRegistry
             'success' => true,
             'total' => $results['total'] ?? 0,
             'properties' => $results['items'] ?? [],
+            'filters' => $filters,
             'radius_km' => $radius,
         ];
     }
@@ -266,8 +304,11 @@ class AiToolRegistry
 
     private function executeGetAgentInfo(array $args): array
     {
-        $agentId = (int) ($args['agent_id'] ?? 0);
-        $agent = User::query()->where('role', 'agent')->find($agentId);
+        $propertyId=(int)($args['property_id']??0);
+        $agentId=(int)($args['agent_id']??0);
+        $agent=$propertyId>0
+            ? Property::query()->with('agent.user')->find($propertyId)?->agent
+            : Agent::query()->with('user')->find($agentId);
 
         if (!$agent) {
             return [
@@ -277,12 +318,17 @@ class AiToolRegistry
         }
 
         return [
-            'success' => true,
-            'agent' => [
-                'id' => $agent->id,
-                'name' => $agent->name,
-                'phone' => $agent->phone,
-                'email' => $agent->email,
+            'success'=>true,
+            'agent'=>[
+                'id'=>$agent->id,
+                'user_id'=>$agent->user?->id,
+                'name'=>$agent->user?->name,
+                'agency_name'=>$agent->agency_name,
+                'job_title'=>$agent->job_title,
+                'phone'=>$agent->phone,
+                'whatsapp'=>$agent->whatsapp,
+                'city'=>$agent->city,
+                'verified'=>$agent->isApproved(),
             ],
         ];
     }
@@ -298,9 +344,8 @@ class AiToolRegistry
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
                 'role' => $user->role,
+                'email_verified' => (bool) $user->email_verified_at,
             ],
         ];
     }

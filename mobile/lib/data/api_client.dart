@@ -43,7 +43,8 @@ class TokenStore {
         }
       }
       return token;
-    } on Object {
+    } on Object catch (_) {
+      // فشل قراءة التوكن المحلي لا يمنع استمرار التطبيق.
       return null;
     }
   }
@@ -55,7 +56,9 @@ class TokenStore {
         key: _loginTimeKey,
         value: DateTime.now().toIso8601String(),
       );
-    } on Object {}
+    } on Object catch (_) {
+      // التخزين المحلي اختياري؛ يُستخدم لاحقًا عند نجاح النظام.
+    }
   }
 
   Future<void> clear() async {
@@ -63,7 +66,9 @@ class TokenStore {
       await _storage.delete(key: _tokenKey);
       await _storage.delete(key: _loginTimeKey);
       await _storage.delete(key: _userKey);
-    } on Object {}
+    } on Object catch (_) {
+      // فشل التخزين المحلي اختياري ولا يمنع استمرار العملية.
+    }
   }
 
   Future<void> refreshSession() async {
@@ -72,7 +77,9 @@ class TokenStore {
         key: _loginTimeKey,
         value: DateTime.now().toIso8601String(),
       );
-    } on Object {}
+    } on Object catch (_) {
+      // فشل التخزين المحلي اختياري ولا يمنع استمرار العملية.
+    }
   }
 
   // --- بيانات المستخدم المخزّنة محليًا -----------------------------------
@@ -80,7 +87,9 @@ class TokenStore {
   Future<void> saveUser(LuxUser user) async {
     try {
       await _storage.write(key: _userKey, value: jsonEncode(user.toJson()));
-    } on Object {}
+    } on Object catch (_) {
+      // فشل التخزين المحلي اختياري ولا يمنع استمرار العملية.
+    }
   }
 
   Future<LuxUser?> readUser() async {
