@@ -806,8 +806,26 @@ class _ConversationHistorySheet extends ConsumerWidget {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (conv.isPinned) const Icon(Icons.push_pin_rounded, size: 16),
-                            const SizedBox(width: 6),
+                            IconButton(
+                              tooltip: conv.isPinned ? 'إلغاء التثبيت' : 'تثبيت',
+                              visualDensity: VisualDensity.compact,
+                              icon: Icon(
+                                conv.isPinned
+                                    ? Icons.push_pin_rounded
+                                    : Icons.push_pin_outlined,
+                                size: 17,
+                              ),
+                              onPressed: () async {
+                                try {
+                                  await ref
+                                      .read(aiAssistantRepositoryProvider)
+                                      .pinConversation(conv.id, !conv.isPinned);
+                                  ref.invalidate(aiConversationsListProvider);
+                                } on Object catch (_) {
+                                  // تعذر التثبيت دون التأثير على المحادثة الحالية.
+                                }
+                              },
+                            ),
                             Text('${conv.messageCount} رسالة', style: theme.textTheme.bodySmall),
                           ],
                         ),
