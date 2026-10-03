@@ -106,9 +106,11 @@ class AiAgentOrchestrator
                     $this->stateService->setPendingAction($conversation,$name,$args);
                 } else {
                     $result=$this->toolRegistry->execute($name,$args,$user);
-                    if($name==='search_properties') {
+                    if($name==='search_properties'||$name==='search_nearby_properties') {
                         $properties=$result['properties']??[];
-                        $filters=$result['filters']??[];
+                        $filters=$result['filters']??$filters;
+                    } elseif($name==='get_property_details'&&isset($result['property'])&&is_array($result['property'])) {
+                        $properties=[$result['property']];
                     }
                 }
 
