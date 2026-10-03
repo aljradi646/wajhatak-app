@@ -31,19 +31,10 @@ Future<void> showAiAssistant(BuildContext context) {
     );
   }
 
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => const FractionallySizedBox(
-      heightFactor: 0.92,
-      child: ClipRRect(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(WajhatakRadius.sheet),
-        ),
-        child: AiAssistantPanel(),
-      ),
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => const AiAssistantPanel(),
     ),
   );
 }
