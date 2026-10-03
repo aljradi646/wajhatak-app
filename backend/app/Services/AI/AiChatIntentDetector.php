@@ -49,9 +49,9 @@ class AiChatIntentDetector
             return 'thanks';
         }
 
-        if (mb_strlen($chatText) <= 90
-            && preg_match('/(مين انت|من انت|وش تقدر|ايش تقدر|شن تقدر|كيف تساعد|وش تسوي|ايش تسوي|قدراتك|مميزاتك|من انت بالضبط|who are you|what can you|كيف استخدم|كيف ابدأ|كيف ابداء|ماذا تستطيع)/u', $chatText) === 1
-            && ! self::looksLikeSearchRequest($chatText)) {
+        if (mb_strlen($chatText) <= 100
+            && preg_match('/(مين انت|من انت|وش تقدر|ايش تقدر|شن تقدر|كيف تساعد|ساعدني|ممكن تساعدني|احتاج مساعده|أحتاج مساعدة|وش تسوي|ايش تسوي|قدراتك|مميزاتك|من انت بالضبط|who are you|what can you|كيف استخدم|كيف ابدأ|كيف ابداء|ماذا تستطيع)/u', $chatText) === 1
+            && ! self::looksLikePropertyRequest($chatText)) {
             return 'capabilities';
         }
 
@@ -65,19 +65,35 @@ class AiChatIntentDetector
             return 'farewell';
         }
 
-        if (mb_strlen($chatText) <= 70
-            && preg_match('/(كيفك|كيف حالك|كيف امورك|كيف الامور|كيف احوالك|كيف الدنيا|طمني عليك|طمنيني عليك|اخبارك|شخبارك|وش اخبارك|ايش اخبارك|شن اخبارك|what.*up|how are you)/u', $chatText) === 1
-            && ! self::looksLikeSearchRequest($chatText)) {
+        if (mb_strlen($chatText) <= 90
+            && preg_match('/(كيفك|كيف حالك|كيف امورك|كيف الامور|كيف احوالك|كيف الدنيا|طمني عليك|طمنيني عليك|اخبارك|شخبارك|وش اخبارك|ايش اخبارك|شن اخبارك|ايش الاخبار|وش الاخبار|ما الاخبار|ما الاخبار اليوم|what(?:'up| is up)|how are you)/u', $chatText) === 1
+            && ! self::looksLikePropertyRequest($chatText)) {
             return 'wellbeing';
         }
 
-        if (mb_strlen($chatText) <= 35
-            && preg_match('/^(تمام|تماما|طيب|كويس|ممتاز|حلو|جميل|رائع|اوكي|اوك|يس|yes|ok|okay|thanks)$/u', $chatText) === 1
-            && ! self::looksLikeSearchRequest($chatText)) {
+        if (mb_strlen($chatText) <= 60
+            && preg_match('/^(تمام|تماما|طيب|كويس|ممتاز|حلو|جميل|رائع|اوكي|اوك|يس|yes|ok|okay|thanks|تمام شكرا)$/u', $chatText) === 1
+            && ! self::looksLikePropertyRequest($chatText)) {
             return 'acknowledgement';
         }
 
         return null;
+    }
+
+    /**
+     * هل الرسالة تحتوي مؤشرات فعلية على طلب عقاري أو متابعة مباشرة للبحث؟
+     *
+     * هذه الدالة تُستخدم لمنع إعادة تطبيق فلاتر محادثة قديمة على رسالة
+     * اجتماعية/عامة لا علاقة لها بالبحث.
+     */
+    public static function looksLikePropertyRequest(string $text): bool
+    {
+        $normalized = self::collapseRepeatedCharacters(self::normalize($text));
+
+        return preg_match(
+            '/(عقار|عقارات|شقه|شقق|فيلا|فلل|بيت|بيوت|منزل|منازل|ارض|اراضي|محل|محلات|مكتب|مكاتب|عماره|عمارات|برج|دور|ادوار|تاون\s*هاوس|للبيع|بيع|ايجار|للايجار|ايجار|شراء|اشتري|تمليك|استئجار|ابحث|بحث|دور لي|اعرض|وريني|اريد|ابغى|ابغا|احتاج|ميزانيه|غرف|حمام|متر|مساحه|سعر|اسعار|ريال|مليون|الف|ك\b|قريب مني|قريبه مني|بالقرب مني|مشابه|شبيه|المفضله|مفضلتي|معاينه|معاينة|حجز|زيارة|عقار رقم|في صنعاء|في عدن|في تعز|في الحديدة|في المكلا|في إب|في مارب|في سيئون|في ذمار|في حجة)/u',
+            $normalized
+        ) === 1;
     }
 
     /**
@@ -97,15 +113,6 @@ class AiChatIntentDetector
             .')(?:[\s،,.!؟?~]|$)';
 
         return preg_match('/'.$pattern.'/u', $normalized) === 1;
-    }
-
-    /** منع «تمام شقة...» ونحوها من أن تتحول إلى حوار عام. */
-    private static function looksLikeSearchRequest(string $normalized): bool
-    {
-        return preg_match(
-            '/(عقار|عقارات|شقه|شقق|فيلا|فلل|بيت|بيوت|منزل|ارض|محل|مكتب|عماره|للبيع|ايجار|للايجار|شراء|تمليك|ابحث|بحث|دور لي|اعرض|اريد|احتاج|ميزانيه|غرف|حمام|متر|من صنعاء|في صنعاء|في عدن|في تعز)/u',
-            $normalized
-        ) === 1;
     }
 
     /** «وين موقعي» / «قريب مني» — يحتاج إحداثيات العميل الحقيقية. */
