@@ -207,17 +207,19 @@ class AiAssistantController extends Controller
             $missing[] = 'ai_search_index(غير قابل للقراءة)';
         }
 
+        $llmHealth = $this->llm->health();
+
         return response()->json(['data' => [
             'assistant_enabled' => $this->settings->enabled(),
             'healthy' => $missing === []
                 && $this->settings->enabled()
-                && (! $this->llm->configured() || (bool) ($this->llm->health()['reachable'] ?? false)),
+                && (! $this->llm->configured() || (bool) ($llmHealth['reachable'] ?? false)),
             'tables_ready' => $missing === [],
             'missing' => $missing,
             'indexed_properties' => $indexed,
-            'latency_ms' => null,
+            'latency_ms' => $llmHealth['latency_ms'] ?? null,
             'engine' => $this->llm->configured() ? 'llm_agent' : 'rule_fallback',
-            'llm' => $this->llm->health(),
+            'llm' => $llmHealth,
         ]]);
     }
 
