@@ -1,8 +1,8 @@
 <?php
 
-namespace AppServicesAI;
+namespace App\\Services\\AI;
 
-use AppModelsUser;
+use App\\Models\\User;
 
 class AiAgentPromptBuilder
 {
