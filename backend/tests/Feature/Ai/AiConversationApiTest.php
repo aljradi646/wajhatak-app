@@ -1,11 +1,11 @@
 <?php
 
-namespace Tests\\Feature\\Ai;
+namespace Tests\Feature\Ai;
 
-use App\\Models\\AiConversation;
-use App\\Models\\User;
-use Illuminate\\Foundation\\Testing\\RefreshDatabase;
-use Tests\\TestCase;
+use App\Models\AiConversation;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class AiConversationApiTest extends TestCase
 {
