@@ -199,12 +199,19 @@ class AiAgentOrchestrator
                     in_array($name, ['create_viewing_request', 'cancel_viewing_request'], true)
                     && !($args['confirmed'] ?? false)
                 ) {
-                    $result = [
-                        'success' => false,
-                        'confirmation_required' => true,
-                        'message' => 'يلزم تأكيد المستخدم قبل تنفيذ العملية.',
-                    ];
                     $this->stateService->setPendingAction($conversation, $name, $args);
+                    return [
+                        'reply' => $this->confirmationPrompt($name, $args),
+                        'status' => 'ok',
+                        'properties' => [],
+                        'filters' => $args['property_id'] ?? null ? ['property_id' => (int) $args['property_id']] : [],
+                        'tool_calls' => [[
+                            'tool' => $name,
+                            'ok' => false,
+                            'confirmation_required' => true,
+                        ]],
+                        'intent' => 'confirmation_required',
+                    ];
                 } else {
                     $result = $this->toolRegistry->execute($name, $args, $user);
 
@@ -469,6 +476,17 @@ class AiAgentOrchestrator
             'tool_calls' => [['tool' => 'search_properties', 'ok' => (bool) ($result['success'] ?? false)]],
             'intent' => $parsed['intent'] ?? 'search',
         ];
+    }
+
+    private function confirmationPrompt(string $tool, array $args): string
+    {
+        return match ($tool) {
+            'create_viewing_request' => 'سأرسل طلب معاينة للعقار #'.((int) ($args['property_id'] ?? 0))
+                .' بتاريخ '.((string) ($args['scheduled_date'] ?? now()->addDay()->toDateString()))
+                .' الساعة '.((string) ($args['scheduled_time'] ?? '10:00')).'. هل تؤكد؟',
+            'cancel_viewing_request' => 'سألغي طلب المعاينة #'.((int) ($args['viewing_id'] ?? 0)).'. هل تؤكد؟',
+            default => 'هذه العملية تحتاج تأكيدك. هل تؤكد؟',
+        };
     }
 
     private function openAiTools(?User $user): array
