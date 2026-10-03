@@ -1,10 +1,10 @@
 <?php
 
-namespace TestsUnitAi;
+namespace Tests\\Unit\\Ai;
 
-use AppServicesAIAiLlmClient;
-use IlluminateSupportFacadesHttp;
-use TestsTestCase;
+use App\\Services\\AI\\AiLlmClient;
+use Illuminate\\Support\\Facades\\Http;
+use Tests\\TestCase;
 
 class AiLlmClientTest extends TestCase
 {
@@ -12,11 +12,11 @@ class AiLlmClientTest extends TestCase
     {
         config()->set('ai.llm.enabled', true);
         config()->set('ai.llm.base_url', 'http://ollama.test/v1');
-        config()->set('ai.llm.model', 'wajhatak-qwen3:0.6b');
+        config()->set('ai.llm.model', 'wajhatak-qwen3:1.7b');
 
         Http::fake([
             'http://ollama.test/v1/chat/completions' => Http::response([
-                'model' => 'wajhatak-qwen3:0.6b',
+                'model' => 'wajhatak-qwen3:1.7b',
                 'choices' => [[
                     'message' => [
                         'role' => 'assistant',
@@ -52,7 +52,7 @@ class AiLlmClientTest extends TestCase
             $payload = $request->data();
 
             return $request->url() === 'http://ollama.test/v1/chat/completions'
-                && $payload['model'] === 'wajhatak-qwen3:0.6b'
+                && $payload['model'] === 'wajhatak-qwen3:1.7b'
                 && isset($payload['tools'])
                 && $payload['stream'] === false;
         });
@@ -62,12 +62,12 @@ class AiLlmClientTest extends TestCase
     {
         config()->set('ai.llm.enabled', true);
         config()->set('ai.llm.base_url', 'http://ollama.test/v1');
-        config()->set('ai.llm.model', 'wajhatak-qwen3:0.6b');
+        config()->set('ai.llm.model', 'wajhatak-qwen3:1.7b');
         config()->set('ai.llm.api_key', 'super-secret-test-key');
 
         Http::fake([
             'http://ollama.test/v1/models' => Http::response([
-                'data' => [['id' => 'wajhatak-qwen3:0.6b']],
+                'data' => [['id' => 'wajhatak-qwen3:1.7b']],
             ], 200),
         ]);
 
