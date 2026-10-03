@@ -73,7 +73,7 @@ services:
       AI_LLM_ENABLED: "true"
       AI_LLM_BASE_URL: http://ollama:11434/v1
       AI_LLM_API_KEY: ""
-      AI_LLM_MODEL: wajhatak-qwen3:0.6b
+      AI_LLM_MODEL: wajhatak-qwen3.5:0.8b
       # سقف ذاكرة الحاوية: PHP + عامل الطابور فقط (النموذج خدمة مستقلة).
       mem_limit: ${APP_MEM_LIMIT:-1g}
       # Control-panel admin account
