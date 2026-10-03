@@ -124,6 +124,27 @@ class AiAssistantController extends Controller
         ])]);
     }
 
+    /** POST /api/v1/ai/conversations — إنشاء محادثة جديدة صريحة. */
+    public function createConversation(Request $request): JsonResponse
+    {
+        $user=$request->user();
+        abort_unless($user,401,'يلزم تسجيل الدخول.');
+        $conversation=$this->conversations->currentFor($user,(string)$request->input('locale','ar'));
+        $conversation->update(['status'=>'archived','last_message_at'=>now()]);
+        $fresh=$this->conversations->currentFor($user,(string)$request->input('locale','ar'));
+        return response()->json(['data'=>['id'=>$fresh->id,'title'=>$fresh->title,'is_pinned'=>(bool)$fresh->is_pinned]],201);
+    }
+
+    /** PATCH /api/v1/ai/conversations/{id}/pin — تثبيت/إلغاء تثبيت. */
+    public function pin(Request $request,AiConversation $conversation): JsonResponse
+    {
+        $user=$request->user();
+        abort_unless($user,401,'يلزم تسجيل الدخول.');
+        abort_if($conversation->user_id!==$user->id,403,'غير مصرح للوصول لهذه المحادثة.');
+        $conversation->update(['is_pinned'=>$request->boolean('pinned')]);
+        return response()->json(['data'=>['id'=>$conversation->id,'is_pinned'=>(bool)$conversation->is_pinned]]);
+    }
+
     /** GET /api/v1/ai/conversations/{id} — رسائل محادثة (ملكيتها فقط). */
     public function show(Request $request, AiConversation $conversation): JsonResponse
     {
