@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EmailTemplate extends Model
 {
@@ -28,6 +29,11 @@ class EmailTemplate extends Model
         'is_system' => 'boolean',
         'version' => 'integer',
     ];
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(EmailTemplateVersion::class)->orderByDesc('version');
+    }
 
     /**
      * Get template by key.
