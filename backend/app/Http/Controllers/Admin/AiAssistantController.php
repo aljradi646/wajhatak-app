@@ -16,6 +16,7 @@ use App\Services\AI\AiIntentService;
 use App\Services\AI\AiLoggingService;
 use App\Services\AI\AiSchemaService;
 use App\Services\AI\AiSettingsService;
+use App\Services\AI\AiLlmClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -108,6 +109,7 @@ class AiAssistantController extends Controller
         private readonly AiAssistantService $assistant,
         private readonly AiConversationService $conversations,
         private readonly AiSchemaService $schema,
+        private readonly AiLlmClient $llm,
     ) {}
 
     /** GET /admin/ai — نظرة عامة: حالة المحرك والإحصاءات وروابط الأقسام. */
@@ -224,19 +226,24 @@ class AiAssistantController extends Controller
         $published = $this->safeCount(Property::class, fn ($q) => $q->where('status', 'published'));
         $needsReindex = $schemaProblems === [] && $indexed === 0 && $published > 0;
 
+        $llmHealth=$this->llm->health();
+        $healthy=$schemaProblems===[] && $this->settings->enabled() && (!$this->llm->configured() || $llmHealth['reachable']);
         return new AiHealthStatus(
-            healthy: $schemaProblems === [] && $this->settings->enabled(),
-            provider: 'deterministic',
+            healthy: $healthy,
+            provider: $this->llm->configured() ? 'openai-compatible-llm' : 'rule-fallback',
+            model: $llmHealth['model'] ?? null,
+            latencyMs: $llmHealth['latency_ms'] ?? null,
             message: $schemaProblems !== []
-                ? 'جداول/أعمدة ناقصة: '.implode('، ', $schemaProblems).' — اضغط «إصلاح المخطط» أو نفّذ php artisan ai:doctor --fix'
-                : ($needsReindex
-                    ? 'الفهرس فارغ رغم وجود '.$published.' عقارًا منشورًا — اضغط «إعادة بناء الفهرس الآن»'
-                    : 'المحرك الحتمي يعمل على الخادم مباشرة — جاهز.'),
+                ? 'جداول/أعمدة ناقصة: '.implode('، ', $schemaProblems)
+                : (!$this->llm->configured()
+                    ? ($needsReindex ? 'الفهرس يحتاج إعادة بناء.' : 'LLM غير مُعد؛ يعمل Rule Fallback.')
+                    : (($llmHealth['reachable']??false) ? 'خادم LLM متاح والوكيل يعمل مع Tool Calling.' : 'خادم LLM غير متاح؛ سيُستخدم fallback إذا كان مفعّلًا.')),
             details: [
-                'tables' => $diagnostics,
-                'indexed_properties' => $indexed,
-                'published_properties' => $published,
-                'schema_problems' => $schemaProblems,
+                'tables'=>$diagnostics,
+                'indexed_properties'=>$indexed,
+                'published_properties'=>$published,
+                'schema_problems'=>$schemaProblems,
+                'llm'=>$llmHealth,
             ],
         );
     }
@@ -327,7 +334,7 @@ class AiAssistantController extends Controller
 
         return view('admin.ai.playground', [
             'messages' => $messages,
-            'health' => new AiHealthStatus(true, 'deterministic', null, null, 'المحرك الحتمي جاهز.'),
+            'health' => $this->healthStatus(),
             'enabled' => $this->settings->enabled(),
             'assistantName' => $this->settings->assistantName(),
             'sections' => self::SETTINGS_SECTIONS,
