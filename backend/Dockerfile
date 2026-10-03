@@ -1,8 +1,12 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
-# المساعد الذكي محرك حتمي داخل Laravel (App\Services\AI\AiReplyEngine) —
-# لا Stage لبناء llama.cpp ولا تنزيل نماذج: صورة أصغر وأسرع بناءً وأقل استهلاكًا.
+# AI Agent runtime
+#
+# Laravel contains the secure orchestration/tool boundary only. The LLM is
+# provided as a separate OpenAI-compatible inference service (Ollama locally or
+# a dedicated inference service in production), so the model is not bundled
+# into the Laravel image.
 # =============================================================================
 
 # =============================================================================
