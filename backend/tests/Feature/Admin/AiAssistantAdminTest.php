@@ -52,6 +52,21 @@ class AiAssistantAdminTest extends TestCase
         $this->from('/admin/ai')->get('/admin/ai/settings/does-not-exist')->assertRedirect('/admin/ai');
     }
 
+    public function test_playground_renders_without_calling_llm_health_on_page_load(): void
+    {
+        $this->admin();
+
+        IlluminateSupportFacadesHttp::fake([
+            '*' => IlluminateSupportFacadesHttp::response([], 500),
+        ]);
+
+        $this->get('/admin/ai/playground')
+            ->assertOk()
+            ->assertSee('محادثة اختبار تفاعلية مباشرة');
+
+        IlluminateSupportFacadesHttp::assertNothingSent();
+    }
+
     public function test_monitoring_stats_and_logs_pages_render(): void
     {
         $this->admin();
