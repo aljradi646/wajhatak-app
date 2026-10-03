@@ -39,7 +39,7 @@ restartPolicyMaxRetries = 5
 # Railway's config-as-code (railway.toml) does NOT support variables. Add them
 # in the dashboard instead: Project -> Variables (or the app service), e.g.:
 #
-#   LUX_ALLOW_DEMO_SEED = true     (demo/trial dataset; entrypoint defaults to true)
+#   LUX_ALLOW_DEMO_SEED = false    (production default; use true only for a demo deployment)
 #   APP_KEY             = base64:...  (stable key across redeploys)
 #   ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD  (control-panel login)
 #   APP_URL             = https://${{RAILWAY_PUBLIC_DOMAIN}}
