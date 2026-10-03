@@ -169,22 +169,25 @@ class AiChatMessage {
 class AiConversationItem {
   const AiConversationItem({
     required this.id,
-    required this.lastMessage,
     required this.lastMessageAt,
+    this.title = 'محادثة جديدة',
+    this.isPinned = false,
     this.messageCount = 0,
   });
 
   final int id;
-  final String lastMessage;
+  final String title;
+  final bool isPinned;
   final DateTime lastMessageAt;
   final int messageCount;
 
   factory AiConversationItem.fromJson(Map<String, dynamic> json) {
     return AiConversationItem(
       id: json['id'] as int,
-      lastMessage: json['last_message'] as String? ?? '',
-      lastMessageAt: DateTime.parse(json['last_message_at'] as String),
-      messageCount: json['message_count'] as int? ?? 0,
+      title: json['title'] as String? ?? 'محادثة جديدة',
+      isPinned: json['is_pinned'] as bool? ?? false,
+      lastMessageAt: DateTime.parse(json['last_message_at'] as String? ?? DateTime.now().toIso8601String()),
+      messageCount: json['messages_count'] as int? ?? json['message_count'] as int? ?? 0,
     );
   }
 }
