@@ -61,6 +61,48 @@ class AiConversationService
         return $conversation;
     }
 
+    /** إنشاء محادثة جديدة صريحة دون إنشاء صف مؤقت ثم أرشفته. */
+    public function createNew(?User $user, string $locale = 'ar', ?string $sessionToken = null): AiConversation
+    {
+        $max = (int) config('ai.limits.max_conversations', 50);
+
+        if ($user) {
+            $count = AiConversation::query()
+                ->where('user_id', $user->id)
+                ->where('status', 'active')
+                ->count();
+
+            if ($count >= $max) {
+                $oldest = AiConversation::query()
+                    ->where('user_id', $user->id)
+                    ->where('status', 'active')
+                    ->orderByRaw('last_message_at IS NULL ASC')
+                    ->orderBy('last_message_at')
+                    ->first();
+
+                $oldest?->update([
+                    'status' => 'archived',
+                    'last_message_at' => now(),
+                ]);
+            }
+
+            return AiConversation::query()->create([
+                'user_id' => $user->id,
+                'locale' => $locale,
+                'status' => 'active',
+                'title' => 'محادثة جديدة',
+            ]);
+        }
+
+        return AiConversation::query()->create([
+            'user_id' => null,
+            'session_token' => $sessionToken ?: bin2hex(random_bytes(32)),
+            'locale' => $locale,
+            'status' => 'active',
+            'title' => 'محادثة جديدة',
+        ]);
+    }
+
     /** آخر رسائل المحادثة بصيغة مزود الاستدلال. */
     public function historyFor(AiConversation $conversation): array
     {
@@ -180,9 +222,19 @@ class AiConversationService
         $days = (int) $this->settings->get('ai_history_retention_days', 30);
         $cutoff = now()->subDays($days);
 
-        return (int) AiConversation::query()
+        $conversations = AiConversation::query()
+            ->whereNotNull('last_message_at')
             ->where('last_message_at', '<', $cutoff)
-            ->each(fn (AiConversation $c) => $c->messages()->delete() || $c->update(['status' => 'archived']))
-            ->count();
+            ->get();
+
+        foreach ($conversations as $conversation) {
+            $conversation->messages()->delete();
+            $conversation->update([
+                'status' => 'archived',
+                'last_message_at' => now(),
+            ]);
+        }
+
+        return $conversations->count();
     }
 }
