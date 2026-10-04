@@ -794,11 +794,14 @@ class AiAgentOrchestrator
             $this->rememberSearchPreferences($user, $filters);
 
             return $this->finish($userMessage, [
-                'reply' => (is_string($result['reply'] ?? null) && trim($result['reply']) !== '')
-                    ? trim((string) $result['reply'])
-                    : $this->replyEngine->summaryReply('', $properties, $filters),
+                'reply' => ($result['result_mode'] ?? 'exact') === 'alternatives'
+                    ? $this->replyEngine->alternativesReply($filters, (array) ($result['relaxations'] ?? []))
+                    : ((is_string($result['reply'] ?? null) && trim($result['reply']) !== '')
+                        ? trim((string) $result['reply'])
+                        : $this->replyEngine->summaryReply('', $properties, $filters)),
                 'status' => 'ok',
                 'response_type' => 'property_results',
+                'result_mode' => $result['result_mode'] ?? 'exact',
                 'properties' => $properties,
                 'filters' => $filters,
                 'tool_calls' => $result['tool_calls'] ?? [['tool' => $toolName, 'ok' => $ok]],
