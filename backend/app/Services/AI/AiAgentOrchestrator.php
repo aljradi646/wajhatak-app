@@ -63,9 +63,10 @@ class AiAgentOrchestrator
 
             if ($this->isRejection($normalized)) {
                 $this->stateService->setPendingAction($conversation, null);
+                $this->stateService->clearRetrievalState($conversation);
                 $this->conversationService->addUserMessage($conversation, $message, []);
 
-                return [
+                return $this->finish($conversation->messages()->latest('id')->first(), [
                     'reply' => 'حسنًا، ألغيت العملية ولم يتم تنفيذ أي إجراء.',
                     'status' => 'ok',
                     'response_type' => 'text',
@@ -74,7 +75,7 @@ class AiAgentOrchestrator
                     'tool_calls' => [],
                     'actions' => [],
                     'intent' => 'action_cancelled',
-                ];
+                ]);
             }
 
             if ($this->isConfirmation($normalized)) {
@@ -84,7 +85,7 @@ class AiAgentOrchestrator
                 $this->stateService->setPendingAction($conversation, null);
                 $this->conversationService->addUserMessage($conversation, $message, []);
 
-                return [
+                return $this->finish($conversation->messages()->latest('id')->first(), [
                     'reply' => (bool) ($result['success'] ?? false)
                         ? ($result['message'] ?? 'تم تنفيذ العملية بنجاح.')
                         : ($result['message'] ?? 'تعذر تنفيذ العملية.'),
@@ -98,7 +99,7 @@ class AiAgentOrchestrator
                     ]],
                     'actions' => [],
                     'intent' => 'confirmed_action',
-                ];
+                ]);
             }
         }
 
