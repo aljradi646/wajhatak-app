@@ -11,6 +11,7 @@ use App\Services\AI\AiConversationService;
 use App\Services\AI\AiSchemaService;
 use App\Services\AI\AiSettingsService;
 use App\Services\AI\AiLlmClient;
+use App\Services\AI\AiPropertySearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -25,6 +26,7 @@ class AiAssistantController extends Controller
         private readonly AiSettingsService $settings,
         private readonly AiSchemaService $schema,
         private readonly AiLlmClient $llm,
+        private readonly AiPropertySearchService $propertySearch,
     ) {}
 
     /** POST /api/v1/ai/chat — رسالة كاملة مع توليد رد ونتائج حقيقية. */
@@ -154,18 +156,37 @@ class AiAssistantController extends Controller
 
         $messages = $conversation->messages()
             ->where('status', '!=', 'blocked')
+            ->orderBy('id')
             ->limit((int) $this->settings->get('ai_max_messages', 50))
-            ->get(['id', 'role', 'content', 'property_ids', 'created_at']);
+            ->get(['id', 'role', 'content', 'property_ids', 'response_type', 'metadata', 'created_at']);
+
+        $ids = $messages->flatMap(fn ($m) => (array) ($m->property_ids ?? []))->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $propertyMap = collect($ids ? $this->propertySearch->detailsMany($ids) : [])->keyBy('property_id');
 
         return response()->json(['data' => [
             'id' => $conversation->id,
-            'messages' => $messages->map(fn ($m) => [
-                'id' => $m->id,
-                'role' => $m->role,
-                'content' => $m->content,
-                'property_ids' => $m->property_ids,
-                'created_at' => optional($m->created_at)->toISOString(),
-            ]),
+            'messages' => $messages->map(function ($m) use ($propertyMap) {
+                $type = $m->response_type ?: 'text';
+                $allowed = in_array($type, ['property_results', 'property_detail'], true);
+                $properties = $allowed
+                    ? collect((array) ($m->property_ids ?? []))
+                        ->map(fn ($id) => $propertyMap->get((int) $id))
+                        ->filter()
+                        ->values()
+                        ->all()
+                    : [];
+
+                return [
+                    'id' => $m->id,
+                    'role' => $m->role,
+                    'content' => $m->content,
+                    'response_type' => $type,
+                    'properties' => $properties,
+                    'actions' => data_get($m->metadata, 'actions', []),
+                    'property_ids' => $m->property_ids,
+                    'created_at' => optional($m->created_at)->toISOString(),
+                ];
+            }),
         ]]);
     }
 
