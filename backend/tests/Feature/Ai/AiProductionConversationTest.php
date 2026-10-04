@@ -70,6 +70,24 @@ class AiProductionConversationTest extends TestCase
         );
     }
 
+    public function test_property_type_with_city_asks_for_transaction_before_search(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد شقة في صنعاء',
+        ])->assertOk();
+
+        $data = $response->json('data');
+        $this->assertSame('clarification', $data['response_type']);
+        $this->assertSame([], $data['properties']);
+        $this->assertSame('apartment', $data['filters']['property_type'] ?? null);
+        $this->assertSame('صنعاء', $data['filters']['city'] ?? null);
+        $this->assertStringContainsString('شراء أم إيجار', $data['reply']);
+        $this->assertSame([], array_filter(
+            (array) $data['tool_calls'],
+            fn ($call) => in_array($call['tool'] ?? '', ['search_properties', 'search_nearby_properties'], true),
+        ));
+    }
+
     public function test_property_type_switch_never_returns_the_previous_type_as_cards(): void
     {
         $first = $this->postJson('/api/v1/ai/chat', [
