@@ -609,7 +609,11 @@ class AiAgentOrchestrator
             match ($name) {
                 'search_properties' => 'property_search',
                 'search_nearby_properties' => 'nearest_property',
-                default => 'property_detail',
+                'find_similar_properties' => 'property_recommendation',
+                'create_viewing_request' => 'viewing_request',
+                'get_property_details' => 'property_detail',
+                'get_app_knowledge' => 'platform_information',
+                default => 'unsupported_request',
             }
         ), true)) {
             return ['success' => false, 'error' => 'TOOL_NOT_ALLOWED', 'message' => 'الأداة غير مسموح بها لهذا الطلب.'];
