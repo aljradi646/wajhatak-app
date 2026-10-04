@@ -360,12 +360,9 @@ class AiAgentOrchestrator
             }
 
             $this->conversationService->updateUserMessageFilters($userMessage, $filters);
-            if ($filters === [] || ! $this->hasSearchCriteria($filters)) {
+            if ($filters === [] || ! $this->hasSearchCriteria($filters) || $this->requiresClarificationForSearch($filters)) {
                 return $this->finish($userMessage, [
-                    'reply' => $this->replyEngine->clarifyReply(
-                        $this->conversationService->consecutiveFollowUps($conversation),
-                        (int) config('ai.limits.max_followups', 2),
-                    ),
+                    'reply' => $this->clarifySearchReply($filters),
                     'status' => 'ok',
                     'response_type' => 'clarification',
                     'properties' => [],
@@ -576,6 +573,35 @@ class AiAgentOrchestrator
             'source' => [],
             'failed_stage' => null,
         ];
+    }
+
+    private function requiresClarificationForSearch(array $filters): bool
+    {
+        $type = ! empty($filters['property_type']);
+        if (! $type) {
+            return false;
+        }
+
+        // نوع العقار وحده لا يكفي لإطلاق بحث واسع، ونوع + عملية بدون موقع
+        // يحتاجان على الأقل اسم المدينة/المنطقة قبل إظهار النتائج.
+        if (empty($filters['transaction_type'])) {
+            return true;
+        }
+
+        return empty($filters['city']) && empty($filters['district']) && empty($filters['nearby']);
+    }
+
+    private function clarifySearchReply(array $filters): string
+    {
+        if (! empty($filters['property_type']) && empty($filters['transaction_type'])) {
+            return 'هل تبحث عن هذا النوع للبيع أم للإيجار؟';
+        }
+
+        if (! empty($filters['transaction_type']) && empty($filters['city']) && empty($filters['district'])) {
+            return 'وفي أي مدينة أو منطقة تفضّل البحث؟';
+        }
+
+        return $this->replyEngine->ambiguousReply();
     }
 
     private function hasSearchCriteria(array $filters): bool
