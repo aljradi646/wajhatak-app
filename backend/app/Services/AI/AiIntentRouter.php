@@ -85,8 +85,12 @@ class AiIntentRouter
         }
 
         if (AiChatIntentDetector::wantsNearby($message)) {
+            $nearbyParsed = $this->intentService->parse($message, [], []);
+            $nearbyFilters = (array) ($nearbyParsed['filters'] ?? []);
+
             return $this->result('nearest_property', [
-                'use_search_context' => $this->containsExplicitPropertyCriteria($message),
+                'filters' => $nearbyFilters,
+                'use_search_context' => false,
             ]);
         }
 
