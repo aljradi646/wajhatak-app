@@ -406,12 +406,23 @@ class _AiPropertyMiniCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} • ${property.transactionLabel}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} • ${property.transactionLabel}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        _copyButton(
+                          context,
+                          'السعر',
+                          '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} ${property.transactionLabel}',
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Row(
@@ -424,13 +435,22 @@ class _AiPropertyMiniCard extends StatelessWidget {
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
-                            property.locationLabel,
+                            property.address?.isNotEmpty == true
+                                ? property.address!
+                                : property.locationLabel,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
+                        ),
+                        _copyButton(
+                          context,
+                          'الموقع',
+                          property.address?.isNotEmpty == true
+                              ? property.address!
+                              : property.locationLabel,
                         ),
                         if (property.bedrooms != null) ...[
                           Icon(
@@ -460,6 +480,26 @@ class _AiPropertyMiniCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
+                        if (property.referenceCode?.isNotEmpty == true) ...[
+                          Icon(
+                            Icons.tag_rounded,
+                            size: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: Text(
+                              property.referenceCode!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          _copyButton(context, 'الرمز', property.referenceCode!),
+                        ],
                         if (!property.available)
                           _chip(context, 'غير متاح', WajhatakColors.terracotta)
                         else if (property.isFurnished)
@@ -502,8 +542,28 @@ class _AiPropertyMiniCard extends StatelessWidget {
     );
   }
 
-  /// مشاركة بطاقة العقار الحقيقي (معرف من الخادم) عبر مشاركة النظام —
-  /// بنسخ النص إلى الحافظة وفتح حوار المشاركة المتاح دون مكتبات إضافية.
+  Widget _copyButton(BuildContext context, String label, String value) {
+    return IconButton(
+      tooltip: 'نسخ $label',
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.all(2),
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      icon: const Icon(Icons.copy_rounded, size: 14),
+      onPressed: () async {
+        await Clipboard.setData(ClipboardData(text: value));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم نسخ $label'),
+              duration: const Duration(milliseconds: 900),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  /// تجهيز نص بطاقة العقار الحقيقية للمشاركة/النسخ.
   Future<void> _share(BuildContext context) async {
     final summary =
         '🏠 ${property.title}\n'
