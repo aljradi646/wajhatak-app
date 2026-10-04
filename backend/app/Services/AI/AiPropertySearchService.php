@@ -38,7 +38,21 @@ class AiPropertySearchService
         }
 
         try {
-            return $this->runSearch($filters, $limit);
+            $result = $this->runSearch($filters, $limit);
+
+            if (($result['items'] ?? []) === [] && $this->shouldOfferAlternatives($filters)) {
+                $alternatives = $this->searchClosestAlternatives($filters, $limit);
+                if (($alternatives['items'] ?? []) !== []) {
+                    return [
+                        'items' => $alternatives['items'],
+                        'total' => $result['total'] ?? 0,
+                        'result_mode' => 'alternatives',
+                        'relaxations' => $alternatives['relaxations'] ?? [],
+                    ];
+                }
+            }
+
+            return $result + ['result_mode' => 'exact', 'relaxations' => []];
         } catch (\Illuminate\Database\QueryException $e) {
             // خطأ مخطط/استعلام — نُسجّل السبب الحقيقي بوضوح ونكمل بأمان.
             Log::error('ai.search_failed', [
@@ -191,6 +205,75 @@ class AiPropertySearchService
         ];
     }
 
+    /**
+     * بدائل قريبة عند فشل التطابق الحرفي. القيود الأساسية فقط تبقى صلبة.
+     */
+    public function searchClosestAlternatives(array $filters, ?int $limit = null): array
+    {
+        if (! $this->indexAvailable()) {
+            return ['items' => [], 'relaxations' => []];
+        }
+
+        $limit = $limit ?? (int) $this->settings->get('ai_max_results', 6);
+        $maxCandidates = max($limit * 10, (int) $this->settings->get('ai_max_candidates', 60));
+
+        try {
+            $rows = AiSearchIndex::query()
+                ->whereIn('status', ['published'])
+                ->when(! empty($filters['transaction_type']), fn (Builder $q) => $q->where('transaction_type', $filters['transaction_type']))
+                ->when(! empty($filters['property_type']), fn (Builder $q) => $q->where('type_slug', $this->typeSlug((string) $filters['property_type'])))
+                ->when(! empty($filters['city']), fn (Builder $q) => $q->where('city', $filters['city']))
+                ->orderByDesc('is_featured')
+                ->orderByDesc('is_new')
+                ->orderBy('price')
+                ->limit($maxCandidates)
+                ->get();
+
+            $scored = $rows->map(fn (AiSearchIndex $row) => [
+                'row' => $row,
+                'score' => $this->score($row, $filters),
+            ])->sortByDesc('score')->take($limit)->values();
+
+            $candidates = $scored->map(
+                fn (array $entry) => $this->present($entry['row'], (float) $entry['score'], detailed: true, alternative: true)
+            )->all();
+
+            return [
+                'items' => $this->hydrateLiveProperties($candidates, []),
+                'relaxations' => array_values(array_filter([
+                    (! empty($filters['district']) || ! empty($filters['neighborhood']))
+                        ? 'وسّعت البحث من الحي إلى بقية المدينة.'
+                        : null,
+                    (isset($filters['min_price']) || isset($filters['max_price']))
+                        ? 'خففت قيد السعر فقط في البدائل.'
+                        : null,
+                    (isset($filters['bedrooms_min']) || isset($filters['bedrooms_max']))
+                        ? 'خففت قيد عدد الغرف فقط في البدائل.'
+                        : null,
+                    array_key_exists('furnished', $filters)
+                        ? 'خففت قيد التأثيث فقط في البدائل.'
+                        : null,
+                    ! empty($filters['is_new'])
+                        ? 'خففت قيد حداثة العقار فقط في البدائل.'
+                        : null,
+                ])),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('ai.closest_alternatives_failed', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return ['items' => [], 'relaxations' => []];
+        }
+    }
+
+    private function shouldOfferAlternatives(array $filters): bool
+    {
+        return ! empty($filters['property_type'])
+            || ! empty($filters['transaction_type'])
+            || ! empty($filters['city']);
+    }
+
     /** بحث بالمدينة/الحي لأدوات search_locations. */
     public function findLocations(string $term, int $limit = 8): array
     {
@@ -292,7 +375,11 @@ class AiPropertySearchService
             }
 
             $distance = $item['distance_km'] ?? null;
-            $presented = $this->presentLive($property, (float) ($item['match_score'] ?? 0.0));
+            $presented = $this->presentLive(
+                $property,
+                (float) ($item['match_score'] ?? 0.0),
+                (bool) ($item['is_alternative'] ?? false),
+            );
             if ($distance !== null) {
                 $presented['distance_km'] = (float) $distance;
             }
@@ -342,7 +429,7 @@ class AiPropertySearchService
         return true;
     }
 
-    private function presentLive(Property $property, float $score): array
+    private function presentLive(Property $property, float $score, bool $alternative = false): array
     {
         $transaction = $property->transaction_type instanceof \BackedEnum
             ? $property->transaction_type->value
@@ -374,6 +461,28 @@ class AiPropertySearchService
             'latitude' => $property->location?->latitude !== null ? (float) $property->location->latitude : null,
             'longitude' => $property->location?->longitude !== null ? (float) $property->location->longitude : null,
         ];
+        $data['is_alternative'] = $alternative;
+        $data['ui'] = [
+            'component' => 'property_card',
+            'variant' => $alternative ? 'close_match' : 'exact_match',
+            'badge' => $alternative ? 'قريب من طلبك' : null,
+            'image_priority' => true,
+            'open_action' => [
+                'type' => 'open_property',
+                'property_id' => (int) $property->id,
+            ],
+            'title_action' => [
+                'type' => 'open_property',
+                'property_id' => (int) $property->id,
+            ],
+            'share_action' => [
+                'type' => 'share_property',
+                'property_id' => (int) $property->id,
+            ],
+            'copy_actions' => [],
+        ];
+
+        return $data;
     }
 
     /** جلب عدة عقارات مباشرة من المصدر الحي، لتغذية تاريخ المحادثة دون N+1 متكرر. */
