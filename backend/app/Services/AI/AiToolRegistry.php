@@ -116,6 +116,14 @@ class AiToolRegistry
      */
     public function execute(string $toolName, array $arguments, ?User $user = null): array
     {
+        $validation = $this->validateArguments($toolName, $arguments);
+        if ($validation !== null) {
+            return [
+                'success' => false,
+                'error' => 'INVALID_TOOL_ARGUMENTS',
+                'message' => $validation,
+            ];
+        }
         // 1. التحقق من الصلاحية
         if (!$this->permissionGuard->canExecuteTool($user, $toolName, $arguments)) {
             return [
@@ -149,6 +157,42 @@ class AiToolRegistry
                 'message' => 'تعذر تنفيذ الأداة حاليًا. تم تسجيل الخطأ داخليًا.',
             ];
         }
+    }
+
+    private function validateArguments(string $toolName, array $args): ?string
+    {
+        $allowed = match ($toolName) {
+            'search_properties' => ['city','district','property_type','transaction_type','bedrooms','min_price','max_price','furnished'],
+            'get_property_details' => ['property_id'],
+            'search_nearby_properties' => ['latitude','longitude','radius_km'],
+            'get_app_knowledge' => ['query'],
+            'create_viewing_request' => ['property_id','scheduled_date','scheduled_time','notes','confirmed'],
+            'cancel_viewing_request' => ['viewing_id','confirmed'],
+            default => null,
+        };
+
+        if ($allowed !== null) {
+            $unknown = array_diff(array_keys($args), $allowed);
+            if ($unknown !== []) {
+                return 'توجد معاملات غير مسموح بها للأداة.';
+            }
+        }
+
+        if (isset($args['property_id']) && (int) $args['property_id'] <= 0) return 'معرف العقار غير صالح.';
+        if (isset($args['bedrooms']) && ((int) $args['bedrooms'] < 0 || (int) $args['bedrooms'] > 20)) return 'عدد الغرف غير صالح.';
+        if (isset($args['transaction_type']) && ! in_array($args['transaction_type'], ['sale','rent'], true)) return 'نوع العملية غير صالح.';
+        if (isset($args['min_price']) && (float) $args['min_price'] < 0) return 'الحد الأدنى للسعر غير صالح.';
+        if (isset($args['max_price']) && (float) $args['max_price'] < 0) return 'الحد الأعلى للسعر غير صالح.';
+        if (isset($args['get_app_knowledge']) && mb_strlen((string) $args['get_app_knowledge']) > 200) return 'الاستعلام طويل جدًا.';
+        if (isset($args['query']) && mb_strlen((string) $args['query']) > 200) return 'الاستعلام طويل جدًا.';
+
+        if ($toolName === 'search_nearby_properties') {
+            if (! isset($args['latitude'], $args['longitude'])) return 'إحداثيات الموقع مطلوبة.';
+            if ((float) $args['latitude'] < -90 || (float) $args['latitude'] > 90) return 'خط العرض غير صالح.';
+            if ((float) $args['longitude'] < -180 || (float) $args['longitude'] > 180) return 'خط الطول غير صالح.';
+        }
+
+        return null;
     }
 
     private function executeSearchProperties(array $args): array
