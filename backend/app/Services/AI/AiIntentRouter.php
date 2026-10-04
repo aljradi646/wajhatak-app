@@ -206,23 +206,31 @@ class AiIntentRouter
 
     private function shouldReuseSearchContext(string $text, array $filters, array $previous): bool
     {
-        if ($previous === []) {
+        if ($previous === [] || $filters === []) {
             return false;
         }
 
-        if ($filters !== [] && $this->isFreshSearchPhrase($text)) {
+        // طلب جديد صريح يبدأ بكلمة طلب + نوع العقار يجب ألا يرث نتائج البحث السابق.
+        if ($this->isFreshSearchPhrase($text)) {
             return false;
         }
 
-        // إذا استخرجنا معيارًا واحدًا فقط مثل «في صنعاء» أو «غرفتين»،
-        // فهذه متابعة بطبيعتها ما لم تتضمن طلب بحث جديد صريحًا.
-        if ($filters !== [] && ! $this->containsExplicitPropertyCriteria($text)) {
-            return true;
+        // كلمة نوع عقار منفردة مثل «فلة» تُعامل كبداية بحث جديدة؛ نطلب العملية
+        // والموقع بدل نسخ القيود السابقة بلا تصريح.
+        if ($this->isStandalonePropertyType($text)) {
+            return false;
         }
 
+        // أي معيار جزئي آخر داخل محادثة بحث نشطة هو متابعة: «تكون غرفتين»،
+        // «في صنعاء»، «أقل من 100 ألف»، «غير مفروشة»... الجديد يتغلب على القديم.
         return $this->isContextRefinement($text)
             || $this->isCorrectionPhrase($text)
-            || ($filters !== [] && $this->isShortPropertyCorrection($text));
+            || $filters !== [];
+    }
+
+    private function isStandalonePropertyType(string $text): bool
+    {
+        return preg_match('/^(شقه|شقق|دوبلكس|فيلا|فلل|فله|فيله|بيت|بيوت|منزل|منازل|دور|ارض|اراضي|محل|محلات|مكتب|عماره)$/u', trim($text)) === 1;
     }
 
     private function isFreshSearchPhrase(string $text): bool
