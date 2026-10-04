@@ -167,15 +167,29 @@ class AiAgentOrchestrator
 
         if ($intent === 'platform_support') {
             $this->stateService->clearRetrievalState($conversation);
+            $knowledge = $this->toolRegistry->execute('get_app_knowledge', ['query' => $message], $user);
+            $items = is_array($knowledge['results'] ?? null) ? $knowledge['results'] : [];
+
             return $this->finish($userMessage, [
-                'reply' => $this->replyEngine->platformSupportReply($message),
+                'reply' => $items !== []
+                    ? $this->replyEngine->knowledgeReply($items)
+                    : $this->replyEngine->platformSupportReply($message),
                 'status' => 'ok',
                 'response_type' => 'text',
                 'properties' => [],
                 'filters' => [],
-                'tool_calls' => [],
+                'tool_calls' => [['tool' => 'get_app_knowledge', 'ok' => (bool) ($knowledge['success'] ?? false)]],
                 'actions' => [],
                 'intent' => $intent,
+                'citations' => array_map(
+                    fn (array $item) => [
+                        'source_type' => 'platform_knowledge',
+                        'source_id' => $item['id'] ?? null,
+                        'version' => $item['version'] ?? $this->knowledgeService->version(),
+                    ],
+                    array_filter($items, 'is_array'),
+                ),
+                'source' => ['type' => 'platform_knowledge', 'version' => $this->knowledgeService->version()],
             ]);
         }
 
