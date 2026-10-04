@@ -238,8 +238,14 @@ class AiPropertySearchService
                 fn (array $entry) => $this->present($entry['row'], (float) $entry['score'], detailed: true, alternative: true)
             )->all();
 
+            $hardFilters = array_filter([
+                'transaction_type' => $filters['transaction_type'] ?? null,
+                'property_type' => $filters['property_type'] ?? null,
+                'city' => $filters['city'] ?? null,
+            ], fn ($value) => $value !== null && $value !== '');
+
             return [
-                'items' => $this->hydrateLiveProperties($candidates, []),
+                'items' => $this->hydrateLiveProperties($candidates, $hardFilters),
                 'relaxations' => array_values(array_filter([
                     (! empty($filters['district']) || ! empty($filters['neighborhood']))
                         ? 'وسّعت البحث من الحي إلى بقية المدينة.'
@@ -502,6 +508,7 @@ class AiPropertySearchService
                 'type',
                 'location',
                 'features',
+                'agent.user',
                 'images' => fn ($q) => $q->orderByDesc('is_cover')->orderBy('sort_order'),
             ])
             ->whereIn('id', $ids)
