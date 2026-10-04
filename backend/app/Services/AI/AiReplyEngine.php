@@ -288,6 +288,25 @@ class AiReplyEngine
     }
 
     /** رد عدم توفر نتائج بعد المتابعة الذكية. */
+    public function alternativesReply(array $filters, array $relaxations = []): string
+    {
+        $city = $filters['city'] ?? null;
+        $type = $filters['property_type'] ?? null;
+        $max = $filters['max_price'] ?? null;
+
+        $criteria = [];
+        if ($type) $criteria[] = 'نوع العقار';
+        if ($city) $criteria[] = 'المدينة ('.$city.')';
+        if ($max !== null) $criteria[] = 'الميزانية';
+
+        $message = 'لم أجد تطابقًا حرفيًا مع '.implode(' و', $criteria ?: ['الشروط']).' حاليًا، لكن وجدت بدائل حقيقية أقرب إلى طلبك.';
+        if ($relaxations !== []) {
+            $message .= '\n'.implode(' ', array_slice($relaxations, 0, 2));
+        }
+
+        return $message;
+    }
+
     public function noResultsReply(array $filters): string
     {
         $city = $filters['city'] ?? null;
