@@ -26,16 +26,10 @@ class AiReplyEngine
         }
 
         $first = $items[0];
-        $lines = [];
+        $lines = [$this->introLine($count, $filters, $first)];
 
-        $lines[] = $this->introLine($count, $filters, $first);
-
-        foreach (array_slice($items, 0, 3) as $index => $item) {
-            $lines[] = $this->cardLine($item);
-        }
-
-        if ($count > 3) {
-            $lines[] = 'وهناك '.($count - 3).' عقارًا آخر مطابقًا ظهرت لك بطاقاته في المحادثة 👇';
+        if ($count > 1) {
+            $lines[] = 'عرضت لك الخيارات في بطاقات تفاعلية. افتح البطاقة التي تهمك للتفاصيل الحالية.';
         }
 
         $lines[] = $this->nextStepLine($filters, $count, (int) ($first['property_id'] ?? 0));
@@ -50,12 +44,7 @@ class AiReplyEngine
             return 'لم أجد عقارات مشابهة كافية حتى الآن، لكن عقارات جديدة تُنشر باستمرار — جرّب لاحقًا أو اسألني عن منطقة معينة.';
         }
 
-        $lines = ['هذه أقرب العقارات المشابهة المتوفرة لدينا حاليًا:'];
-        foreach (array_slice($items, 0, 3) as $item) {
-            $lines[] = $this->cardLine($item);
-        }
-
-        return implode("\n", $lines);
+        return 'وجدت لك '.count($items).' عقارًا مشابهًا من البيانات الحالية. افتح أي بطاقة أدناه لمراجعة التفاصيل.';
     }
 
     /**
@@ -379,7 +368,7 @@ class AiReplyEngine
 
         $message = 'لم أجد تطابقًا حرفيًا مع '.implode(' و', $criteria ?: ['الشروط']).' حاليًا، لكن وجدت بدائل حقيقية أقرب إلى طلبك.';
         if ($relaxations !== []) {
-            $message .= '\n'.implode(' ', array_slice($relaxations, 0, 2));
+            $message .= "\n".implode(' ', array_slice($relaxations, 0, 2));
         }
 
         return $message;
