@@ -3,6 +3,8 @@
 namespace App\Services\AI;
 
 use App\Models\AiConversation;
+use Illuminate\Support\Carbon;
+use Throwable;
 
 class AiConversationStateService
 {
@@ -29,8 +31,10 @@ class AiConversationStateService
         array $lastFilters = [],
         ?array $selectedProperty = null,
         ?array $retrievedPropertyIds = null,
+        ?int $expectedUserMessageId = null,
     ): void {
-        if (! $conversation->exists) {
+        if (! $conversation->exists
+            || ($expectedUserMessageId !== null && ! $this->isCurrentTurn($conversation, $expectedUserMessageId))) {
             return;
         }
 
@@ -124,7 +128,7 @@ class AiConversationStateService
 
         if (! empty($pending['created_at'])) {
             try {
-                if (now()->diffInMinutes(IlluminateSupportCarbon::parse($pending['created_at'])) > 15) {
+                if (now()->diffInMinutes(Carbon::parse($pending['created_at'])) > 15) {
                     $this->setPendingAction($conversation, null);
                     return null;
                 }
