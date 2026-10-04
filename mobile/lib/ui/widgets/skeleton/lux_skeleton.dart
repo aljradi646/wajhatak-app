@@ -464,6 +464,71 @@ class _LuxSkeletonBody extends StatelessWidget {
   }
 }
 
+/// Skeleton مطابق لتخطيط تفاصيل العقار الفعلي.
+class PropertyDetailsSkeleton extends StatelessWidget {
+  const PropertyDetailsSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => _LuxShimmer(
+    child: CustomScrollView(
+      slivers: [
+        const SliverToBoxAdapter(child: LuxSkeleton(height: 330, radius: 0)),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 70),
+          sliver: SliverList.list(children: [
+            const LuxSkeleton(width: 260, height: 26),
+            const SizedBox(height: 10),
+            Row(children: const [LuxSkeleton(width: 150, height: 38), SizedBox(width: 8), LuxSkeleton(width: 100, height: 30)]),
+            const SizedBox(height: 16),
+            Row(children: const [Expanded(child: LuxSkeleton(height: 54)), SizedBox(width: 10), Expanded(child: LuxSkeleton(height: 54))]),
+            const SizedBox(height: 24),
+            const LuxSkeleton(width: 120, height: 20),
+            const SizedBox(height: 10),
+            const LuxSkeleton(height: 90),
+            const SizedBox(height: 20),
+            const LuxSkeleton(width: 120, height: 20),
+            const SizedBox(height: 10),
+            const LuxSkeleton(height: 120),
+            const SizedBox(height: 22),
+            const LuxSkeleton(height: 84),
+            const SizedBox(height: 18),
+            const LuxSkeleton(height: 54),
+          ]),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Skeleton مطابق لشبكة صفحة الاستكشاف.
+class ExploreSkeleton extends StatelessWidget {
+  const ExploreSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => const PropertyGridSkeleton(count: 6);
+}
+
+/// Skeleton لتقرير الوكيل مع KPI وجدول، بدون بيانات وهمية.
+class AgentReportSkeleton extends StatelessWidget {
+  const AgentReportSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => _LuxShimmer(
+    child: Column(children: [
+      const LuxSkeleton(height: 92),
+      const SizedBox(height: 12),
+      Wrap(spacing: 10, runSpacing: 10, children: [
+        SizedBox(width: 160, child: LuxSkeleton(height: 72)),
+        SizedBox(width: 160, child: LuxSkeleton(height: 72)),
+        SizedBox(width: 160, child: LuxSkeleton(height: 72)),
+        SizedBox(width: 160, child: LuxSkeleton(height: 72)),
+      ]),
+      const SizedBox(height: 12),
+      const LuxSkeleton(height: 300),
+    ]),
+  );
+}
+
 /// ===============================================================
 /// Content Skeleton
 /// ===============================================================
