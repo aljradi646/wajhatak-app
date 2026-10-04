@@ -134,7 +134,23 @@ class AiReplyEngine
                 }
             }
 
-            return $count > 0 ? $options[$start] : '';
+            if ($count === 0) {
+                return '';
+            }
+
+            $candidate = $options[$start];
+            $suffixes = [
+                ' وأنا معك للخطوة التالية.',
+                ' وخذ راحتك في الكلام.',
+                ' وقل لي ما يدور في بالك.',
+                ' وأنا جاهز نكمل معك.',
+                ' ونقدر نبدأ من أي نقطة تحب.',
+                ' وأخبرني بما تحتاج الآن.',
+            ];
+
+            return $candidate.($recentReplies !== []
+                ? $suffixes[$variationIndex % count($suffixes)]
+                : '');
         };
         $formal = AiChatIntentDetector::isFormal($message);
 
