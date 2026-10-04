@@ -418,7 +418,18 @@ class AiAgentOrchestrator
         array $filters,
     ): array {
         $allowed = $this->toolRegistry->allowedToolsForIntent('property_search');
-        $tools = $this->toolRegistry->getToolsSchema($user, $allowed);
+        $schemas = $this->toolRegistry->getToolsSchema($user, $allowed);
+        $tools = array_values(array_map(
+            fn (array $schema) => [
+                'type' => 'function',
+                'function' => [
+                    'name' => $schema['name'],
+                    'description' => $schema['description'],
+                    'parameters' => $schema['parameters'],
+                ],
+            ],
+            $schemas,
+        ));
 
         if ($this->llm->configured()) {
             try {
