@@ -127,6 +127,12 @@ class AiAssistantService
                     'filters' => $filters,
                     'tool_calls' => $toolCalls,
                     'response_type' => 'error',
+                    'ui' => [
+                        'response_component' => 'assistant_message',
+                        'property_card_component' => 'property_card',
+                        'property_card_click_action' => 'open_property',
+                        'property_ids' => [],
+                    ],
                     'actions' => [],
                     'citations' => [],
                     'source' => [],
