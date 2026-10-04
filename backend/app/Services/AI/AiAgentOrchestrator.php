@@ -814,7 +814,7 @@ class AiAgentOrchestrator
 
         return [
             'reply' => $reason === 'out_of_domain'
-                ? 'أنا مساعد وجهتك الذكي، ومتخصص في عقارات المنصة وخدماتها فقط.'
+                ? $this->replyEngine->unclearRequestReply()
                 : 'عذرًا، لا أستطيع المساعدة في هذا الطلب.',
             'status' => 'blocked',
             'properties' => [],
