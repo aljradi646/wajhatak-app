@@ -185,6 +185,12 @@ class AiIntentRouter
             return false;
         }
 
+        // إذا استخرجنا معيارًا واحدًا فقط مثل «في صنعاء» أو «غرفتين»،
+        // فهذه متابعة بطبيعتها ما لم تتضمن طلب بحث جديد صريحًا.
+        if ($filters !== [] && ! $this->containsExplicitPropertyCriteria($text)) {
+            return true;
+        }
+
         return $this->isContextRefinement($text)
             || $this->isCorrectionPhrase($text)
             || ($filters !== [] && $this->isShortPropertyCorrection($text));
