@@ -58,7 +58,7 @@ class AiPropertySearchService
         $minScore = (float) $this->settings->get('ai_min_match_score', 0.05);
 
         $query = AiSearchIndex::query()
-            ->with(['property.agent.user', 'property.location'])
+            ->with(['property.agent.user', 'property.location', 'property.images'])
             ->whereIn('status', ['published']);
 
         // --- تصفية هيكلية (كلها AND) ---
@@ -517,19 +517,18 @@ class AiPropertySearchService
         if ($detailed) {
             $data['description'] = $row->description;
             // رابط صورة الغلاف الحقيقية من جدول property_images (إن وجدت).
-            $image = \App\Models\PropertyImage::query()
-                ->where('property_id', $row->property_id)
-                ->orderByDesc('is_cover')->orderBy('sort_order')
-                ->first(['path']);
+            $images = $property = $row->relationLoaded('property') ? $row->property : null;
+            $images = $property?->relationLoaded('images') ? $property->images : collect();
+            $image = $images
+                ->sortBy(fn ($image) => (! empty($image->is_cover) ? 0 : 1).'|'.str_pad((string) ($image->sort_order ?? 0), 10, '0', STR_PAD_LEFT))
+                ->first();
             $data['image_url'] = $image ? asset('storage/'.$image->path) : null;
             $data['latitude'] = $row->latitude !== null ? (float) $row->latitude : null;
             $data['longitude'] = $row->longitude !== null ? (float) $row->longitude : null;
 
             // بيانات عامة من العقار المنشور والوكيل؛ تُستخدم فقط لإجراءات
             // النسخ/المشاركة في الواجهة ولا تتضمن أسرارًا أو بيانات داخلية.
-            $property = $row->relationLoaded('property') ? $row->property : null;
-            $agent = $property?->agent;
-            $location = $property?->location;
+x
 
             if ($property?->reference_code) {
                 $data['reference_code'] = (string) $property->reference_code;
