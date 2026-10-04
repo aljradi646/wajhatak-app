@@ -117,7 +117,7 @@ class AiNaturalConversationRoutingTest extends TestCase
 
     public function test_weather_and_joke_are_safe_conversational_intents(): void
     {
-        foreach (['كيف الجو؟', 'قول لي نكتة'] as $message) {
+        foreach (['كيف الجو؟', 'كيف الجو في صنعاء؟', 'قول لي نكتة'] as $message) {
             $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
 
             $response->assertOk();
