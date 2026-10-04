@@ -499,6 +499,17 @@ class AiPropertySearchService
                     'type' => 'share_property',
                     'property_id' => (int) $property->id,
                 ],
+                'copy_actions' => array_values(array_filter([
+                    $data['price'] !== null
+                        ? ['field' => 'price', 'value' => $data['price'].' '.((string) ($data['currency'] ?? ''))]
+                        : null,
+                    collect([$data['district'], $data['neighborhood'], $data['city']])->filter()->implode(' - ') !== ''
+                        ? ['field' => 'location', 'value' => collect([$data['district'], $data['neighborhood'], $data['city']])->filter()->implode(' - ')]
+                        : null,
+                    $data['title'] !== ''
+                        ? ['field' => 'title', 'value' => $data['title']]
+                        : null,
+                ])),
             ],
         ];
 
