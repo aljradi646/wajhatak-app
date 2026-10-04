@@ -103,13 +103,30 @@ class AiReplyEngine
     }
 
     /** رد حوار عام قصير طبيعي (تحية/شكر/مساعدة/إحصاء). */
-    public function smallTalkReply(string $message, string $intent): string
+    public function smallTalkReply(string $message, string $intent, int $variationIndex = 0, array $recentReplies = []): string
     {
         $name = $this->settings->assistantName();
 
-        return match ($intent) {
-            'greeting' => "وعليكم السلام ورحمة الله وبركاته. أهلًا بك! أنا {$name}، مساعد وجهتك. كيف أساعدك اليوم؟",
-            'wellbeing' => 'بخير والحمد لله 😄. شكرًا لسؤالك. ماذا تحتاج اليوم؟',
+        $variants = [
+            'greeting' => [
+                "وعليكم السلام ورحمة الله وبركاته. أهلًا بك! أنا {$name}، مساعد وجهتك. كيف أساعدك اليوم؟",
+                "وعليكم السلام 🌿. أهلًا بك في وجهتك. ماذا تحب نبدأ به اليوم؟",
+                "حياك الله. أنا {$name}، مساعد وجهتك. أخبرني بما تحتاجه وسأتعامل معه بالطريقة المناسبة.",
+            ],
+            'wellbeing' => [
+                'بخير والحمد لله. شكرًا لسؤالك. ماذا تحتاج اليوم؟',
+                'الحمد لله بخير. جاهز أساعدك في وجهتك؛ ما الذي تبحث عنه؟',
+            ],
+            'acknowledgement' => [
+                'تمام. أنا معك؛ ما الخطوة التالية؟',
+                'تمام 👍. قل لي وش نكمل عليه.',
+            ],
+        ];
+
+        $base = match ($intent) {
+            'greeting' => $variants['greeting'][$variationIndex % count($variants['greeting'])],
+            'wellbeing' => $variants['wellbeing'][$variationIndex % count($variants['wellbeing'])],
+            'acknowledgement' => $variants['acknowledgement'][$variationIndex % count($variants['acknowledgement'])],
             'thanks' => 'العفو، هذا واجبي. قل لي احتياجك متى ما كان جاهزًا.',
             'capabilities' => "أنا {$name}. أساعدك في البحث عن العقارات المنشورة فعليًا، عرض تفاصيلها الحالية، المقارنة بينها، وشرح استخدام وظائف منصة وجهتك المتاحة.",
             'stats' => $this->statsReply(),
@@ -117,10 +134,16 @@ class AiReplyEngine
             'joke' => 'أكيد 😄: يبدو أن حتى العقار يحتاج موعدًا قبل أن يخرج من البيت! وإذا أردت نرجع للعقار، أعطني طلبك وسأبحث فعليًا.',
             'casual' => 'أكيد، خذ راحتك. نقدر نتكلم بشكل طبيعي، وعندما تحتاج شيئًا عقاريًا أبحث لك من بيانات وجهتك الحالية.',
             'farewell' => 'في أمان الله. عندما تحتاج بحثًا أو تفاصيل عقار ارجع لي.',
-            'acknowledgement' => 'تمام. أنا معك؛ ما الخطوة التالية؟',
             'emotion' => 'سلامتك. خذ راحتك، وإذا احتجت مساعدة عملية في وجهتك أساعدك من البيانات الفعلية.',
             default => 'أنا مساعد وجهتك. قل لي ما تحتاج وسأتعامل معه بالطريقة المناسبة.',
         };
+
+        // حماية إضافية لو كان النص المقترح مطابقًا لآخر رد.
+        if ($recentReplies !== [] && end($recentReplies) === $base && isset($variants[$intent])) {
+            return $variants[$intent][($variationIndex + 1) % count($variants[$intent])];
+        }
+
+        return $base;
     }
 
     /** رد إحصاءات حقيقية من الفهرس (كم عقارًا متوفرًا). */
@@ -223,7 +246,7 @@ class AiReplyEngine
 
     public function ambiguousReply(): string
     {
-        return 'عذرًا، لم أفهم قصدك بشكل كافٍ. هل تريد البحث عن عقار، أم تريد معرفة شيء عن منصة وجهتك؟';
+        return 'عذراً، لم أفهم طلبك بوضوح. هل تبحث عن عقار معين أم تحتاج مساعدة في استخدام التطبيق؟';
     }
 
     public function technicalReply(): string
