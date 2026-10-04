@@ -112,6 +112,32 @@ class AiAgentOrchestrator
             ]);
         }
 
+        if ($intent === 'platform_support') {
+            return $this->finish($userMessage, [
+                'reply' => $this->replyEngine->platformSupportReply($message),
+                'status' => 'ok',
+                'response_type' => 'text',
+                'properties' => [],
+                'filters' => [],
+                'tool_calls' => [],
+                'actions' => [],
+                'intent' => $intent,
+            ]);
+        }
+
+        if ($intent === 'investment_clarify') {
+            return $this->finish($userMessage, [
+                'reply' => $this->replyEngine->investmentClarifyReply(),
+                'status' => 'ok',
+                'response_type' => 'clarification',
+                'properties' => [],
+                'filters' => $route['filters'] ?? [],
+                'tool_calls' => [],
+                'actions' => [],
+                'intent' => $intent,
+            ]);
+        }
+
         if (in_array($intent, ['platform_information', 'platform_how_to'], true)) {
             $knowledge = $this->toolRegistry->execute(
                 'get_app_knowledge',
