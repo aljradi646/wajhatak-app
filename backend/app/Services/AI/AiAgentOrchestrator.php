@@ -146,7 +146,7 @@ class AiAgentOrchestrator
 
         // محادثة عامة: نسمح للنموذج بصياغة رد طبيعي من دون أي أدوات أو بيانات عقارية.
         if (($base['intent'] ?? '') === 'conversation') {
-            return $this->processConversationWithLlm($message, $base);
+            return $this->processConversationWithLlm($message, $conversation, $base);
         }
 
         if (empty($base['properties']) && empty($base['tool_calls'])) {
@@ -213,8 +213,19 @@ class AiAgentOrchestrator
      * مسار محادثة عامة اختياري بالنموذج الصغير.
      * لا يرسل أدوات ولا سياق عقاري، ويعود إلى الرد الآمن عند الفشل.
      */
-    private function processConversationWithLlm(string $message, array $base): array
-    {
+    private function processConversationWithLlm(
+        string $message,
+        AiConversation $conversation,
+        array $base
+    ): array {
+        $recentReplies = $conversation->messages()
+            ->where('role', 'assistant')
+            ->latest('id')
+            ->limit(8)
+            ->pluck('content')
+            ->map(fn ($content) => (string) $content)
+            ->all();
+
         try {
             $response = $this->llm->chat([
                 [
@@ -223,6 +234,7 @@ class AiAgentOrchestrator
 هذه الرسالة محادثة طبيعية وليست طلب بحث عقاري.
 أجب بالعربية باختصار، وتعامل مع المستخدم كشخص حقيقي: تعاطف مع المشاعر، تفاعل مع المزاح، وراعِ النبرة الرسمية أو العفوية.
 إذا كانت الرسالة تحية أو سؤالًا عن الحال، رد بلطف ثم وجّه الحديث بسلاسة إلى احتياجه العقاري دون تكرار صياغة آلية.
+لا تكرر حرفيًا أي رد حديث. الردود السابقة: ' . (json_encode($recentReplies, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]') . '
 إذا تحدث عن الطقس، لا تدّعِ معرفة حالة لحظية غير موثقة.
 لا تخترع عقارات أو أسعارًا أو أسماء أو بيانات شخصية.
 لا تدّعِ تنفيذ أي إجراء.
