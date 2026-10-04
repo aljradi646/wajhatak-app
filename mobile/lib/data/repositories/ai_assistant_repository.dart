@@ -80,6 +80,14 @@ class AiAssistantRepository {
   Future<void> clearConversation(int conversationId) =>
       _api.delete('/ai/conversations/$conversationId');
 
+  Future<void> submitFeedback(int messageId, bool helpful) async {
+    await _api.post(
+      '/ai/messages/$messageId/feedback',
+      data: {'feedback': helpful ? 'helpful' : 'not_helpful'},
+    );
+  }
+
+
   /// قائمة محادثات المستخدم (للمستخدمين المسجلين فقط).
   Future<List<AiConversationItem>> listConversations() async {
     final json = await _api.get('/ai/conversations');
