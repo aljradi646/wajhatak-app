@@ -113,7 +113,7 @@ class AiAgentOrchestrator
 
         $userMessage = $this->conversationService->addUserMessage($conversation, $message, []);
 
-        if (! empty($route['reset_search'])) {
+        if ($route['reset_search'] ?? false) {
             $this->stateService->resetSearchState($conversation);
             return $this->finish(
                 $userMessage,
