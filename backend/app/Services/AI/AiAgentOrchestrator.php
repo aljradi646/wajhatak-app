@@ -835,7 +835,7 @@ class AiAgentOrchestrator
 
             return $this->finish($userMessage, [
                 'reply' => ($result['result_mode'] ?? 'exact') === 'alternatives'
-                    ? $this->replyEngine->alternativesReply($filters, (array) ($result['relaxations'] ?? []))
+                    ? $this->replyEngine->alternativesReply($properties, (array) ($result['relaxations'] ?? []))
                     : ((is_string($result['reply'] ?? null) && trim($result['reply']) !== '')
                         ? trim((string) $result['reply'])
                         : $this->replyEngine->summaryReply('', $properties, $filters)),
