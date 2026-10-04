@@ -194,6 +194,7 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
       children: [
         _buildTypeSelector(catalog.types, type),
         const SizedBox(height: 12),
+        _buildDateRange(theme),
         if (type.filters.isNotEmpty) ...[
           ...type.filters.map(_buildFilterRow),
           const SizedBox(height: 8),

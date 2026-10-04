@@ -201,8 +201,10 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
             ),
           _InputBar(
             controller: _inputController,
-            enabled: !state.loading,
+            enabled: state.canSend,
+            sending: state.loading,
             onSubmit: _send,
+            onCancel: () => ref.read(aiConversationProvider.notifier).cancel(),
           ),
         ],
       ),

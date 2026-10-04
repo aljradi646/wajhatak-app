@@ -239,8 +239,6 @@ class AgentReportController extends Controller
         $status = $params['status'] ?? null;
         $from = $params['date_from'] ?? null;
         $to = $params['date_to'] ?? null;
-        $from = $params['date_from'] ?? null;
-        $to = $params['date_to'] ?? null;
         if (! in_array($status, ['draft', 'pending', 'published', 'rejected'], true)) {
             $status = null;
         }

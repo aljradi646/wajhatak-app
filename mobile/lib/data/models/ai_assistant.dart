@@ -28,6 +28,7 @@ class AiPropertyResult {
     this.agentPhone,
     this.isAlternative = false,
     this.matchScore = 0,
+    this.distanceKm,
   });
 
   final int propertyId;
@@ -53,9 +54,7 @@ class AiPropertyResult {
   final String? agentPhone;
   final bool isAlternative;
   final double matchScore;
-
-  // The API may supply distance later; keep the model/UI contract nullable.
-  double? get distanceKm => null;
+  final double? distanceKm;
 
   bool get isRent => transactionType == 'rent';
 
@@ -95,6 +94,7 @@ class AiPropertyResult {
       agentPhone: json['agent_phone'] as String?,
       isAlternative: json['is_alternative'] as bool? ?? false,
       matchScore: (json['match_score'] as num?)?.toDouble() ?? 0,
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
     );
   }
 }

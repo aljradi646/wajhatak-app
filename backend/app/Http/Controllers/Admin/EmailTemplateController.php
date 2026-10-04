@@ -85,13 +85,32 @@ class EmailTemplateController extends Controller
     public function autosave(Request $request, EmailTemplate $emailTemplate): JsonResponse
     {
         $data = $this->validated($request, $emailTemplate);
-        $emailTemplate->update(array_merge($data, [
-            'status' => $emailTemplate->status === 'published' ? 'draft' : $emailTemplate->status,
+        $template = $emailTemplate->fresh();
+        $nextVersion = (int) $template->version;
+
+        // A published snapshot is immutable. The first autosave after publication
+        // therefore forks a new draft version instead of overwriting the live snapshot.
+        if ($template->status === 'published') {
+            $nextVersion++;
+        }
+
+        $template->update(array_merge($data, [
+            'version' => $nextVersion,
+            'status' => 'draft',
             'last_edited_by' => $request->user()?->id,
             'autosaved_at' => now(),
         ]));
 
-        return response()->json(['ok' => true, 'saved_at' => optional($emailTemplate->autosaved_at)->toISOString(), 'version' => (int) $emailTemplate->version, 'status' => $emailTemplate->status]);
+        if ($nextVersion !== (int) $emailTemplate->version) {
+            $this->createSnapshot($template->fresh(), $request->user()?->id, 'نسخة مسودة تلقائية بعد النشر');
+        }
+
+        return response()->json([
+            'ok' => true,
+            'saved_at' => optional($template->autosaved_at)->toISOString(),
+            'version' => (int) $template->version,
+            'status' => $template->status,
+        ]);
     }
 
     public function publish(Request $request, EmailTemplate $emailTemplate): JsonResponse
