@@ -528,7 +528,9 @@ class AiPropertySearchService
 
             // بيانات عامة من العقار المنشور والوكيل؛ تُستخدم فقط لإجراءات
             // النسخ/المشاركة في الواجهة ولا تتضمن أسرارًا أو بيانات داخلية.
-x
+            $agent = $property?->agent;
+            $location = $property?->location;
+
 
             if ($property?->reference_code) {
                 $data['reference_code'] = (string) $property->reference_code;
