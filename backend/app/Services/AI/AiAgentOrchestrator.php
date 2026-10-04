@@ -604,6 +604,29 @@ class AiAgentOrchestrator
         return $this->replyEngine->ambiguousReply();
     }
 
+    private function rememberSearchPreferences(?User $user, array $filters): void
+    {
+        if (! $user) {
+            return;
+        }
+
+        if (! empty($filters['city'])) {
+            $this->memoryService->remember($user, 'preferred_city', (string) $filters['city'], 0.95, 'conversation');
+        }
+        if (! empty($filters['property_type'])) {
+            $this->memoryService->remember($user, 'preferred_property_type', (string) $filters['property_type'], 0.9, 'conversation');
+        }
+        if (! empty($filters['transaction_type'])) {
+            $this->memoryService->remember($user, 'transaction_preference', (string) $filters['transaction_type'], 0.95, 'conversation');
+        }
+        if (isset($filters['max_price'])) {
+            $this->memoryService->remember($user, 'max_budget', (string) $filters['max_price'], 0.85, 'conversation');
+        }
+        if (isset($filters['bedrooms_min'])) {
+            $this->memoryService->remember($user, 'bedrooms', (string) $filters['bedrooms_min'], 0.85, 'conversation');
+        }
+    }
+
     private function hasSearchCriteria(array $filters): bool
     {
         foreach ([
