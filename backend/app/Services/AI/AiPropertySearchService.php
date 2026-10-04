@@ -374,6 +374,36 @@ class AiPropertySearchService
         ];
     }
 
+    /** جلب عدة عقارات مباشرة من المصدر الحي، لتغذية تاريخ المحادثة دون N+1 متكرر. */
+    public function detailsMany(array $propertyIds): array
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $propertyIds),
+            fn ($id) => $id > 0,
+        )));
+        if ($ids === []) return [];
+
+        $properties = Property::query()
+            ->with([
+                'type',
+                'location',
+                'features',
+                'images' => fn ($q) => $q->orderByDesc('is_cover')->orderBy('sort_order'),
+            ])
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        $items = [];
+        foreach ($ids as $id) {
+            if ($properties->has($id)) {
+                $items[] = $this->presentLive($properties->get($id), 1.0);
+            }
+        }
+
+        return $items;
+    }
+
     /** عقارات مشابهة (نفس النوع/المدينة وسعر مقارب) — لعقار مشابه لهذا. */
     public function similar(int $propertyId, int $limit = 4): array
     {
