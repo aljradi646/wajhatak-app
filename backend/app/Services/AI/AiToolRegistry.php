@@ -47,6 +47,18 @@ class AiToolRegistry
                     ],
                 ],
             ],
+            'get_property_availability' => [
+                'name' => 'get_property_availability',
+                'description' => 'جلب حالة توفر العقار الحالية فقط من المصدر التشغيلي. لا يعيد بيانات خاصة.',
+                'parameters' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => ['property_id'],
+                    'properties' => [
+                        'property_id' => ['type' => 'integer', 'minimum' => 1],
+                    ],
+                ],
+            ],
             'get_property_details' => [
                 'name' => 'get_property_details',
                 'description' => 'جلب سجل عقار محدد من بيانات التطبيق الحالية، بما في ذلك حالته الحالية.',
@@ -168,6 +180,7 @@ class AiToolRegistry
             return match ($toolName) {
                 'search_properties' => $this->executeSearchProperties($arguments),
                 'get_property_details' => $this->executeGetPropertyDetails($user, $arguments),
+                'get_property_availability' => $this->executeGetPropertyAvailability($arguments),
                 'find_similar_properties' => $this->executeFindSimilarProperties($arguments),
                 'search_nearby_properties' => $this->executeSearchNearbyProperties($arguments),
                 'create_viewing_request' => $this->executeCreateViewingRequest($user, $arguments),
@@ -196,6 +209,7 @@ class AiToolRegistry
         $allowed = match ($toolName) {
             'search_properties' => ['city','district','property_type','transaction_type','bedrooms','min_price','max_price','furnished'],
             'get_property_details' => ['property_id'],
+            'get_property_availability' => ['property_id'],
             'find_similar_properties' => ['property_id','limit'],
             'search_nearby_properties' => ['latitude','longitude','radius_km'],
             'get_app_knowledge' => ['query'],
@@ -250,6 +264,36 @@ class AiToolRegistry
             'result_mode' => $results['result_mode'] ?? 'exact',
             'relaxations' => $results['relaxations'] ?? [],
             'degraded' => (bool) ($results['degraded'] ?? false),
+        ];
+    }
+
+    private function executeGetPropertyAvailability(array $args): array
+    {
+        $propertyId = (int) ($args['property_id'] ?? 0);
+        $property = Property::query()->select(['id', 'status'])->find($propertyId);
+
+        if (! $property) {
+            return [
+                'success' => false,
+                'error' => 'PROPERTY_NOT_FOUND',
+                'message' => "لم يتم العثور على عقار برقم {$propertyId}.",
+            ];
+        }
+
+        $status = $property->status instanceof \BackedEnum
+            ? $property->status->value
+            : (string) $property->status;
+
+        return [
+            'success' => true,
+            'property_id' => $propertyId,
+            'status' => $status,
+            'available' => $status === \App\Enums\PropertyStatus::Published->value,
+            'source' => [
+                'type' => 'live_property',
+                'source_id' => $propertyId,
+                'retrieved_at' => now()->toISOString(),
+            ],
         ];
     }
 
