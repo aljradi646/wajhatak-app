@@ -73,6 +73,8 @@ class AiAssistantService
             $toolCalls = $orchestratorResult['tool_calls'] ?? [];
             $intent = $orchestratorResult['intent'] ?? 'chat';
             $failedStage = $orchestratorResult['failed_stage'] ?? null;
+            $resultMode = $orchestratorResult['result_mode'] ?? 'none';
+            $relaxations = $orchestratorResult['relaxations'] ?? [];
 
             // 3) تسجيل واستخراج رسالة الرد
             $propertyIds = array_map(fn ($p) => (int) ($p['property_id'] ?? $p['id'] ?? 0), $properties);
@@ -90,6 +92,8 @@ class AiAssistantService
                 'properties' => $properties,
                 'filters' => $filters,
                 'tool_calls' => $toolCalls,
+                'result_mode' => $resultMode,
+                'relaxations' => $relaxations,
                 'ui' => $this->buildUiContract($properties),
                 'failed_stage' => $failedStage,
                 'message_id' => $assistantMessage?->id,
