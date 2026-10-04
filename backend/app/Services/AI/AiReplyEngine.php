@@ -99,11 +99,26 @@ class AiReplyEngine
     }
 
     /** رد حوار طبيعي متنوع؛ variationIndex يمنع تكرار نفس الصياغة في المحادثة. */
-    public function smallTalkReply(string $message, string $intent, int $variationIndex = 0): string
+    public function smallTalkReply(
+        string $message,
+        string $intent,
+        int $variationIndex = 0,
+        array $recentReplies = [],
+    ): string
     {
         $name = $this->settings->assistantName();
-        $pick = static function (array $options) use ($variationIndex): string {
-            return $options[$variationIndex % count($options)];
+        $pick = static function (array $options) use ($variationIndex, $recentReplies): string {
+            $count = count($options);
+            $start = $count > 0 ? $variationIndex % $count : 0;
+
+            for ($offset = 0; $offset < $count; $offset++) {
+                $candidate = $options[($start + $offset) % $count];
+                if (! in_array($candidate, $recentReplies, true)) {
+                    return $candidate;
+                }
+            }
+
+            return $count > 0 ? $options[$start] : '';
         };
         $formal = AiChatIntentDetector::isFormal($message);
 
