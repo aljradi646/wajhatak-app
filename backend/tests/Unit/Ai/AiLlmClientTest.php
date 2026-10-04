@@ -76,6 +76,6 @@ class AiLlmClientTest extends TestCase
         $this->assertTrue($health['configured']);
         $this->assertTrue($health['reachable']);
         $this->assertArrayNotHasKey('api_key', $health);
-        $this->assertNotContains('super-secret-test-key', json_encode($health, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('super-secret-test-key', json_encode($health, JSON_THROW_ON_ERROR));
     }
 }
