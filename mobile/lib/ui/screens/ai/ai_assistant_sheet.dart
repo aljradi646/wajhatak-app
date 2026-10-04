@@ -164,6 +164,7 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
                 return _MessageBubble(
                   message: message,
                   onPropertyTap: (propertyId) => _openProperty(propertyId),
+                  onFeedback: _canFavorite ? (helpful) => _feedback(message, helpful) : null,
                   onFavoriteTap: _canFavorite
                       ? (property) => _favorite(property)
                       : null,
@@ -211,6 +212,22 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
     );
   }
 
+  Future<void> _feedback(AiChatMessage message, bool helpful) async {
+    if (message.id <= 0 || !mounted) return;
+    try {
+      await ref.read(aiAssistantRepositoryProvider).submitFeedback(message.id, helpful);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(helpful ? 'شكرًا، تم تسجيل تقييمك.' : 'تم تسجيل ملاحظتك لتحسين المساعد.')),
+      );
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر تسجيل التقييم الآن.')),
+      );
+    }
+  }
+
   Future<void> _favorite(AiPropertyResult property) async {
     // بناء LuxProperty مصغّرة من بيانات المساعد الحقيقية — تكفي لعملية
     // المفضلة على الخادم (يُعمل بـ property_id فقط).
@@ -253,11 +270,13 @@ class _MessageBubble extends StatelessWidget {
     required this.message,
     required this.onPropertyTap,
     this.onFavoriteTap,
+    this.onFeedback,
   });
 
   final AiChatMessage message;
   final ValueChanged<int> onPropertyTap;
   final ValueChanged<AiPropertyResult>? onFavoriteTap;
+  final ValueChanged<bool>? onFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +332,43 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
             ),
-            if (message.properties.isNotEmpty)
+            if (!isUser)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'نسخ',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.copy_rounded, size: 17),
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: message.content));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('تم نسخ الرد'), duration: Duration(seconds: 1)),
+                          );
+                        }
+                      },
+                    ),
+                    if (message.status == 'ok' && onFeedback != null) ...[
+                      IconButton(
+                        tooltip: 'مفيد',
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.thumb_up_alt_outlined, size: 17),
+                        onPressed: () => onFeedback!(true),
+                      ),
+                      IconButton(
+                        tooltip: 'غير مفيد',
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.thumb_down_alt_outlined, size: 17),
+                        onPressed: () => onFeedback!(false),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            if (message.responseType == 'property_results' || message.responseType == 'property_detail')
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: SizedBox(
