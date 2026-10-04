@@ -202,16 +202,32 @@ class AiReplyEngine
      * رد آمن لرسالة عامة غير مصنفة كبحث عقاري.
      * لا يعتمد على فلاتر أو نتائج محفوظة من رسائل سابقة.
      */
-    public function conversationReply(string $message, int $variationIndex = 0): string
-    {
+    public function conversationReply(
+        string $message,
+        int $variationIndex = 0,
+        array $recentReplies = [],
+    ): string {
         $options = [
             'فهمتك. أنا معك، ويمكنك التحدث معي بشكل طبيعي. وعندما تريد خدمة عقارية، اكتب طلبك بطريقتك المعتادة وسأحوّله إلى بحث فعلي في عقارات وجهتك.',
             'تمام، خذ راحتك بالكلام 😊. وإذا احتجت أي شيء متعلق بعقارات وجهتك، قل لي ما عندك وسأتعامل معه مباشرة.',
             'أكيد، نقدر نتكلم بشكل طبيعي. وعندما يكون عندك احتياج عقاري، لا تحتاج لصيغة محددة؛ اشرح لي بطريقتك وأنا أرتب البحث.',
             'أنا حاضر معك. احكِ لي ما تريد، وإذا كان فيه جزء عقاري سأحوّله إلى خطوة عملية وبحث حقيقي.',
+            'سمعتك. نقدر نكمل الكلام بشكل طبيعي، وعندما يظهر احتياج عقاري سأحوّله إلى بحث فعلي بدل ما أفترض عنك شيئًا.',
         ];
+        $count = count($options);
+        if ($count === 0) {
+            return '';
+        }
 
-        return $options[$variationIndex % count($options)];
+        $start = $variationIndex % $count;
+        for ($offset = 0; $offset < $count; $offset++) {
+            $candidate = $options[($start + $offset) % $count];
+            if (! in_array($candidate, $recentReplies, true)) {
+                return $candidate;
+            }
+        }
+
+        return $options[$start];
     }
 
     /** رد إحصاءات حقيقية من الفهرس (كم عقارًا متوفرًا). */
