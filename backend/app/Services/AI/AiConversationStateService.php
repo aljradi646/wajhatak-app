@@ -67,9 +67,9 @@ class AiConversationStateService
         $conversation->save();
     }
 
-    public function clearRetrievalState(AiConversation $conversation): void
+    public function clearRetrievalState(AiConversation $conversation, ?int $expectedUserMessageId = null): void
     {
-        if (! $conversation->exists) {
+        if (! $conversation->exists || ($expectedUserMessageId !== null && ! $this->isCurrentTurn($conversation, $expectedUserMessageId))) {
             return;
         }
 
@@ -80,9 +80,9 @@ class AiConversationStateService
         $conversation->save();
     }
 
-    public function resetSearchState(AiConversation $conversation): void
+    public function resetSearchState(AiConversation $conversation, ?int $expectedUserMessageId = null): void
     {
-        if (! $conversation->exists) {
+        if (! $conversation->exists || ($expectedUserMessageId !== null && ! $this->isCurrentTurn($conversation, $expectedUserMessageId))) {
             return;
         }
 
@@ -94,9 +94,9 @@ class AiConversationStateService
         $conversation->save();
     }
 
-    public function setPendingAction(AiConversation $conversation, ?string $tool, array $arguments = []): void
+    public function setPendingAction(AiConversation $conversation, ?string $tool, array $arguments = [], ?int $expectedUserMessageId = null): void
     {
-        if (! $conversation->exists) {
+        if (! $conversation->exists || ($expectedUserMessageId !== null && ! $this->isCurrentTurn($conversation, $expectedUserMessageId))) {
             return;
         }
 
@@ -106,6 +106,13 @@ class AiConversationStateService
             : null;
         $conversation->context_state = $state;
         $conversation->save();
+    }
+
+    public function isCurrentTurn(AiConversation $conversation, int $userMessageId): bool
+    {
+        return (int) $conversation->messages()
+            ->where('role', \App\Enums\AiMessageRole::User->value)
+            ->max('id') === $userMessageId;
     }
 
     public function pendingAction(AiConversation $conversation): ?array
