@@ -116,6 +116,11 @@ class AiIntentRouter
         $parsed = $this->intentService->parse($message, $history, []);
         $filters = (array) ($parsed['filters'] ?? []);
 
+        if ($filters === [] && $previousFilters !== [] && $this->isContextRefinement($normalized)) {
+            $contextParsed = $this->intentService->parse($message, $history, $previousFilters);
+            $filters = (array) ($contextParsed['filters'] ?? []);
+        }
+
         if (! empty($filters['investment'])
             && empty($filters['property_type'])
             && empty($filters['city'])
@@ -257,7 +262,7 @@ class AiIntentRouter
 
     private function isPlatformInformation(string $text): bool
     {
-        return preg_match('/(ما هي وجهتك|وش هي وجهتك|ايش هي وجهتك|ما هي المنصه|وش هي المنصه|ايش هي المنصه|معلومات عن وجهتك|معلومات عن المنصه|خدمات وجهتك|خدماتكم|عن التطبيق|عن المنصه)/u', $text) === 1;
+        return preg_match('/(ما هي وجهتك|وش هي وجهتك|ايش هي وجهتك|ما هي منصة وجهتك|وش هي منصة وجهتك|ايش هي منصة وجهتك|معلومات عن منصة وجهتك|معلومات عن وجهتك|معلومات عن المنصة|معلومات عن المنصه|ما هي المنصة|وش هي المنصة|خدمات وجهتك|خدماتكم|عن التطبيق|عن المنصة|عن المنصه)/u', $text) === 1;
     }
 
     private function isPlatformHowTo(string $text): bool
