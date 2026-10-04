@@ -410,10 +410,9 @@ class AiAssistantTest extends TestCase
         $data = $response->json('data');
         $this->assertSame([], $data['properties']);
         $this->assertSame(
-            'عذراً، لم أفهم طلبك بوضوح. هل تبحث عن عقار معين أم تحتاج مساعدة في استخدام التطبيق؟',
+            'لم أجد عقارًا منشورًا بهذا الرقم.',
             $data['reply']
         );
-    }
 
     /** ط) مزامنة الفهرس: تعديل السعر ينعكس فورًا على بحث المساعد. */
     public function test_property_update_syncs_search_index_immediately(): void
