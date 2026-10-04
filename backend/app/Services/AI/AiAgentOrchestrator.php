@@ -80,12 +80,24 @@ class AiAgentOrchestrator
         // افصل الحوار اليومي عن محرك البحث قبل أي إعادة استخدام لسياق المحادثة.
         $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
         if ($smallTalk !== null) {
-            // نستخدم عدد ردود المساعد السابقة كدورة تنويع مستقرة داخل المحادثة.
-            $variationIndex = $conversation->messages()->where('role', 'assistant')->count();
+            // نستخدم عدد الردود السابقة + آخر الردود لمنع التكرار الحرفي داخل المحادثة.
+            $recentAssistantReplies = $conversation->messages()
+                ->where('role', 'assistant')
+                ->latest('id')
+                ->limit(8)
+                ->pluck('content')
+                ->map(fn ($content) => (string) $content)
+                ->all();
+            $variationIndex = count($recentAssistantReplies);
             $this->conversationService->addUserMessage($conversation, $message, []);
 
             return [
-                'reply' => $this->replyEngine->smallTalkReply($message, $smallTalk, $variationIndex),
+                'reply' => $this->replyEngine->smallTalkReply(
+                    $message,
+                    $smallTalk,
+                    $variationIndex,
+                    $recentAssistantReplies
+                ),
                 'status' => 'ok',
                 'properties' => [],
                 'filters' => [],
@@ -461,10 +473,21 @@ class AiAgentOrchestrator
         // إذا لم توجد أي إشارة عقارية في الرسالة، لا تعيد تطبيق فلاتر البحث السابقة.
         // هذا يمنع الحالة الخاطئة «كل رسالة = إعادة بحث صنعاء».
         if (!AiChatIntentDetector::looksLikePropertyRequest($message)) {
-            $variationIndex = $conversation->messages()->where('role', 'assistant')->count();
+            $recentAssistantReplies = $conversation->messages()
+                ->where('role', 'assistant')
+                ->latest('id')
+                ->limit(8)
+                ->pluck('content')
+                ->map(fn ($content) => (string) $content)
+                ->all();
+            $variationIndex = count($recentAssistantReplies);
 
             return [
-                'reply' => $this->replyEngine->conversationReply($message, $variationIndex),
+                'reply' => $this->replyEngine->conversationReply(
+                    $message,
+                    $variationIndex,
+                    $recentAssistantReplies
+                ),
                 'status' => 'ok',
                 'properties' => [],
                 'filters' => [],
