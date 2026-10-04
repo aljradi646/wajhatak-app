@@ -140,7 +140,15 @@ class AiAssistantService
                     'conversation_id' => null,
                     'session_token' => null,
                     'properties' => [],
+                    'result_mode' => 'none',
                     'filters' => [],
+                    'tool_calls' => [],
+                    'response_type' => 'error',
+                    'actions' => [],
+                    'citations' => [],
+                    'source' => [],
+                    'intent' => 'error',
+                    'failed_stage' => $stage,
                 ];
             }
         }
