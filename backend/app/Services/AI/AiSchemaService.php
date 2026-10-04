@@ -211,8 +211,9 @@ class AiSchemaService
     /** خريطة الأعمدة الحرجة لكل جدول — تُستخدم للإصلاح والفحص. */
     private const COLUMN_MAP = [
         'ai_conversations' => ['user_id' => true, 'session_token' => true, 'locale' => true, 'status' => true, 'last_message_at' => true],
-        'ai_messages' => ['ai_conversation_id' => true, 'role' => true, 'content' => true, 'structured_filters' => true, 'property_ids' => true, 'status' => true],
-        'ai_request_logs' => ['ai_conversation_id' => true, 'user_id' => true, 'request_id' => true, 'intent' => true, 'structured_filters' => true, 'tool_calls' => true, 'results_count' => true, 'status' => true, 'error_code' => true, 'latency_ms' => true, 'search_ms' => true, 'tokens_used' => true],
+        'ai_messages' => ['ai_conversation_id' => true, 'role' => true, 'content' => true, 'structured_filters' => true, 'property_ids' => true, 'status' => true, 'response_type' => true, 'metadata' => true],
+        'ai_request_logs' => ['ai_conversation_id' => true, 'user_id' => true, 'request_id' => true, 'intent' => true, 'structured_filters' => true, 'tool_calls' => true, 'results_count' => true, 'status' => true, 'response_type' => true, 'error_code' => true, 'fallback_reason' => true, 'knowledge_version' => true, 'latency_ms' => true, 'search_ms' => true, 'tokens_used' => true],
+        'ai_user_memories' => ['user_id' => true, 'memory_key' => true, 'memory_value' => true, 'confidence' => true, 'source' => true, 'last_used_at' => true, 'expires_at' => true],
         'ai_search_index' => ['property_id' => true, 'title' => true, 'description' => true, 'transaction_type' => true, 'status' => true, 'type_slug' => true, 'type_name_ar' => true, 'city' => true, 'district' => true, 'neighborhood' => true, 'price' => true, 'currency' => true, 'area' => true, 'bedrooms' => true, 'bathrooms' => true, 'is_furnished' => true, 'is_new' => true, 'is_featured' => true, 'published_at' => true, 'latitude' => true, 'longitude' => true, 'search_text' => true, 'content_hash' => true],
     ];
 
@@ -236,6 +237,8 @@ class AiSchemaService
                 'structured_filters' => fn (Blueprint $t) => $t->json('structured_filters')->nullable(),
                 'property_ids' => fn (Blueprint $t) => $t->json('property_ids')->nullable(),
                 'status' => fn (Blueprint $t) => $t->string('status', 20)->default('ok'),
+                'response_type' => fn (Blueprint $t) => $t->string('response_type', 30)->default('text')->index(),
+                'metadata' => fn (Blueprint $t) => $t->json('metadata')->nullable(),
             ],
             'ai_request_logs' => [
                 'ai_conversation_id' => fn (Blueprint $t) => $t->unsignedBigInteger('ai_conversation_id')->nullable()->index(),
@@ -250,6 +253,16 @@ class AiSchemaService
                 'latency_ms' => fn (Blueprint $t) => $t->unsignedInteger('latency_ms')->default(0),
                 'search_ms' => fn (Blueprint $t) => $t->unsignedInteger('search_ms')->default(0),
                 'tokens_used' => fn (Blueprint $t) => $t->unsignedInteger('tokens_used')->default(0),
+                'response_type' => fn (Blueprint $t) => $t->string('response_type', 30)->nullable()->index(),
+                'fallback_reason' => fn (Blueprint $t) => $t->string('fallback_reason', 120)->nullable(),
+                'knowledge_version' => fn (Blueprint $t) => $t->string('knowledge_version', 40)->nullable(),
+            ],
+            'ai_user_memories' => [
+                'memory_value' => fn (Blueprint $t) => $t->string('memory_value', 500),
+                'confidence' => fn (Blueprint $t) => $t->decimal('confidence', 4, 3)->default(1.000),
+                'source' => fn (Blueprint $t) => $t->string('source', 30)->default('conversation'),
+                'last_used_at' => fn (Blueprint $t) => $t->timestamp('last_used_at')->nullable()->index(),
+                'expires_at' => fn (Blueprint $t) => $t->timestamp('expires_at')->nullable()->index(),
             ],
             'ai_search_index' => [
                 'description' => fn (Blueprint $t) => $t->text('description')->nullable(),
