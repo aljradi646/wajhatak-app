@@ -66,15 +66,18 @@ final class AiResponseContract
             ];
         }
 
+        $resultMode = (string) ($response['result_mode'] ?? 'exact');
+        if (! in_array($resultMode, ['exact', 'alternatives', 'none'], true)) {
+            $resultMode = 'exact';
+        }
+
         return [
             'intent' => mb_substr((string) ($response['intent'] ?? 'ambiguous_request'), 0, 50),
             'response_type' => $type,
             'reply' => mb_substr((string) ($response['reply'] ?? ''), 0, 5000),
             'status' => (string) ($response['status'] ?? 'ok'),
             'properties' => $properties,
-            'result_mode' => in_array(($response['result_mode'] ?? 'exact'), ['exact', 'alternatives', 'none'], true)
-                ? (string) $response['result_mode']
-                : 'exact',
+            'result_mode' => $resultMode,
             'filters' => is_array($response['filters'] ?? null) ? $response['filters'] : [],
             'tool_calls' => is_array($response['tool_calls'] ?? null) ? $response['tool_calls'] : [],
             'actions' => $actions,
