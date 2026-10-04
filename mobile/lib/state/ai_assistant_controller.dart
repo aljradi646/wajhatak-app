@@ -100,7 +100,7 @@ class AiConversationController extends Notifier<AiConversationState> {
             longitude: longitude,
           );
       final reply = result.message;
-      if (!mounted || generation != _sendGeneration) return;
+      if (generation != _sendGeneration) return;
       state = state.copyWith(
         messages: [...state.messages, reply],
         loading: false,
