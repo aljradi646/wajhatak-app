@@ -45,7 +45,8 @@ class AiChatIntentDetector
         }
 
         if (mb_strlen($chatText) <= 100
-            && preg_match('/(شكرا|ممتن|يعطيك العافيه|تسلم|ربي يحفظك|جزاك الله|thank|thx)/u', $chatText) === 1) {
+            && preg_match('/(شكرا|ممتن|يعطيك العافيه|تسلم|ربي يحفظك|جزاك الله|thank|thx)/u', $chatText) === 1
+            && ! self::looksLikePropertyRequest($chatText)) {
             return 'thanks';
         }
 
@@ -58,6 +59,24 @@ class AiChatIntentDetector
         if (mb_strlen($chatText) <= 70
             && preg_match('/(كم عقار|كم شقه|ما المتوفر|وش عندكم|ايش عندكم|شن عندكم|كم العدد|احصائيات|عدد العقارات|عدد العقارات المتوفره)/u', $chatText) === 1) {
             return 'stats';
+        }
+
+        if (mb_strlen($chatText) <= 120
+            && preg_match('/(الجو|حاله الطقس|حالة الطقس|الطقس|طقس|درجة الحراره|درجه الحراره|حر اليوم|برد اليوم|مطر اليوم|weather)/u', $chatText) === 1
+            && ! self::looksLikePropertyRequest($chatText)) {
+            return 'weather';
+        }
+
+        if (mb_strlen($chatText) <= 100
+            && preg_match('/(نكتة|نكته|نكتني|مزحه|مزحة|ضحكني|قول لي نكته|قول لي نكتة|joke)/u', $chatText) === 1
+            && ! self::looksLikePropertyRequest($chatText)) {
+            return 'joke';
+        }
+
+        if (mb_strlen($chatText) <= 100
+            && preg_match('/(نتكلم|نتكلم شوي|نسولف|سوالف|دردشه|دردشة|خلنا نتكلم|كيف كان يومك|وش تسوي|ايش تسوي|كيف الحياة|كيف الحياه)/u', $chatText) === 1
+            && ! self::looksLikePropertyRequest($chatText)) {
+            return 'casual';
         }
 
         if (mb_strlen($chatText) <= 50
