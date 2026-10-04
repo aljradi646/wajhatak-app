@@ -86,8 +86,6 @@ class AiAssistantTest extends TestCase
 
         $this->assertContains('price', $copyFields);
         $this->assertContains('location', $copyFields);
-    }
-
         $this->assertSame('property_results', $response->json('data.ui.response_component'));
         $this->assertSame(
             (int) $item['property_id'],
