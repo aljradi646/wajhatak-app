@@ -72,6 +72,9 @@ final class AiResponseContract
             'reply' => mb_substr((string) ($response['reply'] ?? ''), 0, 5000),
             'status' => (string) ($response['status'] ?? 'ok'),
             'properties' => $properties,
+            'result_mode' => in_array(($response['result_mode'] ?? 'exact'), ['exact', 'alternatives', 'none'], true)
+                ? (string) $response['result_mode']
+                : 'exact',
             'filters' => is_array($response['filters'] ?? null) ? $response['filters'] : [],
             'tool_calls' => is_array($response['tool_calls'] ?? null) ? $response['tool_calls'] : [],
             'actions' => $actions,
