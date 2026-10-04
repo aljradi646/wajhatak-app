@@ -63,19 +63,19 @@ class AiChatIntentDetector
 
         if (mb_strlen($chatText) <= 120
             && preg_match('/(الجو|حاله الطقس|حالة الطقس|الطقس|طقس|درجة الحراره|درجه الحراره|حر اليوم|برد اليوم|مطر اليوم|weather)/u', $chatText) === 1
-            && ! self::looksLikePropertyRequest($chatText)) {
+            && ! self::hasStrongPropertySignal($chatText)) {
             return 'weather';
         }
 
         if (mb_strlen($chatText) <= 100
             && preg_match('/(نكتة|نكته|نكتني|مزحه|مزحة|ضحكني|قول لي نكته|قول لي نكتة|joke)/u', $chatText) === 1
-            && ! self::looksLikePropertyRequest($chatText)) {
+            && ! self::hasStrongPropertySignal($chatText)) {
             return 'joke';
         }
 
         if (mb_strlen($chatText) <= 100
             && preg_match('/(نتكلم|نتكلم شوي|نسولف|سوالف|دردشه|دردشة|خلنا نتكلم|كيف كان يومك|وش تسوي|ايش تسوي|كيف الحياة|كيف الحياه)/u', $chatText) === 1
-            && ! self::looksLikePropertyRequest($chatText)) {
+            && ! self::hasStrongPropertySignal($chatText)) {
             return 'casual';
         }
 
@@ -149,6 +149,17 @@ class AiChatIntentDetector
         $normalized = self::normalize($text);
 
         return preg_match('/(كيف حالك|هل يمكنك|من فضلك|لو سمحت|اود|ارغب|ارجو|حضرتك|هل بالامكان|اسال حضرتك)/u', $normalized) === 1;
+    }
+
+    /** هل الرسالة تحتوي إشارة عقارية صريحة وليست مجرد اسم مدينة/سياق؟ */
+    private static function hasStrongPropertySignal(string $text): bool
+    {
+        $normalized = self::collapseRepeatedCharacters(self::normalize($text));
+
+        return preg_match(
+            '/(عقار|عقارات|شقه|شقق|فيلا|فلل|بيت|بيوت|منزل|منازل|ارض|اراضي|محل|محلات|مكتب|مكاتب|عماره|عمارات|برج|دور|ادوار|تاون\s*هاوس|للبيع|بيع|ايجار|للايجار|شراء|اشتري|تمليك|استئجار|ابحث|بحث|دور لي|اعرض|وريني|ميزانيه|غرف|حمام|متر|مساحه|سعر|اسعار|ريال|مليون|الف|قريب مني|قريبه مني|بالقرب مني|مشابه|شبيه|المفضله|مفضلتي|معاينه|حجز|زيارة)/u',
+            $normalized
+        ) === 1;
     }
 
     /** إبقاء الدالة الداخلية للتصنيف مع نفس العقد السابق. */
