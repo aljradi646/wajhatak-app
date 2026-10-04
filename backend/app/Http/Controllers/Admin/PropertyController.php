@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Agent;
 use App\Models\Property;
+use App\Services\AI\AiIndexSyncService;
 use App\Models\PropertyFeature;
 use App\Models\PropertyLocation;
 use App\Models\PropertyType;
