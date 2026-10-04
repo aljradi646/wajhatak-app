@@ -323,6 +323,8 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
             ),
+            if (!isUser && message.content.trim().isNotEmpty)
+              _CopyMessageButton(text: message.content),
             if (message.properties.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -356,6 +358,50 @@ class _MessageBubble extends StatelessWidget {
 }
 
 /// بطاقة عقار مصغّرة داخل المحادثة — مربوطة بعقار حقيقي عبر propertyId.
+class _CopyMessageButton extends StatefulWidget {
+  const _CopyMessageButton({required this.text});
+
+  final String text;
+
+  @override
+  State<_CopyMessageButton> createState() => _CopyMessageButtonState();
+}
+
+class _CopyMessageButtonState extends State<_CopyMessageButton> {
+  bool _copied = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.text));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم نسخ الرد'),
+        duration: Duration(milliseconds: 900),
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (mounted) setState(() => _copied = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: AlignmentDirectional.centerEnd,
+      child: IconButton(
+        tooltip: _copied ? 'تم النسخ' : 'نسخ الرد',
+        visualDensity: VisualDensity.compact,
+        icon: Icon(
+          _copied ? Icons.check_rounded : Icons.copy_rounded,
+          size: 17,
+          color: _copied ? Theme.of(context).colorScheme.primary : null,
+        ),
+        onPressed: _copy,
+      ),
+    );
+  }
+}
+
 class _AiPropertyMiniCard extends StatelessWidget {
   const _AiPropertyMiniCard({
     required this.property,
