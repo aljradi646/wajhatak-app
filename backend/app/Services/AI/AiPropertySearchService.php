@@ -58,6 +58,7 @@ class AiPropertySearchService
         $minScore = (float) $this->settings->get('ai_min_match_score', 0.05);
 
         $query = AiSearchIndex::query()
+            ->with(['property.agent.user', 'property.location'])
             ->whereIn('status', ['published']);
 
         // --- تصفية هيكلية (كلها AND) ---
@@ -225,7 +226,11 @@ class AiPropertySearchService
         }
 
         try {
-            $row = AiSearchIndex::query()->where('property_id', $propertyId)->whereIn('status', ['published'])->first();
+            $row = AiSearchIndex::query()
+                ->with(['property.agent.user', 'property.location'])
+                ->where('property_id', $propertyId)
+                ->whereIn('status', ['published'])
+                ->first();
 
             return $row ? $this->present($row, 1.0, detailed: true) : null;
         } catch (\Illuminate\Database\QueryException $e) {
@@ -259,6 +264,7 @@ class AiPropertySearchService
         }
 
         $rows = AiSearchIndex::query()
+            ->with(['property.agent.user', 'property.location'])
             ->whereIn('status', ['published'])
             ->where('property_id', '!=', $propertyId)
             ->when($base->type_slug, fn (Builder $q) => $q->where('type_slug', $base->type_slug))
@@ -417,6 +423,82 @@ class AiPropertySearchService
             $data['image_url'] = $image ? asset('storage/'.$image->path) : null;
             $data['latitude'] = $row->latitude !== null ? (float) $row->latitude : null;
             $data['longitude'] = $row->longitude !== null ? (float) $row->longitude : null;
+
+            // بيانات عامة من العقار المنشور والوكيل؛ تُستخدم فقط لإجراءات
+            // النسخ/المشاركة في الواجهة ولا تتضمن أسرارًا أو بيانات داخلية.
+            $property = $row->relationLoaded('property') ? $row->property : null;
+            $agent = $property?->agent;
+            $location = $property?->location;
+
+            if ($property?->reference_code) {
+                $data['reference_code'] = (string) $property->reference_code;
+            }
+            if ($location?->address) {
+                $data['address'] = (string) $location->address;
+            }
+
+            $agentPhone = $agent?->phone ?: $agent?->user?->phone;
+            if ($agentPhone) {
+                $data['agent_phone'] = (string) $agentPhone;
+            }
+
+            $copyActions = [];
+            if ($data['price'] !== null && ! empty($data['currency'])) {
+                $copyActions[] = [
+                    'type' => 'copy',
+                    'field' => 'price',
+                    'label' => 'نسخ السعر',
+                    'value' => number_format((float) $data['price']).' '.$data['currency'],
+                ];
+            }
+
+            $locationText = $data['address']
+                ?? collect([$data['district'] ?? null, $data['neighborhood'] ?? null, $data['city'] ?? null])
+                    ->filter()->unique()->implode(' - ');
+            if ($locationText !== '') {
+                $copyActions[] = [
+                    'type' => 'copy',
+                    'field' => 'location',
+                    'label' => 'نسخ الموقع',
+                    'value' => $locationText,
+                ];
+            }
+
+            if (! empty($data['reference_code'])) {
+                $copyActions[] = [
+                    'type' => 'copy',
+                    'field' => 'reference_code',
+                    'label' => 'نسخ الرمز',
+                    'value' => $data['reference_code'],
+                ];
+            }
+
+            if (! empty($data['agent_phone'])) {
+                $copyActions[] = [
+                    'type' => 'copy',
+                    'field' => 'agent_phone',
+                    'label' => 'نسخ هاتف الوكيل',
+                    'value' => $data['agent_phone'],
+                ];
+            }
+
+            $data['ui'] = [
+                'component' => 'property_card',
+                'image_priority' => true,
+                'open_action' => [
+                    'type' => 'open_property',
+                    'property_id' => (int) $row->property_id,
+                ],
+                'title_action' => [
+                    'type' => 'open_property',
+                    'property_id' => (int) $row->property_id,
+                ],
+                'share_action' => [
+                    'type' => 'share_property',
+                    'property_id' => (int) $row->property_id,
+                ],
+                'copy_actions' => $copyActions,
+            ];
         }
 
         return $data;
