@@ -96,6 +96,7 @@ class AiAssistantService
                 'conversation_id' => $conversation->exists ? $conversation->id : null,
                 'session_token' => $conversation->exists ? $conversation->session_token : null,
                 'properties' => $properties,
+                'result_mode' => $contract['result_mode'] ?? 'exact',
                 'filters' => $filters,
                 'tool_calls' => $toolCalls,
                 'response_type' => $contract['response_type'] ?? 'text',
