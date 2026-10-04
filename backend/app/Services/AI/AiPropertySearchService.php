@@ -454,7 +454,9 @@ class AiPropertySearchService
             'is_new' => (bool) $property->is_new,
             'is_featured' => (bool) $property->is_featured,
             'status' => $property->status instanceof \BackedEnum ? $property->status->value : (string) $property->status,
-            'available' => $property->status === PropertyStatus::Published,
+            'available' => $property->status instanceof PropertyStatus
+                ? $property->status === PropertyStatus::Published
+                : (string) $property->status === PropertyStatus::Published->value,
             'match_score' => $score,
             'image_url' => $image ? asset('storage/'.$image->path) : null,
             'description' => (string) $property->description,
