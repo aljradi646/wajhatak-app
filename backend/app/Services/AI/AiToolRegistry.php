@@ -131,7 +131,7 @@ class AiToolRegistry
     public function allowedToolsForIntent(string $intent): array
     {
         return match ($intent) {
-            'property_search', 'property_recommendation', 'search_refinement', 'search_correction' => ['search_properties'],
+            'property_search', 'search_refinement', 'search_correction' => ['search_properties'],
             'nearest_property' => ['search_nearby_properties'],
             'property_detail', 'property_availability', 'property_price', 'property_location',
             'property_features', 'property_agent/contact' => ['get_property_details'],
