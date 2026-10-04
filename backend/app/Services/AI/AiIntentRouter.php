@@ -65,6 +65,12 @@ class AiIntentRouter
             return $this->result('identity');
         }
 
+        // أسئلة «كيف أستخدم...» تعني إرشادًا للمنصة، وليست small talk.
+        // يجب حسمها قبل كاشف الدعم العام.
+        if ($this->isPlatformHowTo($normalized)) {
+            return $this->result('platform_how_to');
+        }
+
         $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
         if ($smallTalk !== null) {
             return $this->result(
@@ -74,10 +80,6 @@ class AiIntentRouter
                     default => 'small_talk',
                 }
             , ['sub_intent' => $smallTalk]);
-        }
-
-        if ($this->isPlatformHowTo($normalized)) {
-            return $this->result('platform_how_to');
         }
 
         if ($this->isPlatformInformation($normalized)) {
