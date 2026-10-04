@@ -508,7 +508,7 @@ class _AiPropertyMiniCard extends StatelessWidget {
                             ),
                             icon: const Icon(Icons.call_rounded, size: 15),
                             onPressed: () async {
-                              final uri = Uri(scheme: 'tel', path: property.agentPhone);
+                              final uri = Uri(scheme: 'tel', path: property.agentPhone!);
                               await launchUrl(uri);
                             },
                           ),
