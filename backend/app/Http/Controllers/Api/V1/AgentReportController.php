@@ -205,7 +205,7 @@ class AgentReportController extends Controller
                 try {
                     Carbon::createFromFormat('Y-m-d', $value);
                     $filters[$dateKey] = $value;
-                } catch (\\Throwable) {
+                } catch (\Throwable) {
                 }
             }
         }
