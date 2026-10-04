@@ -3,7 +3,11 @@
 namespace App\Services\AI;
 
 use App\Models\AiConversation;
+use App\Models\AiMessageFeedback;
 use App\Models\AiRequestLog;
+use App\Models\AiSearchIndex;
+use App\Models\Property;
+use App\Services\AI\AiKnowledgeService;
 use Illuminate\Support\Str;
 
 /**
@@ -78,6 +82,15 @@ class AiLoggingService
         $conversations = \App\Models\AiConversation::query()->count();
         $messages = \App\Models\AiMessage::query()->count();
 
+        $totalRequests = (clone $base)->count();
+        $clarifications = (clone $base)->whereIn('intent', ['clarification_required', 'ambiguous_request'])->count();
+        $feedbackPositive = AiMessageFeedback::query()->where('feedback', 'helpful')->count();
+        $feedbackNegative = AiMessageFeedback::query()->where('feedback', 'not_helpful')->count();
+        $staleIndexes = Property::query()
+            ->join('ai_search_index', 'properties.id', '=', 'ai_search_index.property_id')
+            ->whereColumn('ai_search_index.updated_at', '<', 'properties.updated_at')
+            ->count();
+
         return [
             'total_conversations' => $conversations,
             'total_messages' => $messages,
@@ -88,8 +101,15 @@ class AiLoggingService
             'avg_response_ms' => (int) (clone $base)->where('status', 'ok')->avg('latency_ms'),
             'avg_search_ms' => (int) (clone $base)->where('status', 'ok')->avg('search_ms'),
             'tool_calls' => (clone $base)->whereNotNull('tool_calls')->count(),
-            'no_match_searches' => (clone $base)->where('results_count', 0)->where('intent', 'search')->count(),
+            'no_match_searches' => (clone $base)->whereIn('intent', ['search', 'property_search', 'property_recommendation'])->where('results_count', 0)->count(),
             'requests_today' => (clone $base)->whereDate('created_at', $now)->count(),
+            'clarification_rate' => $totalRequests > 0 ? round(($clarifications / $totalRequests) * 100, 1) : 0.0,
+            'feedback_helpful' => $feedbackPositive,
+            'feedback_not_helpful' => $feedbackNegative,
+            'stale_index_count' => $staleIndexes,
+            'knowledge_version' => AiKnowledgeService::VERSION,
+            // لا توجد طبقة cache عقارية في هذا المسار؛ نعرض ذلك صراحة بدل أرقام وهمية.
+            'property_cache' => 'غير مستخدم — البيانات التشغيلية حية',
         ];
     }
 
