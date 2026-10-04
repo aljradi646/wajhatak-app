@@ -1,8 +1,8 @@
 <?php
 
-namespace App\\Services\\AI;
+namespace App\Services\AI;
 
-use App\\Models\\AiConversation;
+use App\Models\AiConversation;
 
 class AiConversationStateService
 {
