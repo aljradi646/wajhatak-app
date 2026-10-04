@@ -85,14 +85,31 @@ class AiConversationService
     /** المعايير المتراكمة: من آخر رسالة مستخدم تحمل معايير (سياق متسلسل). */
     public function accumulatedFilters(AiConversation $conversation): array
     {
-        $last = AiMessage::query()
+        $state = is_array($conversation->context_state) ? $conversation->context_state : [];
+
+        return is_array($state['active_search'] ?? null) ? $state['active_search'] : [];
+    }
+
+    /** آخر مجموعة عقارات مرتبطة برسالة مساعد بعينها، لا حالة عامة. */
+    public function lastRetrievedPropertyIds(AiConversation $conversation): array
+    {
+        $message = AiMessage::query()
             ->where('ai_conversation_id', $conversation->id)
-            ->where('role', AiMessageRole::User->value)
-            ->whereNotNull('structured_filters')
+            ->where('role', AiMessageRole::Assistant->value)
+            ->whereNotNull('property_ids')
             ->orderByDesc('id')
             ->first();
 
-        return $last?->structured_filters ?? [];
+        return array_values(array_unique(array_filter(
+            array_map('intval', (array) ($message?->property_ids ?? [])),
+            fn ($id) => $id > 0,
+        )));
+    }
+
+    public function updateUserMessageFilters(AiMessage $message, array $filters): void
+    {
+        $message->structured_filters = $filters !== [] ? $filters : null;
+        $message->save();
     }
 
     public function addUserMessage(AiConversation $conversation, string $content, array $filters = []): AiMessage
@@ -111,6 +128,8 @@ class AiConversationService
         string $content,
         array $propertyIds = [],
         string $status = 'ok',
+        string $responseType = 'text',
+        array $metadata = [],
     ): AiMessage {
         $message = AiMessage::query()->create([
             'ai_conversation_id' => $conversation->id,
@@ -118,6 +137,8 @@ class AiConversationService
             'content' => $content,
             'property_ids' => $propertyIds ?: null,
             'status' => $status,
+            'response_type' => $responseType,
+            'metadata' => $metadata ?: null,
         ]);
         $conversation->update(['last_message_at' => now()]);
 
