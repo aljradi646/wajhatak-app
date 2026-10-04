@@ -362,6 +362,9 @@ class AiAgentOrchestrator
 
             $this->conversationService->updateUserMessageFilters($userMessage, $filters);
             if ($filters === [] || ! $this->hasSearchCriteria($filters) || $this->requiresClarificationForSearch($filters)) {
+                $this->stateService->updateState($conversation, $filters, null, []);
+                $this->conversationService->updateUserMessageFilters($userMessage, $filters);
+
                 return $this->finish($userMessage, [
                     'reply' => $this->clarifySearchReply($filters),
                     'status' => 'ok',
@@ -586,13 +589,19 @@ class AiAgentOrchestrator
             return false;
         }
 
-        // نوع العقار وحده لا يكفي لإطلاق بحث واسع، ونوع + عملية بدون موقع
-        // يحتاجان على الأقل اسم المدينة/المنطقة قبل إظهار النتائج.
-        if (empty($filters['transaction_type'])) {
+        // نوع العقار وحده «فلة»/«شقة» لا يكفي؛ نطلب نوع العملية أولًا.
+        if (empty($filters['transaction_type'])
+            && empty($filters['city'])
+            && empty($filters['district'])
+            && empty($filters['nearby'])) {
             return true;
         }
 
-        return empty($filters['city']) && empty($filters['district']) && empty($filters['nearby']);
+        // وجود مدينة/منطقة يجعل «شقة في صنعاء» طلبًا قابلًا للبحث حتى لو لم
+        // يحدد المستخدم بيعًا أو إيجارًا؛ يمكن استخدام النتيجة لتضييق العملية.
+        return empty($filters['city'])
+            && empty($filters['district'])
+            && empty($filters['nearby']);
     }
 
     private function clarifySearchReply(array $filters): string
