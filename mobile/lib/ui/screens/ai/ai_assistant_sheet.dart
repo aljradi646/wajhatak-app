@@ -478,6 +478,49 @@ class _AiPropertyMiniCard extends StatelessWidget {
                         ],
                       ],
                     ),
+                    if (property.agentPhone?.isNotEmpty == true) ...[
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.phone_outlined,
+                            size: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              property.agentPhone!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'اتصال بالوكيل',
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(2),
+                            constraints: const BoxConstraints(
+                              minWidth: 28,
+                              minHeight: 28,
+                            ),
+                            icon: const Icon(Icons.call_rounded, size: 15),
+                            onPressed: () async {
+                              final uri = Uri(scheme: 'tel', path: property.agentPhone);
+                              await launchUrl(uri);
+                            },
+                          ),
+                          _copyButton(
+                            context,
+                            'هاتف الوكيل',
+                            property.agentPhone!,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                    ],
                     const SizedBox(height: 6),
                     Row(
                       children: [
