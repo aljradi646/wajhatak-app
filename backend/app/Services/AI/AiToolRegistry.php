@@ -26,101 +26,89 @@ class AiToolRegistry
      *
      * @return array<string, array<string, mixed>>
      */
-    public function getToolsSchema(?User $user = null): array
+    public function getToolsSchema(?User $user = null, ?array $allowedTools = null): array
     {
-        return [
+        $schemas = [
             'search_properties' => [
                 'name' => 'search_properties',
-                'description' => 'البحث عن عقارات في قاعدة البيانات وفق معايير محددة',
+                'description' => 'بحث حي عن العقارات المتاحة حاليًا وفق معايير محددة.',
                 'parameters' => [
                     'type' => 'object',
+                    'additionalProperties' => false,
                     'properties' => [
-                        'city' => ['type' => 'string', 'description' => 'اسم المدينة (مثل صنعاء، عدن)'],
-                        'district' => ['type' => 'string', 'description' => 'اسم الحي/المنطقة (مثل حدة، الروضة)'],
-                        'property_type' => ['type' => 'string', 'description' => 'نوع العقار (apartment, villa, land, office, house)'],
-                        'transaction_type' => ['type' => 'string', 'description' => 'نوع العملية (rent, sale)'],
-                        'bedrooms' => ['type' => 'integer', 'description' => 'عدد الغرف'],
-                        'min_price' => ['type' => 'number', 'description' => 'الحد الأدنى للسعر'],
-                        'max_price' => ['type' => 'number', 'description' => 'الحد الأقصى للسعر'],
-                        'furnished' => ['type' => 'boolean', 'description' => 'مفروشة أم لا'],
+                        'city' => ['type' => 'string'],
+                        'district' => ['type' => 'string'],
+                        'property_type' => ['type' => 'string'],
+                        'transaction_type' => ['type' => 'string', 'enum' => ['sale', 'rent']],
+                        'bedrooms' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 20],
+                        'min_price' => ['type' => 'number', 'minimum' => 0],
+                        'max_price' => ['type' => 'number', 'minimum' => 0],
+                        'furnished' => ['type' => 'boolean'],
                     ],
                 ],
             ],
             'get_property_details' => [
                 'name' => 'get_property_details',
-                'description' => 'جلب تفاصيل عقار محدد برقم ID الحقيقي',
+                'description' => 'جلب سجل عقار محدد من بيانات التطبيق الحالية، بما في ذلك حالته الحالية.',
                 'parameters' => [
                     'type' => 'object',
+                    'additionalProperties' => false,
                     'required' => ['property_id'],
                     'properties' => [
-                        'property_id' => ['type' => 'integer', 'description' => 'رقم ID العقار'],
+                        'property_id' => ['type' => 'integer', 'minimum' => 1],
                     ],
                 ],
             ],
             'search_nearby_properties' => [
                 'name' => 'search_nearby_properties',
-                'description' => 'البحث عن عقارات قريبة برقم الإحداثيات الجغرافية الحقيقية للمستخدم',
+                'description' => 'بحث حي عن العقارات المنشورة القريبة من إحداثيات المستخدم المصرح بها.',
                 'parameters' => [
                     'type' => 'object',
+                    'additionalProperties' => false,
                     'required' => ['latitude', 'longitude'],
                     'properties' => [
-                        'latitude' => ['type' => 'number', 'description' => 'خط العرض'],
-                        'longitude' => ['type' => 'number', 'description' => 'خط الطول'],
-                        'radius_km' => ['type' => 'number', 'description' => 'نصف قطر البحث بالكم'],
+                        'latitude' => ['type' => 'number', 'minimum' => -90, 'maximum' => 90],
+                        'longitude' => ['type' => 'number', 'minimum' => -180, 'maximum' => 180],
+                        'radius_km' => ['type' => 'number', 'minimum' => 0.5, 'maximum' => 100],
                     ],
-                ],
-            ],
-            'create_viewing_request' => [
-                'name' => 'create_viewing_request',
-                'description' => 'إنشاء طلب معاينة عقار محدد',
-                'parameters' => [
-                    'type' => 'object',
-                    'required' => ['property_id', 'scheduled_date'],
-                    'properties' => [
-                        'property_id' => ['type' => 'integer', 'description' => 'رقم العقار'],
-                        'scheduled_date' => ['type' => 'string', 'description' => 'تاريخ المعاينة YYYY-MM-DD'],
-                        'scheduled_time' => ['type' => 'string', 'description' => 'وقت المعاينة HH:MM:SS'],
-                        'notes' => ['type' => 'string', 'description' => 'ملاحظات المعاينة'],
-                    ],
-                ],
-            ],
-            'get_agent_info' => [
-                'name' => 'get_agent_info',
-                'description' => 'جلب معلومات وكيل عقاري أو مالك عقار',
-                'parameters' => [
-                    'type' => 'object',
-                    'required' => ['agent_id'],
-                    'properties' => [
-                        'agent_id' => ['type' => 'integer', 'description' => 'رقم الوكيل'],
-                    ],
-                ],
-            ],
-            'get_user_profile' => [
-                'name' => 'get_user_profile',
-                'description' => 'جلب معلومات الملف الشخصي للمستخدم الحالي',
-                'parameters' => ['type' => 'object', 'properties' => []],
-            ],
-            'cancel_viewing_request' => [
-                'name' => 'cancel_viewing_request',
-                'description' => 'إلغاء طلب معاينة يملكه المستخدم الحالي بعد تأكيده',
-                'parameters' => [
-                    'type'=>'object',
-                    'required'=>['viewing_id'],
-                    'properties'=>['viewing_id'=>['type'=>'integer','description'=>'رقم طلب المعاينة']],
                 ],
             ],
             'get_app_knowledge' => [
                 'name' => 'get_app_knowledge',
-                'description' => 'الاستعلام عن كيفية استخدام التطبيق وصفحاته وسياساته',
+                'description' => 'استرجاع معرفة منصة وجهتك الحالية فقط؛ ليست مصدرًا لبيانات العقارات التشغيلية.',
                 'parameters' => [
                     'type' => 'object',
+                    'additionalProperties' => false,
                     'required' => ['query'],
                     'properties' => [
-                        'query' => ['type' => 'string', 'description' => 'سؤال أو كلمة دلالية عن التطبيق'],
+                        'query' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 200],
                     ],
                 ],
             ],
         ];
+
+        if ($allowedTools === null) {
+            return $schemas;
+        }
+
+        return array_intersect_key($schemas, array_flip($allowedTools));
+    }
+
+    /**
+     * الأدوات المسموح للنموذج رؤيتها حسب النية.
+     *
+     * @return list<string>
+     */
+    public function allowedToolsForIntent(string $intent): array
+    {
+        return match ($intent) {
+            'property_search', 'property_recommendation', 'search_refinement', 'search_correction' => ['search_properties'],
+            'nearest_property' => ['search_nearby_properties'],
+            'property_detail', 'property_availability', 'property_price', 'property_location',
+            'property_features', 'property_agent/contact' => ['get_property_details'],
+            'platform_information', 'platform_how_to' => ['get_app_knowledge'],
+            default => [],
+        };
     }
 
     /**
