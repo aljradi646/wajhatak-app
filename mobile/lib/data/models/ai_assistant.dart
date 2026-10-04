@@ -23,6 +23,7 @@ class AiPropertyResult {
     this.isNew = false,
     this.isFeatured = false,
     this.imageUrl,
+    this.distanceKm,
     this.matchScore = 0,
   });
 
@@ -44,6 +45,7 @@ class AiPropertyResult {
   final bool isFeatured;
   final bool available;
   final String? imageUrl;
+  final double? distanceKm;
   final double matchScore;
 
   bool get isRent => transactionType == 'rent';
@@ -79,6 +81,7 @@ class AiPropertyResult {
       isFeatured: json['is_featured'] as bool? ?? false,
       available: json['available'] as bool? ?? true,
       imageUrl: json['image_url'] as String?,
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
       matchScore: (json['match_score'] as num?)?.toDouble() ?? 0,
     );
   }
