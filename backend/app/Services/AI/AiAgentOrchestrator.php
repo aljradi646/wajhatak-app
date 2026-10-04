@@ -63,7 +63,7 @@ class AiAgentOrchestrator
 
             if ($this->isRejection($normalized)) {
                 $this->stateService->setPendingAction($conversation, null);
-                $this->stateService->clearRetrievalState($conversation);
+                $this->stateService->clearRetrievalState($conversation, (int) $userMessage->id);
                 $this->conversationService->addUserMessage($conversation, $message, []);
 
                 return $this->finish($conversation->messages()->latest('id')->first(), [
@@ -133,7 +133,7 @@ class AiAgentOrchestrator
         }
 
         if ($intent === 'identity') {
-            $this->stateService->clearRetrievalState($conversation);
+            $this->stateService->clearRetrievalState($conversation, (int) $userMessage->id);
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->identityReply(),
                 'status' => 'ok',
@@ -378,7 +378,7 @@ class AiAgentOrchestrator
                 'notes' => 'طلب معاينة من خلال المساعد الذكي',
             ];
 
-            $this->stateService->setPendingAction($conversation, 'create_viewing_request', $args);
+            $this->stateService->setPendingAction($conversation, 'create_viewing_request', $args, (int) $userMessage->id);
 
             return $this->finish($userMessage, [
                 'reply' => $this->confirmationPrompt('create_viewing_request', $args),
@@ -417,7 +417,7 @@ class AiAgentOrchestrator
             $this->stateService->updateState($conversation, [], null, array_values(array_filter(
                 array_map(fn ($p) => (int) ($p['property_id'] ?? 0), $properties),
                 fn ($id) => $id > 0,
-            )));
+            ), (int) $userMessage->id);
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->similarReply($properties),
                 'status' => 'ok',
@@ -574,7 +574,7 @@ class AiAgentOrchestrator
 
             $this->conversationService->updateUserMessageFilters($userMessage, $filters);
             if ($filters === [] || ! $this->hasSearchCriteria($filters) || $this->requiresClarificationForSearch($filters)) {
-                $this->stateService->updateState($conversation, $filters, null, []);
+                $this->stateService->updateState($conversation, $filters, null, [], (int) $userMessage->id);
                 $this->conversationService->updateUserMessageFilters($userMessage, $filters);
 
                 return $this->finish($userMessage, [
@@ -824,7 +824,7 @@ class AiAgentOrchestrator
                 fn (array $p) => (int) ($p['property_id'] ?? 0),
                 array_filter($properties, 'is_array'),
             )));
-            $this->stateService->updateState($conversation, $filters, $properties[0] ?? null, $ids);
+            $this->stateService->updateState($conversation, $filters, $properties[0] ?? null, $ids, (int) $userMessage->id);
             $this->conversationService->updateUserMessageFilters($userMessage, $filters);
             $this->rememberSearchPreferences($user, $filters);
 
@@ -863,7 +863,7 @@ class AiAgentOrchestrator
             ]);
         }
 
-        $this->stateService->updateState($conversation, $filters, null, []);
+        $this->stateService->updateState($conversation, $filters, null, [], (int) $userMessage->id);
         return $this->finish($userMessage, [
             'reply' => $this->replyEngine->noResultsReply($filters),
             'status' => 'ok',
