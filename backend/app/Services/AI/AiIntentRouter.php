@@ -70,6 +70,7 @@ class AiIntentRouter
             return $this->result(
                 match ($smallTalk) {
                     'capabilities' => 'capability',
+                    'platform_support' => 'platform_support',
                     default => 'small_talk',
                 }
             , ['sub_intent' => $smallTalk]);
@@ -114,6 +115,15 @@ class AiIntentRouter
 
         $parsed = $this->intentService->parse($message, $history, []);
         $filters = (array) ($parsed['filters'] ?? []);
+
+        if (! empty($filters['investment'])
+            && empty($filters['property_type'])
+            && empty($filters['city'])
+            && empty($filters['district'])
+            && empty($filters['transaction_type'])) {
+            return $this->result('investment_clarify', ['filters' => $filters]);
+        }
+
         $hasExplicitProperty = $this->containsExplicitPropertyCriteria($message)
             || $filters !== [];
 
@@ -242,7 +252,7 @@ class AiIntentRouter
     {
         $text = $this->normalize($message);
 
-        return preg_match('/(عقار|عقارات|شقه|شقق|فيلا|فلل|فله|فيله|بيت|بيوت|منزل|منازل|دور|ارض|اراضي|مزرعه|محل|محلات|مكتب|عماره|تاون|شراء|للبيع|ايجار|للإيجار|استئجار|غرفه|غرف|مفروش|ميزانيه|سعر|ريال)/u', $text) === 1;
+        return preg_match('/(عقار|عقارات|شقه|شقق|فيلا|فلل|فله|فيله|بيت|بيوت|منزل|منازل|دور|ارض|اراضي|مزرعه|محل|محلات|مكتب|عماره|تاون|شراء|للبيع|ايجار|للإيجار|استئجار|غرفه|غرف|مفروش|ميزانيه|سعر|ريال|استثمار|استثماري|عائد|roi)/u', $text) === 1;
     }
 
     private function isPlatformInformation(string $text): bool
