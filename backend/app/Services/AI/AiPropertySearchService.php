@@ -2,7 +2,9 @@
 
 namespace App\Services\AI;
 
+use App\Enums\PropertyStatus;
 use App\Models\AiSearchIndex;
+use App\Models\Property;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -175,8 +177,16 @@ class AiPropertySearchService
         usort($scored, fn ($a, $b) => $b['score'] <=> $a['score']);
         $scored = array_slice($scored, 0, $limit);
 
+        $candidateItems = array_map(
+            fn ($entry) => $this->present($entry['row'], $entry['score'], detailed: true),
+            $scored,
+        );
+
+        // الفهرس مشتق للترشيح فقط. قبل الإرجاع نُعيد التحقق من المصدر التشغيلي
+        // properties حتى لا تتغلب snapshot قديمة على السعر/الحالة الحالية.
+        $live = $this->hydrateLiveProperties($candidateItems, $filters);
         return [
-            'items' => array_map(fn ($entry) => $this->present($entry['row'], $entry['score'], detailed: true), $scored),
+            'items' => $live,
             'total' => $total,
         ];
     }
@@ -220,19 +230,148 @@ class AiPropertySearchService
     /** تفاصيل موسعة لعقار واحد من الفهرس (لأدوات get_property_details). */
     public function details(int $propertyId): ?array
     {
-        if (! $this->indexAvailable()) {
+        if ($propertyId <= 0 || ! Schema::hasTable('properties')) {
             return null;
         }
 
         try {
-            $row = AiSearchIndex::query()->where('property_id', $propertyId)->whereIn('status', ['published'])->first();
+            // التفاصيل من المصدر الحي مباشرة، حتى لو تغير السعر أو الحالة بعد آخر
+            // مزامنة للفهرس. السجل المحذوف نهائيًا/المحذوف منطقيًا لا يُكشف هنا.
+            $property = Property::query()
+                ->with([
+                    'type',
+                    'location',
+                    'features',
+                    'images' => fn ($q) => $q->orderByDesc('is_cover')->orderBy('sort_order'),
+                ])
+                ->whereKey($propertyId)
+                ->first();
 
-            return $row ? $this->present($row, 1.0, detailed: true) : null;
-        } catch (\Illuminate\Database\QueryException $e) {
-            Log::error('ai.details_failed', ['message' => $e->getMessage(), 'property_id' => $propertyId]);
+            return $property ? $this->presentLive($property, 1.0) : null;
+        } catch (\Throwable $e) {
+            Log::error('ai.details_failed', [
+                'message' => $e->getMessage(),
+                'property_id' => $propertyId,
+            ]);
 
             return null;
         }
+    }
+
+    /** @param list<array<string,mixed>> $items */
+    private function hydrateLiveProperties(array $items, array $filters): array
+    {
+        if ($items === []) {
+            return [];
+        }
+
+        $ids = array_values(array_unique(array_filter(
+            array_map(fn ($item) => (int) ($item['property_id'] ?? 0), $items),
+            fn ($id) => $id > 0,
+        )));
+
+        $properties = Property::query()
+            ->with([
+                'type',
+                'location',
+                'features',
+                'images' => fn ($q) => $q->orderByDesc('is_cover')->orderBy('sort_order'),
+            ])
+            ->whereIn('id', $ids)
+            ->where('status', PropertyStatus::Published)
+            ->get()
+            ->keyBy('id');
+
+        $out = [];
+        foreach ($items as $item) {
+            $property = $properties->get((int) ($item['property_id'] ?? 0));
+            if (! $property || ! $this->liveMatchesHardConstraints($property, $filters)) {
+                continue;
+            }
+
+            $distance = $item['distance_km'] ?? null;
+            $presented = $this->presentLive($property, (float) ($item['match_score'] ?? 0.0));
+            if ($distance !== null) {
+                $presented['distance_km'] = (float) $distance;
+            }
+            $out[] = $presented;
+        }
+
+        return $out;
+    }
+
+    private function liveMatchesHardConstraints(Property $property, array $filters): bool
+    {
+        if (($filters['transaction_type'] ?? null) !== null) {
+            $value = $property->transaction_type instanceof \BackedEnum
+                ? $property->transaction_type->value
+                : (string) $property->transaction_type;
+            if ($value !== $filters['transaction_type']) return false;
+        }
+
+        if (($filters['property_type'] ?? null) !== null
+            && $property->type?->slug !== $this->typeSlug((string) $filters['property_type'])) {
+            return false;
+        }
+
+        $location = $property->location;
+        foreach (['city', 'district'] as $field) {
+            if (! empty($filters[$field])) {
+                $actual = $location?->{$field};
+                if ($field === 'district') {
+                    if ($actual !== $filters[$field] && $location?->neighborhood !== $filters[$field]) return false;
+                } elseif ($actual !== $filters[$field]) {
+                    return false;
+                }
+            }
+        }
+
+        if (isset($filters['bedrooms_min']) && ((int) ($property->bedrooms ?? -1) < (int) $filters['bedrooms_min'])) return false;
+        if (isset($filters['bedrooms_max']) && ((int) ($property->bedrooms ?? PHP_INT_MAX) > (int) $filters['bedrooms_max'])) return false;
+        if (isset($filters['bathrooms_min']) && ((int) ($property->bathrooms ?? -1) < (int) $filters['bathrooms_min'])) return false;
+        if (isset($filters['min_price']) && (float) ($property->price ?? 0) < (float) $filters['min_price']) return false;
+        if (isset($filters['max_price']) && (float) ($property->price ?? INF) > (float) $filters['max_price']) return false;
+        if (isset($filters['min_area']) && (float) ($property->area ?? 0) < (float) $filters['min_area']) return false;
+        if (isset($filters['max_area']) && (float) ($property->area ?? INF) > (float) $filters['max_area']) return false;
+        if (array_key_exists('furnished', $filters) && $filters['furnished'] !== null
+            && (bool) $property->is_furnished !== (bool) $filters['furnished']) return false;
+        if (! empty($filters['is_new']) && ! (bool) $property->is_new) return false;
+
+        return true;
+    }
+
+    private function presentLive(Property $property, float $score): array
+    {
+        $transaction = $property->transaction_type instanceof \BackedEnum
+            ? $property->transaction_type->value
+            : (string) $property->transaction_type;
+        $image = $property->images->first();
+
+        return [
+            'property_id' => (int) $property->id,
+            'title' => (string) $property->title,
+            'type' => $property->type?->name_ar,
+            'type_slug' => $property->type?->slug,
+            'transaction_type' => $transaction,
+            'city' => $property->location?->city,
+            'district' => $property->location?->district,
+            'neighborhood' => $property->location?->neighborhood,
+            'price' => $property->price !== null ? (float) $property->price : null,
+            'currency' => $property->currency,
+            'area' => $property->area !== null ? (float) $property->area : null,
+            'bedrooms' => $property->bedrooms,
+            'bathrooms' => $property->bathrooms,
+            'is_furnished' => (bool) $property->is_furnished,
+            'is_new' => (bool) $property->is_new,
+            'is_featured' => (bool) $property->is_featured,
+            'status' => $property->status instanceof \BackedEnum ? $property->status->value : (string) $property->status,
+            'available' => $property->status === PropertyStatus::Published,
+            'match_score' => $score,
+            'image_url' => $image ? asset('storage/'.$image->path) : null,
+            'description' => (string) $property->description,
+            'latitude' => $property->location?->latitude !== null ? (float) $property->location->latitude : null,
+            'longitude' => $property->location?->longitude !== null ? (float) $property->location->longitude : null,
+        ];
     }
 
     /** عقارات مشابهة (نفس النوع/المدينة وسعر مقارب) — لعقار مشابه لهذا. */
