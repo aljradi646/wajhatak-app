@@ -28,7 +28,7 @@ class AiConversationStateService
         AiConversation $conversation,
         array $lastFilters = [],
         ?array $selectedProperty = null,
-        array $retrievedPropertyIds = [],
+        ?array $retrievedPropertyIds = null,
     ): void {
         if (! $conversation->exists) {
             return;
@@ -44,9 +44,12 @@ class AiConversationStateService
             $state['active_search'] = [];
         }
 
-        if ($retrievedPropertyIds !== []) {
+        if ($retrievedPropertyIds !== null) {
             $state['retrieval'] = [
-                'property_ids' => array_values(array_unique(array_filter(array_map('intval', $retrievedPropertyIds), fn ($id) => $id > 0))),
+                'property_ids' => array_values(array_unique(array_filter(
+                    array_map('intval', $retrievedPropertyIds),
+                    fn ($id) => $id > 0,
+                ))),
                 'updated_at' => now()->toISOString(),
             ];
         } elseif (! isset($state['retrieval'])) {
