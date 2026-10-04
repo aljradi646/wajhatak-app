@@ -333,6 +333,7 @@ class AiPropertySearchService
                     'type',
                     'location',
                     'features',
+                    'agent.user',
                     'images' => fn ($q) => $q->orderByDesc('is_cover')->orderBy('sort_order'),
                 ])
                 ->whereKey($propertyId)
