@@ -854,6 +854,7 @@ class AiAgentOrchestrator
                 'find_similar_properties' => 'property_recommendation',
                 'create_viewing_request' => 'viewing_request',
                 'get_property_details' => 'property_detail',
+                'get_property_availability' => 'property_availability',
                 'get_app_knowledge' => 'platform_information',
                 default => 'unsupported_request',
             }
