@@ -657,6 +657,16 @@ class AiAgentOrchestrator
         ], $user);
 
         $properties = $result['properties'] ?? [];
+        $resultMode = 'exact';
+        $relaxations = [];
+
+        if ($properties === []) {
+            $alternativeSearch = $this->searchService->searchClosestAlternatives($filters, 6);
+            $properties = $alternativeSearch['items'] ?? [];
+            $relaxations = $alternativeSearch['relaxations'] ?? [];
+            $resultMode = $properties !== [] ? 'alternatives' : 'none';
+        }
+
         $this->conversationService->updateLatestUserFilters($conversation, $filters);
         $this->stateService->updateState($conversation, $filters, $properties[0] ?? null);
 
@@ -665,14 +675,22 @@ class AiAgentOrchestrator
         }
 
         return [
-            'reply' => $properties !== []
+            'reply' => $resultMode === 'exact'
                 ? $this->replyEngine->summaryReply($message, $properties, $filters, $history)
-                : $this->replyEngine->noResultsReply($filters),
+                : $this->replyEngine->alternativesReply($properties, $relaxations),
             'status' => 'ok',
             'properties' => $properties,
             'filters' => $filters,
-            'tool_calls' => [['tool' => 'search_properties', 'ok' => (bool) ($result['success'] ?? false)]],
-            'intent' => $parsed['intent'] ?? 'search',
+            'result_mode' => $resultMode,
+            'relaxations' => $relaxations,
+            'tool_calls' => [[
+                'tool' => 'search_properties',
+                'ok' => (bool) ($result['success'] ?? false),
+                'mode' => $resultMode,
+            ]],
+            'intent' => $resultMode === 'alternatives'
+                ? 'search_alternatives'
+                : ($parsed['intent'] ?? 'search'),
         ];
     }
 
