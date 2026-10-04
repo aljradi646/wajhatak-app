@@ -67,6 +67,19 @@ class AiConversationStateService
         $conversation->save();
     }
 
+    public function clearRetrievalState(AiConversation $conversation): void
+    {
+        if (! $conversation->exists) {
+            return;
+        }
+
+        $state = $this->state($conversation);
+        $state['retrieval'] = ['property_ids' => [], 'updated_at' => now()->toISOString()];
+        $state['selected_property_id'] = null;
+        $conversation->context_state = $state;
+        $conversation->save();
+    }
+
     public function resetSearchState(AiConversation $conversation): void
     {
         if (! $conversation->exists) {
