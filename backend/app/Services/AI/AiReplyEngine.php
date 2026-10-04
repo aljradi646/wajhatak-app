@@ -254,6 +254,84 @@ class AiReplyEngine
         return 'أستطيع مساعدتك في الوظائف المتاحة داخل وجهتك. اذكر اسم الصفحة أو المشكلة التي تظهر لك وسأوجهك إلى المسار المدعوم في التطبيق.';
     }
 
+    /** تفاصيل مختصرة من payload حي تم التحقق منه، دون إعادة استعلام قاعدة البيانات. */
+    public function detailsReplyFromProperty(array $item): string
+    {
+        $location = collect([$item['district'] ?? null, $item['neighborhood'] ?? null, $item['city'] ?? null])
+            ->filter()
+            ->unique()
+            ->implode(' - ');
+
+        $parts = [];
+        if (! empty($item['bedrooms'])) $parts[] = $item['bedrooms'].' غرف نوم';
+        if (! empty($item['bathrooms'])) $parts[] = $item['bathrooms'].' حمام';
+        if (($item['area'] ?? null) !== null) $parts[] = round((float) $item['area']).' م²';
+        if (array_key_exists('is_furnished', $item)) {
+            $parts[] = (bool) $item['is_furnished'] ? 'مفروش' : 'غير مفروش';
+        }
+
+        $lines = [
+            'تفاصيل العقار رقم '.(int) ($item['property_id'] ?? 0).':',
+            '• '.((string) ($item['title'] ?? 'عقار'))
+                .(($item['type'] ?? null) ? ' — '.$item['type'] : '')
+                .($location !== '' ? ' — '.$location : ''),
+        ];
+
+        if (($item['price'] ?? null) !== null) {
+            $lines[] = '• السعر: '.number_format((float) $item['price']).' '.((string) ($item['currency'] ?? ''));
+        }
+        if ($parts !== []) $lines[] = '• المواصفات: '.implode(' · ', $parts);
+
+        if (! empty($item['features']) && is_array($item['features'])) {
+            $names = array_values(array_filter(array_map(
+                fn ($feature) => is_array($feature) ? (string) ($feature['name_ar'] ?? '') : '',
+                $item['features'],
+            )));
+            if ($names !== []) {
+                $lines[] = '• المزايا: '.implode('، ', array_slice($names, 0, 12));
+            }
+        }
+
+        if (($item['status'] ?? null) !== 'published') {
+            $lines[] = '• الحالة الحالية: '.((string) ($item['status'] ?? 'غير معروفة'));
+        }
+
+        $description = trim((string) ($item['description'] ?? ''));
+        if ($description !== '') {
+            $lines[] = '• الوصف: '.mb_substr($description, 0, 180).(mb_strlen($description) > 180 ? '…' : '');
+        }
+
+        return implode("\n", $lines);
+    }
+
+    public function propertyFeaturesReply(array $item): string
+    {
+        $features = is_array($item['features'] ?? null) ? $item['features'] : [];
+        $names = array_values(array_filter(array_map(
+            fn ($feature) => is_array($feature) ? (string) ($feature['name_ar'] ?? '') : '',
+            $features,
+        )));
+
+        return $names !== []
+            ? 'المزايا المسجلة حاليًا للعقار رقم '.(int) ($item['property_id'] ?? 0).': '.implode('، ', array_slice($names, 0, 15)).'.'
+            : 'لا أرى في بيانات العقار الحالية مزايا موثقة يمكنني تأكيدها.';
+    }
+
+    public function propertyContactReply(array $item): string
+    {
+        $agent = is_array($item['agent'] ?? null) ? $item['agent'] : [];
+        $parts = [];
+
+        if (! empty($agent['name'])) $parts[] = 'الوكيل: '.$agent['name'];
+        if (! empty($agent['agency_name'])) $parts[] = 'الجهة: '.$agent['agency_name'];
+        if (! empty($agent['phone'])) $parts[] = 'الهاتف: '.$agent['phone'];
+        if (! empty($agent['whatsapp'])) $parts[] = 'واتساب: '.$agent['whatsapp'];
+
+        return $parts !== []
+            ? implode("\n", $parts)
+            : 'لا توجد في بيانات العقار الحالية وسيلة تواصل عامة مؤكدة يمكنني عرضها.';
+    }
+
     /** رد الحالة أو السعر أو الموقع من السجل الحي فقط. */
     public function propertyStatusReply(array $property, string $intent): string
     {
