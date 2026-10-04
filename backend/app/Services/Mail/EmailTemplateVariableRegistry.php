@@ -19,7 +19,11 @@ final class EmailTemplateVariableRegistry
             'agent.name' => ['type' => 'string', 'description' => 'اسم الوكيل', 'preview' => 'محمد الجرادي'],
             'agent.phone' => ['type' => 'phone', 'description' => 'هاتف الوكيل', 'preview' => '+967700000000'],
             'app.url' => ['type' => 'url', 'description' => 'رابط المنصة', 'preview' => rtrim((string) config('app.url'), '/')],
+            'app.logo_url' => ['type' => 'url', 'description' => 'رابط شعار المنصة للبريد', 'preview' => ''],
             'app.name' => ['type' => 'string', 'description' => 'اسم المنصة', 'preview' => (string) config('app.name', 'وجهتك')],
+            'name' => ['type' => 'string', 'description' => 'اسم المستخدم (صيغة قديمة)', 'preview' => 'أحمد محمد'],
+            'email' => ['type' => 'email', 'description' => 'البريد الإلكتروني (صيغة قديمة)', 'preview' => 'ahmed@example.com'],
+            'property' => ['type' => 'string', 'description' => 'العقار (صيغة قديمة)', 'preview' => 'شقة حديثة في صنعاء'],
             'code' => ['type' => 'string', 'description' => 'رمز التحقق', 'preview' => '123456'],
             'ttl' => ['type' => 'number', 'description' => 'صلاحية الرمز بالدقائق', 'preview' => '15'],
             'reason' => ['type' => 'string', 'description' => 'سبب الرفض أو الإجراء', 'preview' => 'بيانات ناقصة'],
@@ -30,9 +34,7 @@ final class EmailTemplateVariableRegistry
     {
         $values = [];
         foreach (self::definitions() as $key => $definition) {
-            $values[$key] = array_key_exists($key, $overrides)
-                ? $overrides[$key]
-                : $definition['preview'];
+            $values[$key] = array_key_exists($key, $overrides) ? $overrides[$key] : $definition['preview'];
         }
 
         return $values;

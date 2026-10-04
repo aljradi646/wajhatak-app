@@ -14,32 +14,14 @@ final class EmailTemplateRenderer
     ) {
     }
 
-    /**
-     * @return array{subject:string,html:?string,text:?string,unknown_variables:list<string>}
-     */
     public function render(EmailTemplate $template, array $variables = []): array
     {
-        return $this->renderPayload(
-            (string) $template->subject,
-            $template->html_content,
-            $template->text_content,
-            $template->css_styles,
-            $variables,
-        );
+        return $this->renderPayload((string) $template->subject, $template->html_content, $template->text_content, $template->css_styles, $variables);
     }
 
-    /**
-     * @return array{subject:string,html:?string,text:?string,unknown_variables:list<string>}
-     */
     public function renderVersion(EmailTemplateVersion $version, array $variables = []): array
     {
-        return $this->renderPayload(
-            (string) $version->subject,
-            $version->html_content,
-            $version->text_content,
-            $version->css_styles,
-            $variables,
-        );
+        return $this->renderPayload((string) $version->subject, $version->html_content, $version->text_content, $version->css_styles, $variables);
     }
 
     /**
@@ -56,6 +38,30 @@ final class EmailTemplateRenderer
         $definitions = EmailTemplateVariableRegistry::definitions();
         $unknown = [];
 
+        $normalizeLegacy = static function (?string $content) use ($definitions): ?string {
+            if ($content === null || $content === '') {
+                return $content;
+            }
+
+            $legacy = array_keys(array_filter(
+                $definitions,
+                static fn (array $definition, string $key): bool => ! str_contains($key, '.'),
+                ARRAY_FILTER_USE_BOTH,
+            ));
+
+            if ($legacy === []) {
+                return $content;
+            }
+
+            $pattern = '/(?<!\{)\{('.implode('|', array_map(static fn (string $key): string => preg_quote($key, '/'), $legacy)).')\}(?!\})/u';
+
+            return preg_replace_callback(
+                $pattern,
+                static fn (array $match): string => '{{'.$match[1].'}}',
+                $content,
+            ) ?? $content;
+        };
+
         $resolve = static function (string $name) use ($variables, $definitions, &$unknown): mixed {
             if (array_key_exists($name, $variables)) {
                 return $variables[$name];
@@ -66,16 +72,19 @@ final class EmailTemplateRenderer
                 return $value;
             }
 
-            if (array_key_exists($name, $definitions)) {
-                return $definitions[$name]['preview'];
+            if (array_key_exists($name, $definitions) && array_key_exists('preview', $definitions[$name])) {
+                // Preview defaults are only supplied explicitly by the editor.
+                // Production rendering must never invent a missing value.
+                $unknown[] = $name;
+                return '';
             }
 
             $unknown[] = $name;
-
             return '';
         };
 
-        $replace = static function (?string $content, bool $escapeHtml) use ($resolve): ?string {
+        $replace = static function (?string $content, bool $escapeHtml) use ($resolve, $normalizeLegacy): ?string {
+            $content = $normalizeLegacy($content);
             if ($content === null || $content === '') {
                 return $content;
             }
@@ -84,11 +93,13 @@ final class EmailTemplateRenderer
                 '/{{\s*([A-Za-z0-9_.-]+)\s*}}/u',
                 static function (array $match) use ($resolve, $escapeHtml): string {
                     $value = $resolve($match[1]);
-                    $text = is_scalar($value) || $value === null ? (string) $value : json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    $text = is_scalar($value) || $value === null
+                        ? (string) $value
+                        : (string) json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
                     return $escapeHtml ? e($text) : $text;
                 },
-                $content
+                $content,
             ) ?? $content;
         };
 

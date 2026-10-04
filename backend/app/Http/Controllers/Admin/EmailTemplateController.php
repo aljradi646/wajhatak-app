@@ -7,8 +7,9 @@ use App\Models\ActivityLog;
 use App\Models\EmailSetting;
 use App\Models\EmailTemplate;
 use App\Models\EmailTemplateVersion;
-use App\Services\Mail\DynamicMailService;
+use App\Services\Mail\EmailTemplateRenderer;
 use App\Services\Mail\EmailTemplateVariableRegistry;
+use App\Services\Mail\UnifiedMailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,9 +28,7 @@ class EmailTemplateController extends Controller
 
     public function create()
     {
-        return view('admin.email-templates.create', [
-            'variables' => EmailTemplateVariableRegistry::definitions(),
-        ]);
+        return view('admin.email-templates.create', ['variables' => EmailTemplateVariableRegistry::definitions()]);
     }
 
     public function store(Request $request)
@@ -42,15 +41,12 @@ class EmailTemplateController extends Controller
             $data['version'] = 1;
             $data['status'] = 'draft';
             $data['last_edited_by'] = $userId;
-
             $template = EmailTemplate::create($data);
             $this->createSnapshot($template, $userId, 'النسخة الأولى');
-
             return $template;
         });
 
         ActivityLog::record('email_template', "تم إنشاء قالب بريد: {$template->name}", $template);
-
         return redirect()->route('admin.email-templates.edit', $template)->with('status', 'تم إنشاء القالب كمسودة.');
     }
 
@@ -60,7 +56,7 @@ class EmailTemplateController extends Controller
             'template' => $emailTemplate,
             'logoUrl' => EmailSetting::current()->getLogoUrlForEmail(),
             'variables' => EmailTemplateVariableRegistry::definitions(),
-            'previewValues' => EmailTemplateVariableRegistry::previewValues(),
+            'previewValues' => EmailTemplateVariableRegistry::previewValues(['app.logo_url' => EmailSetting::current()->getLogoUrlForEmail() ?? '']),
         ]);
     }
 
@@ -70,19 +66,19 @@ class EmailTemplateController extends Controller
         $userId = $request->user()?->id;
 
         DB::transaction(function () use ($emailTemplate, $data, $userId, $request): void {
-            $nextVersion = (int) $emailTemplate->version + 1;
-            $emailTemplate->update(array_merge($data, [
+            $template = $emailTemplate->fresh();
+            $nextVersion = (int) $template->version + 1;
+            $template->update(array_merge($data, [
                 'version' => $nextVersion,
                 'status' => 'draft',
                 'last_edited_by' => $userId,
-                'published_at' => null,
                 'archived_at' => null,
+                'autosaved_at' => null,
             ]));
-            $this->createSnapshot($emailTemplate->fresh(), $userId, (string) ($request->input('change_note') ?: 'حفظ نسخة جديدة'));
+            $this->createSnapshot($template->fresh(), $userId, (string) ($request->input('change_note') ?: 'حفظ نسخة جديدة'));
         });
 
         ActivityLog::record('email_template', "تم حفظ إصدار جديد من قالب: {$emailTemplate->name}", $emailTemplate, properties: ['version' => $emailTemplate->version]);
-
         return back()->with('status', 'تم حفظ المسودة وإنشاء إصدار جديد.');
     }
 
@@ -95,24 +91,16 @@ class EmailTemplateController extends Controller
             'autosaved_at' => now(),
         ]));
 
-        return response()->json([
-            'ok' => true,
-            'saved_at' => optional($emailTemplate->autosaved_at)->toISOString(),
-            'version' => (int) $emailTemplate->version,
-            'status' => $emailTemplate->status,
-        ]);
+        return response()->json(['ok' => true, 'saved_at' => optional($emailTemplate->autosaved_at)->toISOString(), 'version' => (int) $emailTemplate->version, 'status' => $emailTemplate->status]);
     }
 
     public function publish(Request $request, EmailTemplate $emailTemplate): JsonResponse
     {
-        abort_if($emailTemplate->status === 'archived', 409, 'لا يمكن نشر قالب مؤرشف قبل استعادته.');
+        abort_if($emailTemplate->status === 'archived', 409, 'لا يمكن نشر قالب مؤرشف.');
 
         DB::transaction(function () use ($emailTemplate, $request): void {
             $template = $emailTemplate->fresh();
-            if (! $template->versions()->where('version', $template->version)->exists()) {
-                $this->createSnapshot($template, $request->user()?->id, 'نسخة النشر');
-            }
-
+            $this->createSnapshot($template, $request->user()?->id, 'نسخة النشر');
             $template->update([
                 'status' => 'published',
                 'is_active' => true,
@@ -120,27 +108,19 @@ class EmailTemplateController extends Controller
                 'published_at' => now(),
                 'archived_at' => null,
                 'last_edited_by' => $request->user()?->id,
+                'autosaved_at' => null,
             ]);
         });
 
         ActivityLog::record('email_template', "تم نشر قالب البريد: {$emailTemplate->name}", $emailTemplate, properties: ['published_version' => $emailTemplate->version]);
-
         return response()->json(['ok' => true, 'status' => 'published', 'version' => (int) $emailTemplate->version]);
     }
 
     public function archive(Request $request, EmailTemplate $emailTemplate): JsonResponse
     {
         abort_if($emailTemplate->is_system, 403, 'لا يمكن أرشفة قالب نظامي.');
-
-        $emailTemplate->update([
-            'status' => 'archived',
-            'is_active' => false,
-            'archived_at' => now(),
-            'last_edited_by' => $request->user()?->id,
-        ]);
-
+        $emailTemplate->update(['status' => 'archived', 'is_active' => false, 'archived_at' => now(), 'last_edited_by' => $request->user()?->id]);
         ActivityLog::record('email_template', "تمت أرشفة قالب البريد: {$emailTemplate->name}", $emailTemplate);
-
         return response()->json(['ok' => true, 'status' => 'archived']);
     }
 
@@ -168,7 +148,6 @@ class EmailTemplateController extends Controller
         });
 
         ActivityLog::record('email_template', "تمت استعادة الإصدار {$version->version} كإصدار جديد", $emailTemplate);
-
         return back()->with('status', 'تمت الاستعادة كمسودة جديدة.');
     }
 
@@ -183,8 +162,14 @@ class EmailTemplateController extends Controller
     public function preview(Request $request, EmailTemplate $emailTemplate): JsonResponse
     {
         $data = $this->validated($request, $emailTemplate, false);
-        $variables = $this->decodeArray($request->input('preview_variables', $request->input('variables', [])));
-        $rendered = app(\App\Services\Mail\EmailTemplateRenderer::class)->renderPayload(
+        $variables = $this->decodeArray($request->input('preview_variables', $request->input('variables', []))) ?? [];
+        $variables = array_merge(
+            EmailTemplateVariableRegistry::previewValues(),
+            $variables,
+        );
+        $variables['app.logo_url'] ??= EmailSetting::current()->getLogoUrlForEmail() ?? '';
+
+        $rendered = app(EmailTemplateRenderer::class)->renderPayload(
             (string) ($data['subject'] ?? $emailTemplate->subject),
             array_key_exists('html_content', $data) ? $data['html_content'] : $emailTemplate->html_content,
             array_key_exists('text_content', $data) ? $data['text_content'] : $emailTemplate->text_content,
@@ -202,11 +187,15 @@ class EmailTemplateController extends Controller
 
     public function sendTest(Request $request, EmailTemplate $emailTemplate): JsonResponse
     {
-        $data = $this->validated($request, $emailTemplate, false);
-        $recipient = (string) $request->input('recipient');
         $request->validate(['recipient' => ['required', 'email:rfc,dns', 'max:254']]);
-        $variables = $this->decodeArray($request->input('preview_variables', []));
-        $rendered = app(\App\Services\Mail\EmailTemplateRenderer::class)->renderPayload(
+        $data = $this->validated($request, $emailTemplate, false);
+        $variables = array_merge(
+            EmailTemplateVariableRegistry::previewValues(),
+            $this->decodeArray($request->input('preview_variables', [])) ?? [],
+        );
+        $variables['app.logo_url'] ??= EmailSetting::current()->getLogoUrlForEmail() ?? '';
+
+        $rendered = app(EmailTemplateRenderer::class)->renderPayload(
             (string) ($data['subject'] ?? $emailTemplate->subject),
             array_key_exists('html_content', $data) ? $data['html_content'] : $emailTemplate->html_content,
             array_key_exists('text_content', $data) ? $data['text_content'] : $emailTemplate->text_content,
@@ -219,31 +208,28 @@ class EmailTemplateController extends Controller
         }
 
         try {
-            app(DynamicMailService::class)->sendHtml(
-                $recipient,
+            app(UnifiedMailService::class)->send(
+                (string) $request->input('recipient'),
                 '[TEST] '.$rendered['subject'],
-                $rendered['html'],
-                $rendered['text']
+                (string) ($rendered['text'] ?? strip_tags($rendered['html'])),
+                ['html' => $rendered['html'], 'text' => $rendered['text'] ?? null],
             );
         } catch (Throwable $e) {
             report($e);
-            ActivityLog::record('email_template_test', "فشل إرسال اختبار قالب: {$emailTemplate->name}", $emailTemplate, properties: ['recipient' => $recipient, 'error' => class_basename($e)]);
-            return response()->json(['message' => 'تعذر إرسال البريد التجريبي عبر إعدادات البريد الحالية.'], 502);
+            ActivityLog::record('email_template_test', "فشل إرسال اختبار قالب: {$emailTemplate->name}", $emailTemplate, properties: ['recipient' => $request->input('recipient'), 'error' => class_basename($e)]);
+            return response()->json(['message' => 'تعذر إرسال البريد التجريبي عبر موفر البريد المهيأ حاليًا.'], 502);
         }
 
-        ActivityLog::record('email_template_test', "تم إرسال اختبار قالب: {$emailTemplate->name}", $emailTemplate, properties: ['recipient' => $recipient]);
+        ActivityLog::record('email_template_test', "تم إرسال اختبار قالب: {$emailTemplate->name}", $emailTemplate, properties: ['recipient' => $request->input('recipient')]);
         return response()->json(['ok' => true, 'message' => 'تم إرسال البريد التجريبي.']);
     }
 
     public function destroy(EmailTemplate $emailTemplate)
     {
         abort_if(! $emailTemplate->canBeDeleted(), 403, 'لا يمكن حذف قالب نظامي.');
-
         $name = $emailTemplate->name;
         $emailTemplate->delete();
-
         ActivityLog::record('email_template', "تم حذف قالب البريد: {$name}");
-
         return redirect()->route('admin.email-templates.index')->with('status', 'تم حذف القالب.');
     }
 
@@ -261,9 +247,7 @@ class EmailTemplateController extends Controller
         $copy->last_edited_by = $request->user()?->id;
         $copy->save();
         $this->createSnapshot($copy, $request->user()?->id, 'نسخة من قالب آخر');
-
         ActivityLog::record('email_template', "تم نسخ قالب البريد: {$emailTemplate->name}", $copy);
-
         return redirect()->route('admin.email-templates.edit', $copy)->with('status', 'تم نسخ القالب كمسودة.');
     }
 
@@ -296,14 +280,8 @@ class EmailTemplateController extends Controller
 
     private function decodeArray(mixed $value): ?array
     {
-        if (is_array($value)) {
-            return $value;
-        }
-
-        if (! is_string($value) || trim($value) === '') {
-            return null;
-        }
-
+        if (is_array($value)) return $value;
+        if (! is_string($value) || trim($value) === '') return null;
         $decoded = json_decode($value, true);
         return is_array($decoded) ? $decoded : [$value];
     }
@@ -311,10 +289,7 @@ class EmailTemplateController extends Controller
     private function createSnapshot(EmailTemplate $template, ?int $userId, string $note): EmailTemplateVersion
     {
         return EmailTemplateVersion::query()->updateOrCreate(
-            [
-                'email_template_id' => $template->id,
-                'version' => (int) $template->version,
-            ],
+            ['email_template_id' => $template->id, 'version' => (int) $template->version],
             [
                 'subject' => (string) $template->subject,
                 'html_content' => $template->html_content,
