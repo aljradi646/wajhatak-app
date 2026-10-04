@@ -8,11 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('ai_message_feedbacks')) {
+        if (Schema::hasTable('ai_message_feedback')) {
             return;
         }
 
-        Schema::create('ai_message_feedbacks', function (Blueprint $table): void {
+        Schema::create('ai_message_feedback', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('ai_message_id')->constrained('ai_messages')->cascadeOnDelete();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
@@ -26,6 +26,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('ai_message_feedbacks');
+        Schema::dropIfExists('ai_message_feedback');
     }
 };
