@@ -103,5 +103,6 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
         Route::get('ai/conversations/{conversation}/messages', [AiAssistantController::class, 'show'])->whereNumber('conversation')->name('ai.conversations.messages');
         Route::get('ai/conversations/{conversation}', [AiAssistantController::class, 'show'])->whereNumber('conversation')->name('ai.conversations.show');
         Route::delete('ai/conversations/{conversation}', [AiAssistantController::class, 'destroy'])->whereNumber('conversation')->name('ai.conversations.destroy');
+        Route::post('ai/messages/{message}/feedback', [AiAssistantController::class, 'feedback'])->whereNumber('message')->name('ai.messages.feedback');
     });
 });

@@ -61,47 +61,6 @@ class AiConversationService
         return $conversation;
     }
 
-    /** إنشاء محادثة جديدة صريحة دون إنشاء صف مؤقت ثم أرشفته. */
-    public function createNew(?User $user, string $locale = 'ar', ?string $sessionToken = null): AiConversation
-    {
-        $max = (int) config('ai.limits.max_conversations', 50);
-
-        if ($user) {
-            $count = AiConversation::query()
-                ->where('user_id', $user->id)
-                ->where('status', 'active')
-                ->count();
-
-            if ($count >= $max) {
-                $oldest = AiConversation::query()
-                    ->where('user_id', $user->id)
-                    ->where('status', 'active')
-                    ->orderBy('last_message_at')
-                    ->first();
-
-                $oldest?->update([
-                    'status' => 'archived',
-                    'last_message_at' => now(),
-                ]);
-            }
-
-            return AiConversation::query()->create([
-                'user_id' => $user->id,
-                'locale' => $locale,
-                'status' => 'active',
-                'title' => 'محادثة جديدة',
-            ]);
-        }
-
-        return AiConversation::query()->create([
-            'user_id' => null,
-            'session_token' => $sessionToken ?: bin2hex(random_bytes(32)),
-            'locale' => $locale,
-            'status' => 'active',
-            'title' => 'محادثة جديدة',
-        ]);
-    }
-
     /** آخر رسائل المحادثة بصيغة مزود الاستدلال. */
     public function historyFor(AiConversation $conversation): array
     {
@@ -126,14 +85,31 @@ class AiConversationService
     /** المعايير المتراكمة: من آخر رسالة مستخدم تحمل معايير (سياق متسلسل). */
     public function accumulatedFilters(AiConversation $conversation): array
     {
-        $last = AiMessage::query()
+        $state = is_array($conversation->context_state) ? $conversation->context_state : [];
+
+        return is_array($state['active_search'] ?? null) ? $state['active_search'] : [];
+    }
+
+    /** آخر مجموعة عقارات مرتبطة برسالة مساعد بعينها، لا حالة عامة. */
+    public function lastRetrievedPropertyIds(AiConversation $conversation): array
+    {
+        $message = AiMessage::query()
             ->where('ai_conversation_id', $conversation->id)
-            ->where('role', AiMessageRole::User->value)
-            ->whereNotNull('structured_filters')
+            ->where('role', AiMessageRole::Assistant->value)
+            ->whereNotNull('property_ids')
             ->orderByDesc('id')
             ->first();
 
-        return $last?->structured_filters ?? [];
+        return array_values(array_unique(array_filter(
+            array_map('intval', (array) ($message?->property_ids ?? [])),
+            fn ($id) => $id > 0,
+        )));
+    }
+
+    public function updateUserMessageFilters(AiMessage $message, array $filters): void
+    {
+        $message->structured_filters = $filters !== [] ? $filters : null;
+        $message->save();
     }
 
     public function addUserMessage(AiConversation $conversation, string $content, array $filters = []): AiMessage
@@ -147,26 +123,13 @@ class AiConversationService
         ]);
     }
 
-    public function updateLatestUserFilters(AiConversation $conversation, array $filters): void
-    {
-        if ($filters === []) {
-            return;
-        }
-
-        $message = AiMessage::query()
-            ->where('ai_conversation_id', $conversation->id)
-            ->where('role', AiMessageRole::User->value)
-            ->latest('id')
-            ->first();
-
-        $message?->update(['structured_filters' => $filters]);
-    }
-
     public function addAssistantMessage(
         AiConversation $conversation,
         string $content,
         array $propertyIds = [],
         string $status = 'ok',
+        string $responseType = 'text',
+        array $metadata = [],
     ): AiMessage {
         $message = AiMessage::query()->create([
             'ai_conversation_id' => $conversation->id,
@@ -174,6 +137,8 @@ class AiConversationService
             'content' => $content,
             'property_ids' => $propertyIds ?: null,
             'status' => $status,
+            'response_type' => $responseType,
+            'metadata' => $metadata ?: null,
         ]);
         $conversation->update(['last_message_at' => now()]);
 
@@ -236,19 +201,9 @@ class AiConversationService
         $days = (int) $this->settings->get('ai_history_retention_days', 30);
         $cutoff = now()->subDays($days);
 
-        $conversations = AiConversation::query()
-            ->whereNotNull('last_message_at')
+        return (int) AiConversation::query()
             ->where('last_message_at', '<', $cutoff)
-            ->get();
-
-        foreach ($conversations as $conversation) {
-            $conversation->messages()->delete();
-            $conversation->update([
-                'status' => 'archived',
-                'last_message_at' => now(),
-            ]);
-        }
-
-        return $conversations->count();
+            ->each(fn (AiConversation $c) => $c->messages()->delete() || $c->update(['status' => 'archived']))
+            ->count();
     }
 }

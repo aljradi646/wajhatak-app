@@ -332,11 +332,9 @@ class AiAssistantController extends Controller
             }
         }
 
-        // صفحة المحادثة لا تحتاج إلى تشخيص شامل أو طلب شبكة إلى خادم LLM عند
-        // فتحها. التشخيص موجود في صفحة «المراقبة» حتى لا يجعل تعطل inference
-        // أو cache قاعدة البيانات صفحة الاختبار نفسها تُرجع 500.
         return view('admin.ai.playground', [
             'messages' => $messages,
+            'health' => $this->healthStatus(),
             'enabled' => $this->settings->enabled(),
             'assistantName' => $this->settings->assistantName(),
             'sections' => self::SETTINGS_SECTIONS,

@@ -140,9 +140,11 @@ class _LuxShimmerScope extends InheritedWidget {
 class _LuxShimmer extends StatefulWidget {
   const _LuxShimmer({
     required this.child,
+    this.duration = const Duration(milliseconds: 1350),
   });
 
   final Widget child;
+  final Duration duration;
 
   @override
   State<_LuxShimmer> createState() => _LuxShimmerState();
@@ -153,13 +155,26 @@ class _LuxShimmerState extends State<_LuxShimmer>
   late final AnimationController _controller =
       AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 1350),
+        duration: widget.duration,
       );
 
   @override
   void initState() {
     super.initState();
     _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LuxShimmer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.duration != widget.duration) {
+      _controller.duration = widget.duration;
+
+      if (!_controller.isAnimating) {
+        _controller.repeat();
+      }
+    }
   }
 
   @override
@@ -170,7 +185,7 @@ class _LuxShimmerState extends State<_LuxShimmer>
         MediaQuery.maybeOf(context)?.disableAnimations ??
             false;
 
-    final tickerEnabled = TickerMode.valuesOf(context).enabled;
+    final tickerEnabled = TickerMode.of(context);
 
     if (disabled || !tickerEnabled) {
       if (_controller.isAnimating) {

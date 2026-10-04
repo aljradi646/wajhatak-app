@@ -23,6 +23,7 @@ class AiPermissionGuard
             'search_nearby_properties',
             'get_agent_info',
             'get_app_knowledge',
+            'get_property_availability',
         ];
 
         if (in_array($toolName, $publicTools, true)) {

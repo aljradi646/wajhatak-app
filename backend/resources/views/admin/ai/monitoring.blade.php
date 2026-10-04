@@ -54,6 +54,11 @@
                 <div class="flex flex-wrap items-center gap-4">
                     <span>عقارات منشورة في القاعدة: <b>{{ $health->details['published_properties'] ?? 0 }}</b></span>
                     <span>صفوف فهرس المساعد: <b>{{ $health->details['indexed_properties'] ?? 0 }}</b></span>
+                    <span>إصدار المعرفة: <b>{{ \App\Services\AI\AiKnowledgeService::VERSION }}</b></span>
+                </div>
+                <div class="rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40 px-4 py-3 text-sm">
+                    <div class="font-bold">قاعدة الحداثة</div>
+                    <div class="mt-1 text-gray-500 dark:text-gray-400">البحث العقاري يستخدم الفهرس لاختيار المترشحين فقط، ثم تُعاد قراءة السجلات الحالية من قاعدة العقارات قبل عرضها.</div>
                 </div>
 
                 <form method="POST" action="{{ route('admin.ai.repair') }}">

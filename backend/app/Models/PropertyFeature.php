@@ -19,6 +19,6 @@ class PropertyFeature extends Model
 
     public function properties(): BelongsToMany
     {
-        return $this->belongsToMany(Property::class);
+        return $this->belongsToMany(Property::class, 'property_feature');
     }
 }
