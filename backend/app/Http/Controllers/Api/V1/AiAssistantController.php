@@ -8,6 +8,7 @@ use App\Http\Requests\AiSearchRequest;
 use App\Models\AiConversation;
 use App\Services\AI\AiAssistantService;
 use App\Services\AI\AiConversationService;
+use App\Services\AI\AiPropertySearchService;
 use App\Services\AI\AiSchemaService;
 use App\Services\AI\AiSettingsService;
 use App\Services\AI\AiLlmClient;
@@ -21,6 +22,7 @@ class AiAssistantController extends Controller
     public function __construct(
         private readonly AiAssistantService $assistant,
         private readonly AiConversationService $conversations,
+        private readonly AiPropertySearchService $propertySearch,
         private readonly AiSettingsService $settings,
         private readonly AiSchemaService $schema,
         private readonly AiLlmClient $llm,
@@ -167,13 +169,30 @@ class AiAssistantController extends Controller
 
         return response()->json(['data' => [
             'id' => $conversation->id,
-            'messages' => $messages->map(fn ($m) => [
-                'id' => $m->id,
-                'role' => $m->role,
-                'content' => $m->content,
-                'property_ids' => $m->property_ids,
-                'created_at' => optional($m->created_at)->toISOString(),
-            ]),
+            'messages' => $messages->map(function ($m) {
+                $propertyIds = collect($m->property_ids ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->filter(fn ($id) => $id > 0)
+                    ->unique()
+                    ->values();
+
+                // إعادة قراءة العقارات المنشورة من الفهرس الحالي حتى تبقى
+                // البطاقات التاريخية مرتبطة ببيانات حقيقية وحديثة.
+                $properties = $propertyIds
+                    ->map(fn (int $id) => $this->propertySearch->details($id))
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                return [
+                    'id' => $m->id,
+                    'role' => $m->role,
+                    'content' => $m->content,
+                    'property_ids' => $propertyIds->all(),
+                    'properties' => $properties,
+                    'created_at' => optional($m->created_at)->toISOString(),
+                ];
+            })->values(),
         ]]);
     }
 

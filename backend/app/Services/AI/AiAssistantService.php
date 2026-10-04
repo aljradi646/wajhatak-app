@@ -90,6 +90,7 @@ class AiAssistantService
                 'properties' => $properties,
                 'filters' => $filters,
                 'tool_calls' => $toolCalls,
+                'ui' => $this->buildUiContract($properties),
                 'failed_stage' => $failedStage,
                 'message_id' => $assistantMessage?->id,
             ];
@@ -204,6 +205,26 @@ class AiAssistantService
         ));
 
         return $message instanceof AiMessage ? $message : null;
+    }
+
+    /**
+     * عقد العرض للواجهات: يحدد أن نتائج العقار يجب أن تعرض كبطاقات
+     * تفاعلية، ويحتفظ بالمعرفات كمرجع وحيد لفتح التفاصيل.
+     *
+     * @param  list<array<string, mixed>>  $properties
+     * @return array<string, mixed>
+     */
+    private function buildUiContract(array $properties): array
+    {
+        return [
+            'response_component' => $properties === [] ? 'assistant_message' : 'property_results',
+            'property_card_component' => 'property_card',
+            'property_card_click_action' => 'open_property',
+            'property_ids' => array_values(array_filter(array_map(
+                static fn (array $item): int => (int) ($item['property_id'] ?? 0),
+                $properties
+            ))),
+        ];
     }
 
     private function ms(): int

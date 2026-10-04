@@ -51,6 +51,82 @@ class AiAssistantTest extends TestCase
         }
     }
 
+    /** ب1) نتائج البحث تحمل عقد Property Card تفاعلي وحقول النسخ العامة. */
+    public function test_property_results_include_grounded_ui_actions(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد شقة في صنعاء',
+        ]);
+
+        $response->assertOk();
+        $items = $response->json('data.properties');
+
+        $this->assertNotEmpty($items);
+
+        $item = $items[0];
+        $this->assertArrayHasKey('image_url', $item);
+        $this->assertSame('property_card', $item['ui']['component'] ?? null);
+        $this->assertTrue((bool) ($item['ui']['image_priority'] ?? false));
+        $this->assertSame(
+            (int) $item['property_id'],
+            (int) ($item['ui']['open_action']['property_id'] ?? 0)
+        );
+        $this->assertSame(
+            'open_property',
+            $item['ui']['title_action']['type'] ?? null
+        );
+        $this->assertSame(
+            'share_property',
+            $item['ui']['share_action']['type'] ?? null
+        );
+
+        $copyFields = collect($item['ui']['copy_actions'] ?? [])
+            ->pluck('field')
+            ->all();
+
+        $this->assertContains('price', $copyFields);
+        $this->assertContains('location', $copyFields);
+        $this->assertSame('property_results', $response->json('data.ui.response_component'));
+        $this->assertSame(
+            (int) $item['property_id'],
+            (int) $response->json('data.ui.property_ids.0')
+        );
+    }
+
+    /** ب2) البطاقة التاريخية تُعاد عند فتح المحادثة من جديد عبر نفس endpoint الذي يستخدمه Flutter. */
+    public function test_conversation_history_restores_property_cards(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
+            'message' => 'شقة في صنعاء',
+        ]);
+
+        $response->assertOk();
+
+        $conversationId = (int) $response->json('data.conversation_id');
+        $propertyId = (int) $response->json('data.properties.0.property_id');
+
+        $history = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/ai/conversations/'.$conversationId.'/messages');
+
+        $history->assertOk();
+
+        $messages = collect($history->json('data.messages'));
+        $assistant = $messages->firstWhere('role', 'assistant');
+
+        $this->assertNotNull($assistant);
+        $this->assertNotEmpty($assistant['properties'] ?? []);
+        $this->assertSame(
+            $propertyId,
+            (int) ($assistant['properties'][0]['property_id'] ?? 0)
+        );
+        $this->assertSame(
+            'property_card',
+            $assistant['properties'][0]['ui']['component'] ?? null
+        );
+    }
+
     /** ب) بحث متعدد الشروط: شقة 2-3 غرف مفروشة أقل من 150 ألف. */
     public function test_multi_condition_search_applies_all_filters(): void
     {

@@ -93,6 +93,43 @@ class AiNaturalConversationRoutingTest extends TestCase
         $this->assertStringNotContainsString('لا توجد حاليًا عقارات مطابقة', (string) $data['reply']);
     }
 
+    public function test_repeated_greetings_are_varied_in_same_conversation(): void
+    {
+        $first = $this->postJson('/api/v1/ai/chat', ['message' => 'السلام عليكم']);
+        $first->assertOk();
+
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $second = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'السلام عليكم',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
+        ]);
+        $second->assertOk();
+
+        $this->assertNotSame(
+            $first->json('data.reply'),
+            $second->json('data.reply'),
+            'يجب ألا تتكرر نفس صياغة التحية داخل المحادثة.'
+        );
+    }
+
+    public function test_weather_and_joke_are_safe_conversational_intents(): void
+    {
+        foreach (['كيف الجو؟', 'كيف الجو في صنعاء؟', 'قول لي نكتة'] as $message) {
+            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+
+            $response->assertOk();
+            $data = $response->json('data');
+
+            $this->assertSame('ok', $data['status'], $message);
+            $this->assertSame('small_talk', $data['intent'], $message);
+            $this->assertSame([], $data['properties'], $message);
+            $this->assertStringNotContainsString('لا توجد حاليًا عقارات مطابقة', (string) $data['reply'], $message);
+        }
+    }
+
     public function test_acknowledgement_is_conversational_not_a_search(): void
     {
         $response = $this->postJson('/api/v1/ai/chat', ['message' => 'تمام']);

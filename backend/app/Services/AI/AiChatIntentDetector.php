@@ -45,7 +45,8 @@ class AiChatIntentDetector
         }
 
         if (mb_strlen($chatText) <= 100
-            && preg_match('/(شكرا|ممتن|يعطيك العافيه|تسلم|ربي يحفظك|جزاك الله|thank|thx)/u', $chatText) === 1) {
+            && preg_match('/(شكرا|ممتن|يعطيك العافيه|تسلم|ربي يحفظك|جزاك الله|thank|thx)/u', $chatText) === 1
+            && ! self::looksLikePropertyRequest($chatText)) {
             return 'thanks';
         }
 
@@ -60,6 +61,24 @@ class AiChatIntentDetector
             return 'stats';
         }
 
+        if (mb_strlen($chatText) <= 120
+            && preg_match('/(الجو|حاله الطقس|حالة الطقس|الطقس|طقس|درجة الحراره|درجه الحراره|حر اليوم|برد اليوم|مطر اليوم|weather)/u', $chatText) === 1
+            && ! self::hasStrongPropertySignal($chatText)) {
+            return 'weather';
+        }
+
+        if (mb_strlen($chatText) <= 100
+            && preg_match('/(نكتة|نكته|نكتني|مزحه|مزحة|ضحكني|قول لي نكته|قول لي نكتة|joke)/u', $chatText) === 1
+            && ! self::hasStrongPropertySignal($chatText)) {
+            return 'joke';
+        }
+
+        if (mb_strlen($chatText) <= 100
+            && preg_match('/(نتكلم|نتكلم شوي|نسولف|سوالف|دردشه|دردشة|خلنا نتكلم|كيف كان يومك|وش تسوي|ايش تسوي|كيف الحياة|كيف الحياه)/u', $chatText) === 1
+            && ! self::hasStrongPropertySignal($chatText)) {
+            return 'casual';
+        }
+
         if (mb_strlen($chatText) <= 50
             && preg_match('/(وداعا|الى اللقاء|مع السلامه|تصبح على خير|تصبحي على خير|باي|باي باي|bye|goodbye)/u', $chatText) === 1) {
             return 'farewell';
@@ -70,6 +89,13 @@ class AiChatIntentDetector
             && ! self::looksLikeSearchRequest($chatText)) {
             return 'wellbeing';
         }
+
+        if (mb_strlen($chatText) <= 100
+            && preg_match('/(تعبان|تعبانه|متضايق|متضايقه|مضايق|مضايقه|زعلان|زعلانه|حزين|حزينه|مبسوط|مبسوطه|فرحان|فرحانه|متوتر|متوتره|قلقان|قلقانه)/u', $chatText) === 1
+            && ! self::looksLikeSearchRequest($chatText)) {
+            return 'emotion';
+        }
+
 
         if (mb_strlen($chatText) <= 35
             && preg_match('/^(تمام|تماما|طيب|كويس|ممتاز|حلو|جميل|رائع|اوكي|اوك|يس|yes|ok|okay|thanks)$/u', $chatText) === 1
@@ -106,6 +132,25 @@ class AiChatIntentDetector
 
         return preg_match(
             '/(عقار|عقارات|شقه|شقق|فيلا|فلل|بيت|بيوت|منزل|منازل|ارض|اراضي|محل|محلات|مكتب|مكاتب|عماره|عمارات|برج|دور|ادوار|تاون\s*هاوس|للبيع|بيع|ايجار|للايجار|شراء|اشتري|تمليك|استئجار|ابحث|بحث|دور لي|اعرض|وريني|ميزانيه|غرف|حمام|متر|مساحه|سعر|اسعار|ريال|مليون|الف|ك\b|قريب مني|قريبه مني|بالقرب مني|مشابه|شبيه|المفضله|مفضلتي|معاينه|حجز|زيارة|عقار رقم|صنعاء|عدن|تعز|الحديدة|المكلا|إب|اب|مارب|سيئون|ذمار|حجة|المهرة)/u',
+            $normalized
+        ) === 1;
+    }
+
+    /** تقدير بسيط لأسلوب المستخدم لتكييف نبرة الرد دون الاعتماد على نموذج خارجي. */
+    public static function isFormal(string $text): bool
+    {
+        $normalized = self::normalize($text);
+
+        return preg_match('/(كيف حالك|هل يمكنك|من فضلك|لو سمحت|اود|ارغب|ارجو|حضرتك|هل بالامكان|اسال حضرتك)/u', $normalized) === 1;
+    }
+
+    /** هل الرسالة تحتوي إشارة عقارية صريحة وليست مجرد اسم مدينة/سياق؟ */
+    private static function hasStrongPropertySignal(string $text): bool
+    {
+        $normalized = self::collapseRepeatedCharacters(self::normalize($text));
+
+        return preg_match(
+            '/(عقار|عقارات|شقه|شقق|فيلا|فلل|بيت|بيوت|منزل|منازل|ارض|اراضي|محل|محلات|مكتب|مكاتب|عماره|عمارات|برج|دور|ادوار|تاون\s*هاوس|للبيع|بيع|ايجار|للايجار|شراء|اشتري|تمليك|استئجار|ابحث|بحث|دور لي|اعرض|وريني|ميزانيه|غرف|حمام|متر|مساحه|سعر|اسعار|ريال|مليون|الف|قريب مني|قريبه مني|بالقرب مني|مشابه|شبيه|المفضله|مفضلتي|معاينه|حجز|زيارة)/u',
             $normalized
         ) === 1;
     }
