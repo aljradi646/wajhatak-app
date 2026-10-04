@@ -515,6 +515,19 @@ class AiAgentOrchestrator
         $parsed = $this->intentService->parse($message, $history, $previous);
         $filters = $parsed['filters'] ?? [];
 
+        // الاستثمار وحده ليس معيار بحث كافيًا؛ نسأل عن أساسيات القرار
+        // بدل عرض كل عقارات البيع أو اختلاق عائد استثماري.
+        if (!empty($filters['investment']) && ! $this->hasConcreteInvestmentCriteria($filters)) {
+            return [
+                'reply' => $this->replyEngine->investmentClarifyReply(),
+                'status' => 'ok',
+                'properties' => [],
+                'filters' => $filters,
+                'tool_calls' => [],
+                'intent' => 'investment_clarify',
+            ];
+        }
+
         if (!empty($filters['similar_to'])) {
             $items = $this->searchService->similar((int) $filters['similar_to'], 6);
             $similarFilters = array_merge($filters, ['similar_to' => (int) $filters['similar_to']]);
@@ -807,6 +820,22 @@ class AiAgentOrchestrator
             '/^(?:نعم|نعم موافق|موافق|أوافق|بالتأكيد|أكيد|اكيد|أكيد موافق|ايوه|أيوه|ايوا|نعم، موافق|confirm|yes|ok|okay)$/iu',
             trim($message)
         );
+    }
+
+    private function hasConcreteInvestmentCriteria(array $filters): bool
+    {
+        foreach ([
+            'property_type', 'city', 'district', 'neighborhood',
+            'min_price', 'max_price', 'min_area', 'max_area',
+            'bedrooms_min', 'bedrooms_max', 'bathrooms_min',
+            'furnished', 'is_new', 'keywords', 'q',
+        ] as $key) {
+            if (isset($filters[$key]) && $filters[$key] !== '' && $filters[$key] !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasSearchCriteria(array $filters): bool
