@@ -122,10 +122,16 @@ class AiLoggingService
 
     private function sanitizeFilters(array $filters): array
     {
-        // المعايير منظمة ومتظبطة أصلاً؛ نحدّ الحجم فقط ويُحذف أي نص حر طويل.
+        // لا نخزن الإحداثيات الدقيقة أو نصوصًا غير لازمة للتشخيص.
         $clean = $filters;
         if (isset($clean['q'])) {
             $clean['q'] = mb_substr((string) $clean['q'], 0, 60);
+        }
+        if (isset($clean['nearby']) && is_array($clean['nearby'])) {
+            $clean['nearby'] = [
+                'enabled' => true,
+                'radius_km' => max(0.5, min(100, (float) ($clean['nearby']['radius_km'] ?? 10))),
+            ];
         }
 
         return array_slice($clean, 0, 20);
