@@ -287,7 +287,7 @@ class AiPropertySearchService
             return ['row' => $row, 'score' => min(1.0, $score)];
         })->sortByDesc('score')->take($limit)->values();
 
-        return $scored->map(fn ($e) => $this->present($e['row'], $e['score']))->all();
+        return $scored->map(fn ($e) => $this->present($e['row'], $e['score'], detailed: true))->all();
     }
 
     // ------------------------------------------------------------------
