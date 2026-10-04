@@ -104,10 +104,9 @@ class AiAgentOrchestrator
         }
 
         $previousFilters = $this->stateService->activeSearch($conversation);
+        // IDs المسترجعة حالة عابرة صريحة. إذا صُفّرت فلا نعيد إحياءها من تاريخ
+        // المحادثة، وإلا عادت البطاقات القديمة إلى رسائل جديدة.
         $previousPropertyIds = $this->stateService->retrievalPropertyIds($conversation);
-        if ($previousPropertyIds === []) {
-            $previousPropertyIds = $this->conversationService->lastRetrievedPropertyIds($conversation);
-        }
 
         $route = $this->intentRouter->route($message, [], $previousFilters, $previousPropertyIds);
         $intent = (string) $route['intent'];
