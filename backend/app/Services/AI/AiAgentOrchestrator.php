@@ -133,6 +133,7 @@ class AiAgentOrchestrator
         }
 
         if ($intent === 'identity') {
+            $this->stateService->clearRetrievalState($conversation);
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->identityReply(),
                 'status' => 'ok',
@@ -146,6 +147,7 @@ class AiAgentOrchestrator
         }
 
         if ($intent === 'capability' || $intent === 'small_talk') {
+            $this->stateService->clearRetrievalState($conversation);
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->smallTalkReply(
                     $message,
@@ -164,6 +166,7 @@ class AiAgentOrchestrator
         }
 
         if ($intent === 'platform_support') {
+            $this->stateService->clearRetrievalState($conversation);
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->platformSupportReply($message),
                 'status' => 'ok',
@@ -177,6 +180,7 @@ class AiAgentOrchestrator
         }
 
         if ($intent === 'investment_clarify') {
+            $this->stateService->clearRetrievalState($conversation);
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->investmentClarifyReply(),
                 'status' => 'ok',
@@ -190,6 +194,7 @@ class AiAgentOrchestrator
         }
 
         if (in_array($intent, ['platform_information', 'platform_how_to'], true)) {
+            $this->stateService->clearRetrievalState($conversation);
             $knowledge = $this->toolRegistry->execute(
                 'get_app_knowledge',
                 ['query' => $message],
@@ -222,6 +227,7 @@ class AiAgentOrchestrator
         }
 
         if ($intent === 'technical_help') {
+            $this->stateService->clearRetrievalState($conversation);
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->technicalReply(),
                 'status' => 'ok',
@@ -235,6 +241,7 @@ class AiAgentOrchestrator
         }
 
         if (in_array($intent, ['out_of_scope', 'unsupported_request'], true)) {
+            $this->stateService->clearRetrievalState($conversation);
             return $this->finish($userMessage, [
                 'reply' => 'هذا خارج نطاق مساعد وجهتك. أستطيع مساعدتك في العقارات المتاحة واستخدام وظائف المنصة التي يدعمها حسابك.',
                 'status' => 'ok',
@@ -248,6 +255,7 @@ class AiAgentOrchestrator
         }
 
         if ($intent === 'ambiguous_request') {
+            $this->stateService->clearRetrievalState($conversation);
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->clarifyReply(
                     $this->conversationService->consecutiveFollowUps($conversation),
