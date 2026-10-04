@@ -204,6 +204,7 @@ class AiPropertySearchService
             // نحتفظ فقط بالمرتكزات التي تجعل البديل ذا صلة واضحة، ونحوّل
             // بقية الشروط إلى درجات مطابقة بدل شروط SQL صلبة.
             $query = AiSearchIndex::query()
+                ->with(['property.agent.user', 'property.location'])
                 ->whereIn('status', ['published'])
                 ->when(! empty($filters['transaction_type']), fn (Builder $q) => $q->where('transaction_type', $filters['transaction_type']))
                 ->when(! empty($filters['property_type']), fn (Builder $q) => $q->where('type_slug', $this->typeSlug($filters['property_type'])))
@@ -247,7 +248,7 @@ class AiPropertySearchService
             }
 
             return ['items' => $items, 'relaxations' => $relaxations];
-        } catch (IlluminateDatabaseQueryException $e) {
+        } catch (\Illuminate\Database\QueryException $e) {
             Log::error('ai.closest_alternatives_failed', [
                 'message' => $e->getMessage(),
                 'filters' => $filters,
