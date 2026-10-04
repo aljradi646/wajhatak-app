@@ -327,6 +327,62 @@ class AiAgentOrchestrator
             fn ($id) => $id > 0,
         )));
 
+        if ($intent === 'property_availability') {
+            $id = $references[0] ?? null;
+            if ($id === null) {
+                return $this->finish($userMessage, [
+                    'reply' => 'أحتاج رقم العقار أو الإشارة إلى بطاقة العقار التي تقصدها.',
+                    'status' => 'ok',
+                    'response_type' => 'clarification',
+                    'properties' => [],
+                    'filters' => [],
+                    'tool_calls' => [],
+                    'actions' => [],
+                    'intent' => 'clarification_required',
+                ]);
+            }
+
+            $result = $this->executeTool('get_property_availability', ['property_id' => $id], $user);
+            if (! ($result['success'] ?? false)) {
+                return $this->finish($userMessage, [
+                    'reply' => $result['message'] ?? 'تعذر التحقق من حالة العقار الحالية.',
+                    'status' => 'ok',
+                    'response_type' => 'text',
+                    'properties' => [],
+                    'filters' => [],
+                    'tool_calls' => [['tool' => 'get_property_availability', 'ok' => false]],
+                    'actions' => [],
+                    'intent' => $intent,
+                ]);
+            }
+
+            $status = (string) ($result['status'] ?? 'unknown');
+            $label = match ($status) {
+                'published' => 'منشور ومتاح للاكتشاف حاليًا',
+                'draft' => 'مسودة وغير متاح للاكتشاف',
+                'pending' => 'قيد المراجعة وغير متاح للاكتشاف',
+                'rejected' => 'مرفوض وغير متاح للاكتشاف',
+                'archived' => 'مؤرشف وغير متاح للاكتشاف',
+                default => 'حالته الحالية غير معروفة',
+            };
+
+            return $this->finish($userMessage, [
+                'reply' => "حالة العقار رقم {$id} حاليًا: {$label}.",
+                'status' => 'ok',
+                'response_type' => 'text',
+                'properties' => [],
+                'filters' => [],
+                'tool_calls' => [['tool' => 'get_property_availability', 'ok' => true]],
+                'actions' => [],
+                'intent' => $intent,
+                'source' => $result['source'] ?? [
+                    'type' => 'live_property',
+                    'source_id' => $id,
+                    'retrieved_at' => now()->toISOString(),
+                ],
+            ]);
+        }
+
         if ($intent === 'viewing_request') {
             if (! $user || ! $user->is_active) {
                 return $this->finish($userMessage, [
