@@ -141,3 +141,4 @@ class AiAssistantRepository {
 
   Future<void> pinConversation(int conversationId, bool pinned) =>
       _api.patch('/ai/conversations/$conversationId/pin', data: {'pinned': pinned});
+}
