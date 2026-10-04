@@ -5,7 +5,7 @@ class AppConfig {
 
   static const apiBaseUrl = String.fromEnvironment(
     'WAJHATAK_API_BASE_URL',
-    defaultValue: 'https://marvelous-warmth-production-803a.up.railway.app/api/v1',
+    defaultValue: 'https://wajhatak-app-production.up.railway.app/api/v1',
   );
 
   static const connectTimeout = Duration(seconds: 12);
