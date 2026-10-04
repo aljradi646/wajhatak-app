@@ -202,6 +202,34 @@ class AiAssistantController extends Controller
         return response()->json(status: 204);
     }
 
+    /** POST /api/v1/ai/messages/{message}/feedback — تقييم رسالة المساعد. */
+    public function feedback(Request $request, int $message): JsonResponse
+    {
+        $user = $request->user('sanctum') ?? $request->user();
+        abort_unless($user, 401, 'يلزم تسجيل الدخول.');
+
+        $value = (string) $request->input('feedback', '');
+        abort_unless(in_array($value, ['helpful', 'not_helpful'], true), 422, 'قيمة التقييم غير صالحة.');
+
+        $aiMessage = \App\Models\AiMessage::query()
+            ->whereKey($message)
+            ->where('role', 'assistant')
+            ->whereHas('conversation', fn ($q) => $q->where('user_id', $user->id))
+            ->firstOrFail();
+
+        $feedback = \App\Models\AiMessageFeedback::query()->updateOrCreate(
+            ['ai_message_id' => $aiMessage->id, 'user_id' => $user->id],
+            ['feedback' => $value, 'note' => null],
+        );
+
+        return response()->json([
+            'data' => [
+                'message_id' => $aiMessage->id,
+                'feedback' => $feedback->feedback,
+            ],
+        ]);
+    }
+
     /** GET /api/v1/ai/health — صحة المحرك الحتمي (فحص حقيقي، بلا أسرار). */
     public function health(): JsonResponse
     {
