@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\\Feature\\Ai;
+namespace Tests\Feature\Ai;
 
-use App\\Services\\AI\\AiIntentRouter;
-use Illuminate\\Foundation\\Testing\\RefreshDatabase;
-use Tests\\TestCase;
+use App\Services\AI\AiIntentRouter;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class AiContractEvaluationTest extends TestCase
 {
@@ -50,7 +50,7 @@ class AiContractEvaluationTest extends TestCase
 
     public function test_response_contract_removes_properties_from_non_property_responses(): void
     {
-        $contract = \\App\\Services\\AI\\AiResponseContract::normalize([
+        $contract = \App\Services\AI\AiResponseContract::normalize([
             'intent' => 'platform_information',
             'response_type' => 'text',
             'reply' => 'معلومات',
