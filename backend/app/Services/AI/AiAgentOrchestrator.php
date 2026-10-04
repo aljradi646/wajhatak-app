@@ -487,7 +487,7 @@ class AiAgentOrchestrator
                 'actions' => [
                     ['type' => 'open_property', 'label' => 'فتح التفاصيل', 'payload' => ['property_id' => (int) $property['property_id']]],
                 ],
-                'intent' => $intent,
+                'intent' => (string) ($result['intent'] ?? $intent),
                 'source' => [
                     'type' => 'live_property',
                     'source_id' => (int) $property['property_id'],
