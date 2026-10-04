@@ -413,10 +413,16 @@ class AiAgentOrchestrator
 
             $result = $this->executeTool('find_similar_properties', ['property_id' => (int) $id, 'limit' => 4], $user);
             $properties = is_array($result['properties'] ?? null) ? $result['properties'] : [];
-            $this->stateService->updateState($conversation, [], null, array_values(array_filter(
-                array_map(fn ($p) => (int) ($p['property_id'] ?? 0), $properties),
-                fn ($id) => $id > 0,
-            ), (int) $userMessage->id);
+            $this->stateService->updateState(
+                $conversation,
+                [],
+                null,
+                array_values(array_filter(
+                    array_map(fn ($p) => (int) ($p['property_id'] ?? 0), $properties),
+                    fn ($id) => $id > 0,
+                )),
+                (int) $userMessage->id,
+            );
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->similarReply($properties),
                 'status' => 'ok',
