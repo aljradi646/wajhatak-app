@@ -277,7 +277,9 @@ class AiReplyEngine
     /** رد دعم استخدام المنصة دون عرض أي عقارات. */
     public function platformSupportReply(string $message): string
     {
-        $text = mb_strtolower($message);
+        $text = mb_strtolower(trim($message));
+        $text = preg_replace('/[\x{064B}-\x{0652}\x{0670}]/u', '', $text) ?? $text;
+        $text = str_replace(['أ', 'إ', 'آ', 'ة', 'ى'], ['ا', 'ا', 'ا', 'ه', 'ي'], $text);
 
         if (preg_match('/(مفضل|المفضله|مفضلتي|احفظ|حفظ)/u', $text) === 1) {
             return 'للعثور على المفضلة: افتح التطبيق ثم اختر «المفضلة» من شريط التنقل السفلي للمستخدم أو من القائمة الجانبية. لحفظ عقار، افتح بطاقته واضغط أيقونة القلب.';
