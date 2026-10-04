@@ -13,7 +13,7 @@ window.LuxPreferences = (() => {
         if (!endpoint || !values || typeof values !== 'object') return false;
         queued = { ...queued, ...values };
         clearTimeout(timer);
-        await new Promise((resolve) => { timer = setTimeout(resolve, 250); });
+        await new Promise(resolve => { timer = setTimeout(resolve, 250); });
         const payload = queued;
         queued = {};
         try {
@@ -34,39 +34,44 @@ window.LuxPreferences = (() => {
     return { persist };
 })();
 
+// --- Theme manager (System / Light / Dark) ---
 window.LuxTheme = (() => {
     const storageKey = 'lux_theme';
     const html = document.documentElement;
-    const valid = (value) => ['light', 'dark', 'system'].includes(value);
 
     function preferred() {
-        const server = window.__LUX_THEME_SERVER__;
-        if (valid(server)) return server;
         try {
-            const cookie = document.cookie
-                .split('; ')
-                .find((part) => part.startsWith(storageKey + '='))
-                ?.split('=')[1];
-            if (valid(cookie)) return cookie;
-            const stored = localStorage.getItem(storageKey);
-            if (valid(stored)) return stored;
-        } catch {}
-        return 'system';
+            const server = window.__LUX_THEME_SERVER__;
+            if (['light', 'dark', 'system'].includes(server)) return server;
+            try {
+                const cookie = document.cookie.split('; ').find(part => part.startsWith(storageKey + '='))?.split('=')[1];
+                if (['light', 'dark', 'system'].includes(cookie)) return cookie;
+                const stored = localStorage.getItem(storageKey);
+                return ['light', 'dark', 'system'].includes(stored) ? stored : 'system';
+            } catch {
+                return 'system';
+            }
+        } catch {
+            return 'system';
+        }
     }
 
     function systemDark() {
-        return Boolean(window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+        return (
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches
+        );
     }
 
     function apply(theme) {
-        const chosen = valid(theme) ? theme : 'system';
-        html.classList.toggle('dark', chosen === 'dark' || (chosen === 'system' && systemDark()));
-        html.setAttribute('data-theme', chosen);
+        const dark = theme === 'dark' || (theme === 'system' && systemDark());
+        html.classList.toggle('dark', dark);
+        html.setAttribute('data-theme', theme);
     }
 
     async function set(theme) {
-        const chosen = valid(theme) ? theme : 'system';
-        try { localStorage.setItem(storageKey, chosen); } catch {}
+        const chosen = ['light', 'dark', 'system'].includes(theme) ? theme : 'system';
+        try { localStorage.setItem(storageKey, chosen); } catch (e) {}
         const secure = location.protocol === 'https:' ? '; Secure' : '';
         document.cookie = storageKey + '=' + chosen + '; Max-Age=31536000; Path=/; SameSite=Lax' + secure;
         apply(chosen);
@@ -75,8 +80,13 @@ window.LuxTheme = (() => {
     }
 
     function init() {
-        const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-        media?.addEventListener?.('change', () => { if (preferred() === 'system') apply('system'); });
+        if (window.matchMedia) {
+            window
+                .matchMedia('(prefers-color-scheme: dark)')
+                .addEventListener('change', () => {
+                    if (preferred() === 'system') apply('system');
+                });
+        }
         apply(preferred());
     }
 
@@ -84,4 +94,5 @@ window.LuxTheme = (() => {
 })();
 
 LuxTheme.init();
+
 Alpine.start();
