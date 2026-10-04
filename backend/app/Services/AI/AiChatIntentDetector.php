@@ -96,13 +96,6 @@ class AiChatIntentDetector
             return 'emotion';
         }
 
-        if (mb_strlen($chatText) <= 100
-            && preg_match('/(نتكلم|نتكلم شوي|نسولف|سوالف|دردشه|دردشة|خلنا نتكلم|كيف كان يومك|وش تسوي|ايش تسوي|كيف الحياة|كيف الحياه)/u', $chatText) === 1
-            && ! self::looksLikeSearchRequest($chatText)) {
-            return 'casual';
-        }
-
-
 
         if (mb_strlen($chatText) <= 35
             && preg_match('/^(تمام|تماما|طيب|كويس|ممتاز|حلو|جميل|رائع|اوكي|اوك|يس|yes|ok|okay|thanks)$/u', $chatText) === 1
