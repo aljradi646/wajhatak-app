@@ -230,7 +230,7 @@ class AiToolRegistry
         if (isset($args['transaction_type']) && ! in_array($args['transaction_type'], ['sale','rent'], true)) return 'نوع العملية غير صالح.';
         if (isset($args['min_price']) && (float) $args['min_price'] < 0) return 'الحد الأدنى للسعر غير صالح.';
         if (isset($args['max_price']) && (float) $args['max_price'] < 0) return 'الحد الأعلى للسعر غير صالح.';
-        if (isset($args['get_app_knowledge']) && mb_strlen((string) $args['get_app_knowledge']) > 200) return 'الاستعلام طويل جدًا.';
+        if ($toolName === 'get_app_knowledge' && mb_strlen((string) ($args['query'] ?? '')) > 200) return 'الاستعلام طويل جدًا.';
         if (isset($args['query']) && mb_strlen((string) $args['query']) > 200) return 'الاستعلام طويل جدًا.';
 
         if ($toolName === 'search_nearby_properties') {
