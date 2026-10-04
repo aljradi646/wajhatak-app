@@ -360,7 +360,7 @@ class AiAgentOrchestrator
                     ['tool' => 'create_viewing_request', 'ok' => (bool) ($result['success'] ?? false)],
                 ],
                 'actions' => [['type' => 'open_property', 'label' => 'فتح العقار', 'payload' => ['property_id' => (int) $id]]],
-                'intent' => $intent,
+                'intent' => $result['intent'] ?? $intent,
                 'source' => [
                     'type' => 'live_property',
                     'source_id' => (int) $id,
@@ -794,12 +794,14 @@ class AiAgentOrchestrator
             $this->rememberSearchPreferences($user, $filters);
 
             return $this->finish($userMessage, [
-                'reply' => $this->replyEngine->summaryReply('',$properties,$filters),
+                'reply' => (is_string($result['reply'] ?? null) && trim($result['reply']) !== '')
+                    ? trim((string) $result['reply'])
+                    : $this->replyEngine->summaryReply('', $properties, $filters),
                 'status' => 'ok',
                 'response_type' => 'property_results',
                 'properties' => $properties,
                 'filters' => $filters,
-                'tool_calls' => [['tool' => $toolName, 'ok' => $ok]],
+                'tool_calls' => $result['tool_calls'] ?? [['tool' => $toolName, 'ok' => $ok]],
                 'actions' => [['type' => 'open_property', 'label' => 'فتح التفاصيل', 'payload' => ['property_id' => (int) $properties[0]['property_id']]]],
                 'intent' => $intent,
                 'source' => [
