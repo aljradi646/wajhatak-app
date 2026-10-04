@@ -28,22 +28,45 @@ class AiLoggingService
         int $searchMs = 0,
         int $tokensUsed = 0,
         ?string $errorCode = null,
+        string $responseType = 'text',
+        ?string $fallbackReason = null,
+        ?string $knowledgeVersion = null,
     ): AiRequestLog {
         return AiRequestLog::query()->create([
             'ai_conversation_id' => $conversation?->exists ? $conversation->id : null,
             'user_id' => $userId,
-            // Request ID: يُقبَل من الطلب الحالي إن وُجد (X-Request-Id) وإلا يُولد uuid.
             'request_id' => mb_substr((string) (request()?->header('X-Request-Id') ?: (string) Str::uuid()), 0, 64),
             'intent' => mb_substr($intent, 0, 40),
             'structured_filters' => $this->sanitizeFilters($filters) ?: null,
-            'tool_calls' => $toolCalls,
+            'tool_calls' => $this->sanitizeToolCalls($toolCalls),
             'results_count' => $resultsCount,
             'status' => $status,
+            'response_type' => mb_substr($responseType, 0, 30),
             'error_code' => $errorCode !== null ? mb_substr($errorCode, 0, 60) : null,
+            'fallback_reason' => $fallbackReason !== null ? mb_substr($fallbackReason, 0, 120) : null,
+            'knowledge_version' => $knowledgeVersion !== null ? mb_substr($knowledgeVersion, 0, 40) : null,
             'latency_ms' => $latencyMs,
             'search_ms' => $searchMs,
             'tokens_used' => $tokensUsed,
         ]);
+    }
+
+    /** @param list<array<string,mixed>>|null $toolCalls */
+    private function sanitizeToolCalls(?array $toolCalls): ?array
+    {
+        if ($toolCalls === null) {
+            return null;
+        }
+
+        return array_values(array_map(
+            fn (array $call) => [
+                'tool' => mb_substr((string) ($call['tool'] ?? ''), 0, 60),
+                'ok' => (bool) ($call['ok'] ?? false),
+                'confirmation_required' => (bool) ($call['confirmation_required'] ?? false),
+                'duration_ms' => max(0, (int) ($call['duration_ms'] ?? 0)),
+            ],
+            array_filter($toolCalls, 'is_array'),
+        ));
     }
 
     /** إحصاءات لوحة المراقبة. */

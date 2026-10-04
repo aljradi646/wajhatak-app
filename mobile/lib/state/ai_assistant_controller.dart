@@ -68,10 +68,13 @@ class AiConversationController extends Notifier<AiConversationState> {
   @override
   AiConversationState build() => const AiConversationState();
 
+  int _sendGeneration = 0;
+
   Future<void> send(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || state.loading) return;
 
+    final generation = ++_sendGeneration;
     final userMessage = AiChatMessage.local(isUser: true, content: trimmed);
     state = state.copyWith(
       messages: [...state.messages, userMessage],
@@ -97,12 +100,14 @@ class AiConversationController extends Notifier<AiConversationState> {
             longitude: longitude,
           );
       final reply = result.message;
+      if (generation != _sendGeneration) return;
       state = state.copyWith(
         messages: [...state.messages, reply],
         loading: false,
         conversationId: state.conversationId ?? result.conversationId,
       );
     } on ApiFailure catch (error) {
+      if (generation != _sendGeneration) return;
       // Fallback لطيف دائمًا — التطبيق لا ينكسر بدون AI.
       final fallback = AiChatMessage.local(
         isUser: false,
@@ -117,6 +122,7 @@ class AiConversationController extends Notifier<AiConversationState> {
         error: error.message,
       );
     } on Object {
+      if (generation != _sendGeneration) return;
       final fallback = AiChatMessage.local(
         isUser: false,
         content:
@@ -160,28 +166,6 @@ class AiConversationController extends Notifier<AiConversationState> {
       }
     }
     ref.invalidate(aiBootstrapProvider);
-    state = const AiConversationState();
-    await _seedWelcome();
-  }
-
-  Future<void> newConversation() async
-  {
-    if (state.loading) return;
-
-    final session = ref.read(sessionProvider).asData?.value;
-    if (session != null) {
-      try {
-        final id = await ref.read(aiAssistantRepositoryProvider).createConversation();
-        state = AiConversationState(conversationId: id);
-        await _seedWelcome();
-        ref.invalidate(aiConversationsListProvider);
-        return;
-      } on Object catch (_) {
-        // عند تعذر إنشاء المحادثة على الخادم، نستمر بمحادثة جديدة محلية.
-      }
-    }
-
-    state = const AiConversationState();
     await _seedWelcome();
   }
 

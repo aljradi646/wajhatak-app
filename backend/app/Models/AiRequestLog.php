@@ -12,7 +12,7 @@ class AiRequestLog extends Model
 
     protected $fillable = [
         'ai_conversation_id', 'user_id', 'request_id', 'intent', 'structured_filters',
-        'tool_calls', 'results_count', 'status', 'error_code', 'latency_ms', 'search_ms', 'tokens_used',
+        'tool_calls', 'results_count', 'status', 'response_type', 'error_code', 'fallback_reason', 'knowledge_version', 'latency_ms', 'search_ms', 'tokens_used',
     ];
 
     protected function casts(): array
@@ -21,6 +21,9 @@ class AiRequestLog extends Model
             'structured_filters' => 'array',
             'tool_calls' => 'array',
             'results_count' => 'integer',
+            'response_type' => 'string',
+            'fallback_reason' => 'string',
+            'knowledge_version' => 'string',
             'latency_ms' => 'integer',
             'search_ms' => 'integer',
             'tokens_used' => 'integer',
