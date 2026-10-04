@@ -227,8 +227,8 @@ class AiIntentService
     private function typeMap(): array
     {
         return [
-            '/(شقة|شقق|دوبلكس)/u' => 'apartment',
-            '/(فيلا|فلل)/u' => 'villa',
+            '/(شقة|شقق|شقه|دوبلكس|دوبلكس)/u' => 'apartment',
+            '/(فيلا|فلل|فله|فيله|فيله)/u' => 'villa',
             '/(دور\s*كامل|دورين|دور\s*سكني)/u' => 'floor',
             '/تاون\s*هاوس/u' => 'townhouse',
             '/(أرض|ارض|قطعة\s*أرض)/u' => 'land',
