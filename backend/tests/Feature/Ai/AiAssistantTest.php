@@ -203,6 +203,22 @@ class AiAssistantTest extends TestCase
         $this->assertStringNotContainsString('عائد', (string) $data['reply']);
     }
 
+    /** Intent B: أسئلة استخدام التطبيق لا تبحث عن عقارات. */
+    public function test_platform_support_is_not_property_search(): void
+    {
+        foreach (['كيف أضيف عقار؟', 'وين ألاقي المفضلة؟', 'كيف أستخدم الفلاتر؟'] as $message) {
+            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+
+            $response->assertOk();
+            $data = $response->json('data');
+
+            $this->assertSame('ok', $data['status'], $message);
+            $this->assertSame('platform_support', $data['intent'], $message);
+            $this->assertSame([], $data['properties'], $message);
+            $this->assertNotEmpty($data['reply'], $message);
+        }
+    }
+
     /** د) خارج النطاق: طلب برمجة يُرفض من الحاجز (بلا نموذج). */
     public function test_out_of_domain_request_is_blocked(): void
     {
@@ -211,7 +227,10 @@ class AiAssistantTest extends TestCase
         $response->assertOk();
         $data = $response->json('data');
         $this->assertSame('blocked', $data['status']);
-        $this->assertStringContainsString('مساعد وجهتك', $data['reply']);
+        $this->assertSame(
+            'عذراً، لم أفهم طلبك بوضوح. هل تبحث عن عقار معين أم تحتاج مساعدة في استخدام التطبيق؟',
+            $data['reply']
+        );
         $this->assertDatabaseHas('ai_request_logs', ['status' => 'blocked']);
     }
 
