@@ -62,11 +62,11 @@ class AiAgentOrchestrator
             $normalized = $this->normalizeTurn($message);
 
             if ($this->isRejection($normalized)) {
-                $this->stateService->setPendingAction($conversation, null);
+                $userMessage = $this->conversationService->addUserMessage($conversation, $message, []);
+                $this->stateService->setPendingAction($conversation, null, [], (int) $userMessage->id);
                 $this->stateService->clearRetrievalState($conversation, (int) $userMessage->id);
-                $this->conversationService->addUserMessage($conversation, $message, []);
 
-                return $this->finish($conversation->messages()->latest('id')->first(), [
+                return $this->finish($userMessage, [
                     'reply' => 'حسنًا، ألغيت العملية ولم يتم تنفيذ أي إجراء.',
                     'status' => 'ok',
                     'response_type' => 'text',
@@ -81,11 +81,11 @@ class AiAgentOrchestrator
             if ($this->isConfirmation($normalized)) {
                 $args = $pending['arguments'];
                 $args['confirmed'] = true;
+                $userMessage = $this->conversationService->addUserMessage($conversation, $message, []);
                 $result = $this->executeTool((string) $pending['tool'], $args, $user);
-                $this->stateService->setPendingAction($conversation, null);
-                $this->conversationService->addUserMessage($conversation, $message, []);
+                $this->stateService->setPendingAction($conversation, null, [], (int) $userMessage->id);
 
-                return $this->finish($conversation->messages()->latest('id')->first(), [
+                return $this->finish($userMessage, [
                     'reply' => (bool) ($result['success'] ?? false)
                         ? ($result['message'] ?? 'تم تنفيذ العملية بنجاح.')
                         : ($result['message'] ?? 'تعذر تنفيذ العملية.'),
@@ -115,7 +115,7 @@ class AiAgentOrchestrator
         $userMessage = $this->conversationService->addUserMessage($conversation, $message, []);
 
         if ($route['reset_search'] ?? false) {
-            $this->stateService->resetSearchState($conversation);
+            $this->stateService->resetSearchState($conversation, (int) $userMessage->id);
             return $this->finish(
                 $userMessage,
                 [
@@ -147,7 +147,7 @@ class AiAgentOrchestrator
         }
 
         if ($intent === 'capability' || $intent === 'small_talk') {
-            $this->stateService->clearRetrievalState($conversation);
+            $this->stateService->clearRetrievalState($conversation, (int) $userMessage->id);
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->smallTalkReply(
                     $message,
