@@ -194,20 +194,23 @@ class AiPropertySearchService
     /** بحث بالمدينة/الحي لأدوات search_locations. */
     public function findLocations(string $term, int $limit = 8): array
     {
-        if (! $this->indexAvailable()) {
+        if (! Schema::hasTable('properties') || ! Schema::hasTable('property_locations')) {
             return [];
         }
 
         $like = '%'.$term.'%';
 
         try {
-            return AiSearchIndex::query()
-                ->whereIn('status', ['published'])
-                ->where(fn (Builder $q) => $q->where('city', 'like', $like)
-                    ->orWhere('district', 'like', $like)
-                    ->orWhere('neighborhood', 'like', $like))
-                ->selectRaw('city, district, neighborhood, count(*) as properties_count, min(price) as min_price, max(price) as max_price')
-                ->groupBy('city', 'district', 'neighborhood')
+            return Property::query()
+                ->where('properties.status', PropertyStatus::Published)
+                ->join('property_locations', 'properties.property_location_id', '=', 'property_locations.id')
+                ->when($term !== '', fn (Builder $q) => $q->where(function (Builder $q) use ($like) {
+                    $q->where('property_locations.city', 'like', $like)
+                        ->orWhere('property_locations.district', 'like', $like)
+                        ->orWhere('property_locations.neighborhood', 'like', $like);
+                }))
+                ->selectRaw('property_locations.city, property_locations.district, property_locations.neighborhood, count(properties.id) as properties_count, min(properties.price) as min_price, max(properties.price) as max_price')
+                ->groupBy('property_locations.city', 'property_locations.district', 'property_locations.neighborhood')
                 ->orderByDesc('properties_count')
                 ->limit($limit)
                 ->get()
@@ -220,9 +223,8 @@ class AiPropertySearchService
                     'max_price' => $r->max_price !== null ? (float) $r->max_price : null,
                 ])
                 ->all();
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (\Throwable $e) {
             Log::error('ai.locations_failed', ['message' => $e->getMessage()]);
-
             return [];
         }
     }
