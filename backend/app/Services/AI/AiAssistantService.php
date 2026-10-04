@@ -123,6 +123,12 @@ class AiAssistantService
                     'session_token' => $conversation?->session_token,
                     'properties' => [],
                     'filters' => $filters,
+                    'tool_calls' => $toolCalls,
+                    'response_type' => 'error',
+                    'actions' => [],
+                    'citations' => [],
+                    'source' => [],
+                    'intent' => $intent !== 'chat' ? $intent : 'error',
                     'failed_stage' => $stage,
                 ];
             } catch (Throwable) {
