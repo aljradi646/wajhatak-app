@@ -533,19 +533,56 @@ class AiAgentOrchestrator
             ], $user);
 
             $properties = $result['properties'] ?? [];
+            $resultMode = 'exact';
+            $relaxations = [];
+
+            if ($properties === []) {
+                $radius = max(0.5, (float) ($clientContext['radius_km'] ?? 10));
+                $expandedRadius = min(100, max($radius + 2, $radius * 1.75));
+
+                $expanded = $this->toolRegistry->execute('search_nearby_properties', [
+                    'latitude' => (float) $clientContext['latitude'],
+                    'longitude' => (float) $clientContext['longitude'],
+                    'radius_km' => $expandedRadius,
+                    'property_type' => $filters['property_type'] ?? null,
+                    'transaction_type' => $filters['transaction_type'] ?? null,
+                    'max_price' => $filters['max_price'] ?? null,
+                    'bedrooms_min' => $filters['bedrooms_min'] ?? null,
+                ], $user);
+
+                $properties = $expanded['properties'] ?? [];
+                if ($properties !== []) {
+                    $resultMode = 'alternatives';
+                    $relaxations[] = 'وسّعت دائرة القرب من '.number_format($radius, 1).' كم إلى '.number_format($expandedRadius, 1).' كم';
+                    $properties = array_map(static function (array $property): array {
+                        $property['is_alternative'] = true;
+                        if (isset($property['ui']) && is_array($property['ui'])) {
+                            $property['ui']['variant'] = 'close_match';
+                            $property['ui']['badge'] = 'قريب من موقعك';
+                        }
+                        return $property;
+                    }, $properties);
+                }
+            }
+
             $this->conversationService->updateLatestUserFilters($conversation, $filters);
             $this->stateService->updateState($conversation, $filters, $properties[0] ?? null);
 
             return [
-                'reply' => $properties !== []
-                    ? $this->replyEngine->summaryReply($message, $properties, $filters, $history)
-                    : $this->replyEngine->noResultsReply($filters),
+                'reply' => $resultMode === 'exact'
+                    ? ($properties !== []
+                        ? $this->replyEngine->summaryReply($message, $properties, $filters, $history)
+                        : $this->replyEngine->noResultsReply($filters))
+                    : $this->replyEngine->alternativesReply($properties, $relaxations),
                 'status' => 'ok',
                 'properties' => $properties,
                 'filters' => $filters,
+                'result_mode' => $resultMode,
+                'relaxations' => $relaxations,
                 'tool_calls' => [[
                     'tool' => 'search_nearby_properties',
                     'ok' => (bool) ($result['success'] ?? false),
+                    'mode' => $resultMode,
                 ]],
                 'intent' => 'nearby',
             ];
