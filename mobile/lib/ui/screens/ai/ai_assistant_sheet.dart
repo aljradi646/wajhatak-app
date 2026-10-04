@@ -415,7 +415,7 @@ class _AiPropertyMiniCard extends StatelessWidget {
                             margin: const EdgeInsetsDirectional.only(start: 6),
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: WajhatakColors.amberSoft,
+                              color: WajhatakColors.amber.withValues(alpha: .16),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
