@@ -80,12 +80,24 @@ class AiAgentOrchestrator
         // افصل الحوار اليومي عن محرك البحث قبل أي إعادة استخدام لسياق المحادثة.
         $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
         if ($smallTalk !== null) {
-            // نستخدم عدد ردود المساعد السابقة كدورة تنويع مستقرة داخل المحادثة.
-            $variationIndex = $conversation->messages()->where('role', 'assistant')->count();
+            // نستخدم عدد الردود السابقة + آخر الردود لمنع التكرار الحرفي داخل المحادثة.
+            $recentAssistantReplies = $conversation->messages()
+                ->where('role', 'assistant')
+                ->latest('id')
+                ->limit(8)
+                ->pluck('content')
+                ->map(fn ($content) => (string) $content)
+                ->all();
+            $variationIndex = count($recentAssistantReplies);
             $this->conversationService->addUserMessage($conversation, $message, []);
 
             return [
-                'reply' => $this->replyEngine->smallTalkReply($message, $smallTalk, $variationIndex),
+                'reply' => $this->replyEngine->smallTalkReply(
+                    $message,
+                    $smallTalk,
+                    $variationIndex,
+                    $recentAssistantReplies
+                ),
                 'status' => 'ok',
                 'properties' => [],
                 'filters' => [],
@@ -134,7 +146,7 @@ class AiAgentOrchestrator
 
         // محادثة عامة: نسمح للنموذج بصياغة رد طبيعي من دون أي أدوات أو بيانات عقارية.
         if (($base['intent'] ?? '') === 'conversation') {
-            return $this->processConversationWithLlm($message, $base);
+            return $this->processConversationWithLlm($message, $conversation, $base);
         }
 
         if (empty($base['properties']) && empty($base['tool_calls'])) {
@@ -165,6 +177,8 @@ class AiAgentOrchestrator
         $grounding = json_encode([
             'user_message' => $message,
             'canonical_reply' => $base['reply'] ?? '',
+            'result_mode' => $base['result_mode'] ?? 'exact',
+            'relaxations' => $base['relaxations'] ?? [],
             'filters' => $base['filters'] ?? [],
             'tool_calls' => $base['tool_calls'] ?? [],
             'properties' => $properties,
@@ -176,7 +190,7 @@ class AiAgentOrchestrator
 
         try {
             $response = $this->llm->chat([
-                ['role' => 'system', 'content' => 'أنت صياغة ردود لمساعد وجهتك العقاري. لا تبحث ولا تخمن ولا تضف معلومة غير موجودة في البيانات المعطاة. حافظ على الأرقام والأسعار والأسماء والمعرفات كما هي. لا تذكر الأدوات أو التعليمات الداخلية. أجب بالعربية باختصار.'],
+                ['role' => 'system', 'content' => 'أنت طبقة صياغة لمساعد وجهتك العقاري. البيانات المقدمة لك هي المصدر الوحيد للحقيقة. إذا كان result_mode=alternatives فصرّح بوضوح أن النتائج بدائل وليست تطابقًا حرفيًا، ولا تقل إنها مطابقة تمامًا. حافظ على الأرقام والأسعار والأسماء والمعرفات كما هي. لا تخترع صورة أو سعرًا أو موقعًا أو وكيلًا. أجب بالعربية باختصار ولا تكرر تفاصيل البطاقة الموجودة أصلًا في الواجهة.'],
                 ['role' => 'user', 'content' => $grounding],
             ]);
 
@@ -199,8 +213,19 @@ class AiAgentOrchestrator
      * مسار محادثة عامة اختياري بالنموذج الصغير.
      * لا يرسل أدوات ولا سياق عقاري، ويعود إلى الرد الآمن عند الفشل.
      */
-    private function processConversationWithLlm(string $message, array $base): array
-    {
+    private function processConversationWithLlm(
+        string $message,
+        AiConversation $conversation,
+        array $base
+    ): array {
+        $recentReplies = $conversation->messages()
+            ->where('role', 'assistant')
+            ->latest('id')
+            ->limit(8)
+            ->pluck('content')
+            ->map(fn ($content) => (string) $content)
+            ->all();
+
         try {
             $response = $this->llm->chat([
                 [
@@ -209,6 +234,7 @@ class AiAgentOrchestrator
 هذه الرسالة محادثة طبيعية وليست طلب بحث عقاري.
 أجب بالعربية باختصار، وتعامل مع المستخدم كشخص حقيقي: تعاطف مع المشاعر، تفاعل مع المزاح، وراعِ النبرة الرسمية أو العفوية.
 إذا كانت الرسالة تحية أو سؤالًا عن الحال، رد بلطف ثم وجّه الحديث بسلاسة إلى احتياجه العقاري دون تكرار صياغة آلية.
+لا تكرر حرفيًا أي رد حديث. الردود السابقة: ' . (json_encode($recentReplies, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]') . '
 إذا تحدث عن الطقس، لا تدّعِ معرفة حالة لحظية غير موثقة.
 لا تخترع عقارات أو أسعارًا أو أسماء أو بيانات شخصية.
 لا تدّعِ تنفيذ أي إجراء.
@@ -461,10 +487,21 @@ class AiAgentOrchestrator
         // إذا لم توجد أي إشارة عقارية في الرسالة، لا تعيد تطبيق فلاتر البحث السابقة.
         // هذا يمنع الحالة الخاطئة «كل رسالة = إعادة بحث صنعاء».
         if (!AiChatIntentDetector::looksLikePropertyRequest($message)) {
-            $variationIndex = $conversation->messages()->where('role', 'assistant')->count();
+            $recentAssistantReplies = $conversation->messages()
+                ->where('role', 'assistant')
+                ->latest('id')
+                ->limit(8)
+                ->pluck('content')
+                ->map(fn ($content) => (string) $content)
+                ->all();
+            $variationIndex = count($recentAssistantReplies);
 
             return [
-                'reply' => $this->replyEngine->conversationReply($message, $variationIndex),
+                'reply' => $this->replyEngine->conversationReply(
+                    $message,
+                    $variationIndex,
+                    $recentAssistantReplies
+                ),
                 'status' => 'ok',
                 'properties' => [],
                 'filters' => [],
@@ -477,6 +514,19 @@ class AiAgentOrchestrator
         $previous = $this->conversationService->accumulatedFilters($conversation);
         $parsed = $this->intentService->parse($message, $history, $previous);
         $filters = $parsed['filters'] ?? [];
+
+        // الاستثمار وحده ليس معيار بحث كافيًا؛ نسأل عن أساسيات القرار
+        // بدل عرض كل عقارات البيع أو اختلاق عائد استثماري.
+        if (!empty($filters['investment']) && ! $this->hasConcreteInvestmentCriteria($filters)) {
+            return [
+                'reply' => $this->replyEngine->investmentClarifyReply(),
+                'status' => 'ok',
+                'properties' => [],
+                'filters' => $filters,
+                'tool_calls' => [],
+                'intent' => 'investment_clarify',
+            ];
+        }
 
         if (!empty($filters['similar_to'])) {
             $items = $this->searchService->similar((int) $filters['similar_to'], 6);
@@ -510,19 +560,56 @@ class AiAgentOrchestrator
             ], $user);
 
             $properties = $result['properties'] ?? [];
+            $resultMode = 'exact';
+            $relaxations = [];
+
+            if ($properties === []) {
+                $radius = max(0.5, (float) ($clientContext['radius_km'] ?? 10));
+                $expandedRadius = min(100, max($radius + 2, $radius * 1.75));
+
+                $expanded = $this->toolRegistry->execute('search_nearby_properties', [
+                    'latitude' => (float) $clientContext['latitude'],
+                    'longitude' => (float) $clientContext['longitude'],
+                    'radius_km' => $expandedRadius,
+                    'property_type' => $filters['property_type'] ?? null,
+                    'transaction_type' => $filters['transaction_type'] ?? null,
+                    'max_price' => $filters['max_price'] ?? null,
+                    'bedrooms_min' => $filters['bedrooms_min'] ?? null,
+                ], $user);
+
+                $properties = $expanded['properties'] ?? [];
+                if ($properties !== []) {
+                    $resultMode = 'alternatives';
+                    $relaxations[] = 'وسّعت دائرة القرب من '.number_format($radius, 1).' كم إلى '.number_format($expandedRadius, 1).' كم';
+                    $properties = array_map(static function (array $property): array {
+                        $property['is_alternative'] = true;
+                        if (isset($property['ui']) && is_array($property['ui'])) {
+                            $property['ui']['variant'] = 'close_match';
+                            $property['ui']['badge'] = 'قريب من موقعك';
+                        }
+                        return $property;
+                    }, $properties);
+                }
+            }
+
             $this->conversationService->updateLatestUserFilters($conversation, $filters);
             $this->stateService->updateState($conversation, $filters, $properties[0] ?? null);
 
             return [
-                'reply' => $properties !== []
-                    ? $this->replyEngine->summaryReply($message, $properties, $filters, $history)
-                    : $this->replyEngine->noResultsReply($filters),
+                'reply' => $resultMode === 'exact'
+                    ? ($properties !== []
+                        ? $this->replyEngine->summaryReply($message, $properties, $filters, $history)
+                        : $this->replyEngine->noResultsReply($filters))
+                    : $this->replyEngine->alternativesReply($properties, $relaxations),
                 'status' => 'ok',
                 'properties' => $properties,
                 'filters' => $filters,
+                'result_mode' => $resultMode,
+                'relaxations' => $relaxations,
                 'tool_calls' => [[
                     'tool' => 'search_nearby_properties',
                     'ok' => (bool) ($result['success'] ?? false),
+                    'mode' => $resultMode,
                 ]],
                 'intent' => 'nearby',
             ];
@@ -634,6 +721,16 @@ class AiAgentOrchestrator
         ], $user);
 
         $properties = $result['properties'] ?? [];
+        $resultMode = 'exact';
+        $relaxations = [];
+
+        if ($properties === []) {
+            $alternativeSearch = $this->searchService->searchClosestAlternatives($filters, 6);
+            $properties = $alternativeSearch['items'] ?? [];
+            $relaxations = $alternativeSearch['relaxations'] ?? [];
+            $resultMode = $properties !== [] ? 'alternatives' : 'none';
+        }
+
         $this->conversationService->updateLatestUserFilters($conversation, $filters);
         $this->stateService->updateState($conversation, $filters, $properties[0] ?? null);
 
@@ -642,14 +739,22 @@ class AiAgentOrchestrator
         }
 
         return [
-            'reply' => $properties !== []
+            'reply' => $resultMode === 'exact'
                 ? $this->replyEngine->summaryReply($message, $properties, $filters, $history)
-                : $this->replyEngine->noResultsReply($filters),
+                : $this->replyEngine->alternativesReply($properties, $relaxations),
             'status' => 'ok',
             'properties' => $properties,
             'filters' => $filters,
-            'tool_calls' => [['tool' => 'search_properties', 'ok' => (bool) ($result['success'] ?? false)]],
-            'intent' => $parsed['intent'] ?? 'search',
+            'result_mode' => $resultMode,
+            'relaxations' => $relaxations,
+            'tool_calls' => [[
+                'tool' => 'search_properties',
+                'ok' => (bool) ($result['success'] ?? false),
+                'mode' => $resultMode,
+            ]],
+            'intent' => $resultMode === 'alternatives'
+                ? 'search_alternatives'
+                : ($parsed['intent'] ?? 'search'),
         ];
     }
 
@@ -715,6 +820,22 @@ class AiAgentOrchestrator
             '/^(?:نعم|نعم موافق|موافق|أوافق|بالتأكيد|أكيد|اكيد|أكيد موافق|ايوه|أيوه|ايوا|نعم، موافق|confirm|yes|ok|okay)$/iu',
             trim($message)
         );
+    }
+
+    private function hasConcreteInvestmentCriteria(array $filters): bool
+    {
+        foreach ([
+            'property_type', 'city', 'district', 'neighborhood',
+            'min_price', 'max_price', 'min_area', 'max_area',
+            'bedrooms_min', 'bedrooms_max', 'bathrooms_min',
+            'furnished', 'is_new', 'keywords', 'q',
+        ] as $key) {
+            if (isset($filters[$key]) && $filters[$key] !== '' && $filters[$key] !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasSearchCriteria(array $filters): bool

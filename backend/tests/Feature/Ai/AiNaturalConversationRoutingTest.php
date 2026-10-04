@@ -108,11 +108,30 @@ class AiNaturalConversationRoutingTest extends TestCase
         ]);
         $second->assertOk();
 
-        $this->assertNotSame(
-            $first->json('data.reply'),
-            $second->json('data.reply'),
-            'يجب ألا تتكرر نفس صياغة التحية داخل المحادثة.'
-        );
+        $replies = [
+            (string) $first->json('data.reply'),
+            (string) $second->json('data.reply'),
+        ];
+
+        $currentConversation = $second->json('data.conversation_id');
+        $currentToken = $second->json('data.session_token');
+
+        foreach (range(1, 6) as $turn) {
+            $response = $this->postJson('/api/v1/ai/chat', [
+                'message' => 'السلام عليكم',
+                'conversation_id' => $currentConversation,
+                'session_token' => $currentToken,
+            ]);
+            $response->assertOk();
+            $reply = (string) $response->json('data.reply');
+
+            $this->assertNotSame(end($replies), $reply, 'لا يجوز تكرار الرد السابق حرفيًا.');
+            $replies[] = $reply;
+            $currentToken = $response->json('data.session_token') ?: $currentToken;
+        }
+
+        $this->assertGreaterThanOrEqual(2, count(array_unique(array_slice($replies, 0, 5))));
+
     }
 
     public function test_weather_and_joke_are_safe_conversational_intents(): void

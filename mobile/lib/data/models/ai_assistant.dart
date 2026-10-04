@@ -26,6 +26,7 @@ class AiPropertyResult {
     this.referenceCode,
     this.address,
     this.agentPhone,
+    this.isAlternative = false,
     this.matchScore = 0,
   });
 
@@ -50,6 +51,7 @@ class AiPropertyResult {
   final String? referenceCode;
   final String? address;
   final String? agentPhone;
+  final bool isAlternative;
   final double matchScore;
 
   bool get isRent => transactionType == 'rent';
@@ -88,6 +90,7 @@ class AiPropertyResult {
       referenceCode: json['reference_code'] as String?,
       address: json['address'] as String?,
       agentPhone: json['agent_phone'] as String?,
+      isAlternative: json['is_alternative'] as bool? ?? false,
       matchScore: (json['match_score'] as num?)?.toDouble() ?? 0,
     );
   }

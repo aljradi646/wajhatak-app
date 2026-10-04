@@ -58,7 +58,7 @@ class AiPropertySearchService
         $minScore = (float) $this->settings->get('ai_min_match_score', 0.05);
 
         $query = AiSearchIndex::query()
-            ->with(['property.agent.user', 'property.location'])
+            ->with(['property.agent.user', 'property.location', 'property.images'])
             ->whereIn('status', ['published']);
 
         // --- تصفية هيكلية (كلها AND) ---
@@ -180,6 +180,82 @@ class AiPropertySearchService
             'items' => array_map(fn ($entry) => $this->present($entry['row'], $entry['score'], detailed: true), $scored),
             'total' => $total,
         ];
+    }
+
+    /**
+     * بحث بدائل قريبة عند فشل التطابق الحرفي.
+     *
+     * يحتفظ بمرتكزات الطلب المهمة (نوع العملية، نوع العقار، المدينة) ويرخي
+     * القيود الأقل أهمية، ثم يعيد ترتيب النتائج حسب مقدار تطابقها مع الطلب الأصلي.
+     * كل نتيجة تبقى من ai_search_index، أي من عقار منشور حقيقي.
+     *
+     * @return array{items:list<array<string,mixed>>,relaxations:list<string>}
+     */
+    public function searchClosestAlternatives(array $filters, ?int $limit = null): array
+    {
+        if (! $this->indexAvailable()) {
+            return ['items' => [], 'relaxations' => []];
+        }
+
+        $limit = $limit ?? (int) $this->settings->get('ai_max_results', 6);
+        $maxCandidates = max($limit * 10, (int) $this->settings->get('ai_max_candidates', 60));
+
+        try {
+            // نحتفظ فقط بالمرتكزات التي تجعل البديل ذا صلة واضحة، ونحوّل
+            // بقية الشروط إلى درجات مطابقة بدل شروط SQL صلبة.
+            $query = AiSearchIndex::query()
+                ->with(['property.agent.user', 'property.location'])
+                ->whereIn('status', ['published'])
+                ->when(! empty($filters['transaction_type']), fn (Builder $q) => $q->where('transaction_type', $filters['transaction_type']))
+                ->when(! empty($filters['property_type']), fn (Builder $q) => $q->where('type_slug', $this->typeSlug($filters['property_type'])))
+                ->when(! empty($filters['city']), fn (Builder $q) => $q->where('city', $filters['city']));
+
+            $rows = $query
+                ->orderByDesc('is_featured')
+                ->orderByDesc('is_new')
+                ->orderBy('price')
+                ->limit($maxCandidates)
+                ->get();
+
+            $scored = $rows->map(fn (AiSearchIndex $row) => [
+                'row' => $row,
+                'score' => $this->score($row, $filters),
+            ])->sortByDesc('score')->values();
+
+            $items = $scored
+                ->take($limit)
+                ->map(fn (array $entry) => $this->present($entry['row'], (float) $entry['score'], detailed: true, alternative: true))
+                ->all();
+
+            $relaxations = [];
+            if (! empty($filters['district']) || ! empty($filters['neighborhood'])) {
+                $relaxations[] = 'وسّعت النطاق من الحي إلى بقية المدينة';
+            }
+            if (isset($filters['max_price']) || isset($filters['min_price'])) {
+                $relaxations[] = 'خففت حد الميزانية قليلًا';
+            }
+            if (isset($filters['bedrooms_min']) || isset($filters['bedrooms_max'])) {
+                $relaxations[] = 'خففت شرط عدد الغرف';
+            }
+            if (array_key_exists('furnished', $filters)) {
+                $relaxations[] = 'خففت شرط التأثيث';
+            }
+            if (! empty($filters['is_new'])) {
+                $relaxations[] = 'خففت شرط حداثة العقار';
+            }
+            if (! empty($filters['q']) || ! empty($filters['keywords'])) {
+                $relaxations[] = 'وسّعت المطابقة النصية';
+            }
+
+            return ['items' => $items, 'relaxations' => $relaxations];
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('ai.closest_alternatives_failed', [
+                'message' => $e->getMessage(),
+                'filters' => $filters,
+            ]);
+
+            return ['items' => [], 'relaxations' => []];
+        }
     }
 
     /** بحث بالمدينة/الحي لأدوات search_locations. */
@@ -378,6 +454,26 @@ class AiPropertySearchService
             $checks++;
             $passed += ($row->is_furnished === (bool) $filters['furnished']) ? 1 : 0;
         }
+        if (isset($filters['bathrooms_min'])) {
+            $checks++;
+            $passed += ($row->bathrooms !== null && $row->bathrooms >= (int) $filters['bathrooms_min']) ? 1 : 0;
+        }
+        if (isset($filters['min_area'])) {
+            $checks++;
+            $passed += ($row->area !== null && (float) $row->area >= (float) $filters['min_area']) ? 1 : 0;
+        }
+        if (isset($filters['max_area'])) {
+            $checks++;
+            $passed += ($row->area !== null && (float) $row->area <= (float) $filters['max_area']) ? 1 : 0;
+        }
+        if (isset($filters['is_new'])) {
+            $checks++;
+            $passed += ($row->is_new === (bool) $filters['is_new']) ? 1 : 0;
+        }
+        foreach (array_filter((array) ($filters['keywords'] ?? [])) as $keyword) {
+            $checks++;
+            $passed += mb_stripos((string) $row->search_text, (string) $keyword) !== false ? 1 : 0;
+        }
 
         $score = $checks > 0 ? $passed / $checks : 0.5;
 
@@ -390,7 +486,12 @@ class AiPropertySearchService
     }
 
     /** شكل القطعة الموثوقة التي تُمرر للنموذج وللواجهة (بلا بيانات حساسة). */
-    private function present(AiSearchIndex $row, float $score, bool $detailed = false): array
+    private function present(
+        AiSearchIndex $row,
+        float $score,
+        bool $detailed = false,
+        bool $alternative = false,
+    ): array
     {
         $data = [
             'property_id' => $row->property_id,
@@ -416,19 +517,20 @@ class AiPropertySearchService
         if ($detailed) {
             $data['description'] = $row->description;
             // رابط صورة الغلاف الحقيقية من جدول property_images (إن وجدت).
-            $image = \App\Models\PropertyImage::query()
-                ->where('property_id', $row->property_id)
-                ->orderByDesc('is_cover')->orderBy('sort_order')
-                ->first(['path']);
+            $images = $property = $row->relationLoaded('property') ? $row->property : null;
+            $images = $property?->relationLoaded('images') ? $property->images : collect();
+            $image = $images
+                ->sortBy(fn ($image) => (! empty($image->is_cover) ? 0 : 1).'|'.str_pad((string) ($image->sort_order ?? 0), 10, '0', STR_PAD_LEFT))
+                ->first();
             $data['image_url'] = $image ? asset('storage/'.$image->path) : null;
             $data['latitude'] = $row->latitude !== null ? (float) $row->latitude : null;
             $data['longitude'] = $row->longitude !== null ? (float) $row->longitude : null;
 
             // بيانات عامة من العقار المنشور والوكيل؛ تُستخدم فقط لإجراءات
             // النسخ/المشاركة في الواجهة ولا تتضمن أسرارًا أو بيانات داخلية.
-            $property = $row->relationLoaded('property') ? $row->property : null;
             $agent = $property?->agent;
             $location = $property?->location;
+
 
             if ($property?->reference_code) {
                 $data['reference_code'] = (string) $property->reference_code;
@@ -482,8 +584,11 @@ class AiPropertySearchService
                 ];
             }
 
+            $data['is_alternative'] = $alternative;
             $data['ui'] = [
                 'component' => 'property_card',
+                'variant' => $alternative ? 'close_match' : 'exact_match',
+                'badge' => $alternative ? 'قريب من طلبك' : null,
                 'image_priority' => true,
                 'open_action' => [
                     'type' => 'open_property',

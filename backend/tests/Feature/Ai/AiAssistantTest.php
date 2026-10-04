@@ -144,8 +144,8 @@ class AiAssistantTest extends TestCase
         }
     }
 
-    /** ج) لا نتائج: ميزانية مستحيلة — يجب رد صريح بلا اختراع. */
-    public function test_no_results_returns_honest_reply(): void
+    /** ج) لا تطابق حرفي: يعرض النظام أقرب بدائل حقيقية بدل رسالة آلية فقط. */
+    public function test_no_exact_results_offer_grounded_close_alternatives(): void
     {
         $response = $this->postJson('/api/v1/ai/chat', [
             'message' => 'أريد شقة في صنعاء أقل من 1000 ريال',
@@ -153,8 +153,54 @@ class AiAssistantTest extends TestCase
 
         $response->assertOk();
         $data = $response->json('data');
+
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame('alternatives', $data['result_mode']);
+        $this->assertNotEmpty($data['properties']);
+        $this->assertStringContainsString('تطابقًا حرفيًا', $data['reply']);
+
+        foreach ($data['properties'] as $property) {
+            $this->assertDatabaseHas('properties', [
+                'id' => $property['property_id'],
+                'status' => 'published',
+            ]);
+            $this->assertTrue((bool) ($property['is_alternative'] ?? false));
+            $this->assertSame('close_match', $property['ui']['variant'] ?? null);
+        }
+    }
+
+    /** ج1) الاستثمار وحده يطلب معايير حقيقية بدل عرض كامل السوق. */
+    public function test_investment_request_without_criteria_asks_for_focus(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد استثمار عقاري',
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame('investment_clarify', $data['intent']);
         $this->assertSame([], $data['properties']);
-        $this->assertStringContainsString('لا توجد', $data['reply']);
+        $this->assertTrue((bool) ($data['filters']['investment'] ?? false));
+    }
+
+    /** ج2) الاستثمار مع مدينة يُحوّل إلى شراء عقاري مقيّد بالمدينة. */
+    public function test_investment_with_city_uses_sale_search_without_financial_claims(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد استثمار عقاري في صنعاء',
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame('sale', $data['filters']['transaction_type'] ?? null);
+        $this->assertSame('صنعاء', $data['filters']['city'] ?? null);
+        $this->assertNotSame('blocked', $data['status']);
+        $this->assertStringNotContainsString('مضمون', (string) $data['reply']);
+        $this->assertStringNotContainsString('عائد', (string) $data['reply']);
     }
 
     /** د) خارج النطاق: طلب برمجة يُرفض من الحاجز (بلا نموذج). */

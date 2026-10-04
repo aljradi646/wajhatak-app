@@ -39,19 +39,35 @@ class AiReplyEngine
         return implode("\n", $lines);
     }
 
-    /** رد "عقار مشابه لهذا العقار". */
+    /** رد "عقار مشابه لهذا العقار" — التفاصيل تعرضها البطاقات التفاعلية. */
     public function similarReply(array $items): string
     {
         if ($items === []) {
-            return 'لم أجد عقارات مشابهة كافية حتى الآن، لكن عقارات جديدة تُنشر باستمرار — جرّب لاحقًا أو اسألني عن منطقة معينة.';
+            return 'لم أجد عقارات مشابهة كافية حتى الآن، لكن أقدر أوسّع البحث إلى مدينة أو ميزانية مختلفة.';
         }
 
-        $lines = ['هذه أقرب العقارات المشابهة المتوفرة لدينا حاليًا:'];
-        foreach (array_slice($items, 0, 3) as $item) {
-            $lines[] = $this->cardLine($item);
+        return 'وجدت لك '.count($items).' خيارات مشابهة من العقارات المنشورة فعليًا. البطاقات أدناه تحتوي الصور والتفاصيل؛ افتح أي بطاقة لاختيار الخطوة التالية.';
+    }
+
+    /**
+     * رد صريح عند غياب التطابق الحرفي مع عرض البدائل القريبة في البطاقات.
+     *
+     * @param list<array<string,mixed>> $items
+     * @param list<string> $relaxations
+     */
+    public function alternativesReply(array $items, array $relaxations = []): string
+    {
+        if ($items === []) {
+            return 'لم أجد تطابقًا حرفيًا ولا بديلًا قريبًا من المعايير الحالية. يمكننا تعديل معيار واحد فقط ثم أعيد البحث.';
         }
 
-        return implode("\n", $lines);
+        $message = 'لم أجد تطابقًا حرفيًا لكل الشروط، لذلك عرضت لك أقرب البدائل المتاحة فعليًا في البطاقات أدناه.';
+
+        if ($relaxations !== []) {
+            $message .= "\nخففت ".implode('، ', array_slice($relaxations, 0, 3)).' فقط، مع الحفاظ على بيانات العقارات الحقيقية.';
+        }
+
+        return $message."\nاختر أي بطاقة للتفاصيل، أو قل لي ما المعيار الذي تريد تضييقه.";
     }
 
     /**
@@ -99,11 +115,42 @@ class AiReplyEngine
     }
 
     /** رد حوار طبيعي متنوع؛ variationIndex يمنع تكرار نفس الصياغة في المحادثة. */
-    public function smallTalkReply(string $message, string $intent, int $variationIndex = 0): string
+    public function smallTalkReply(
+        string $message,
+        string $intent,
+        int $variationIndex = 0,
+        array $recentReplies = [],
+    ): string
     {
         $name = $this->settings->assistantName();
-        $pick = static function (array $options) use ($variationIndex): string {
-            return $options[$variationIndex % count($options)];
+        $pick = static function (array $options) use ($variationIndex, $recentReplies): string {
+            $count = count($options);
+            $start = $count > 0 ? $variationIndex % $count : 0;
+
+            for ($offset = 0; $offset < $count; $offset++) {
+                $candidate = $options[($start + $offset) % $count];
+                if (! in_array($candidate, $recentReplies, true)) {
+                    return $candidate;
+                }
+            }
+
+            if ($count === 0) {
+                return '';
+            }
+
+            $candidate = $options[$start];
+            $suffixes = [
+                ' وأنا معك للخطوة التالية.',
+                ' وخذ راحتك في الكلام.',
+                ' وقل لي ما يدور في بالك.',
+                ' وأنا جاهز نكمل معك.',
+                ' ونقدر نبدأ من أي نقطة تحب.',
+                ' وأخبرني بما تحتاج الآن.',
+            ];
+
+            return $candidate.($recentReplies !== []
+                ? $suffixes[$variationIndex % count($suffixes)]
+                : '');
         };
         $formal = AiChatIntentDetector::isFormal($message);
 
@@ -187,16 +234,38 @@ class AiReplyEngine
      * رد آمن لرسالة عامة غير مصنفة كبحث عقاري.
      * لا يعتمد على فلاتر أو نتائج محفوظة من رسائل سابقة.
      */
-    public function conversationReply(string $message, int $variationIndex = 0): string
-    {
+    public function conversationReply(
+        string $message,
+        int $variationIndex = 0,
+        array $recentReplies = [],
+    ): string {
         $options = [
             'فهمتك. أنا معك، ويمكنك التحدث معي بشكل طبيعي. وعندما تريد خدمة عقارية، اكتب طلبك بطريقتك المعتادة وسأحوّله إلى بحث فعلي في عقارات وجهتك.',
             'تمام، خذ راحتك بالكلام 😊. وإذا احتجت أي شيء متعلق بعقارات وجهتك، قل لي ما عندك وسأتعامل معه مباشرة.',
             'أكيد، نقدر نتكلم بشكل طبيعي. وعندما يكون عندك احتياج عقاري، لا تحتاج لصيغة محددة؛ اشرح لي بطريقتك وأنا أرتب البحث.',
             'أنا حاضر معك. احكِ لي ما تريد، وإذا كان فيه جزء عقاري سأحوّله إلى خطوة عملية وبحث حقيقي.',
+            'سمعتك. نقدر نكمل الكلام بشكل طبيعي، وعندما يظهر احتياج عقاري سأحوّله إلى بحث فعلي بدل ما أفترض عنك شيئًا.',
         ];
+        $count = count($options);
+        if ($count === 0) {
+            return '';
+        }
 
-        return $options[$variationIndex % count($options)];
+        $start = $variationIndex % $count;
+        for ($offset = 0; $offset < $count; $offset++) {
+            $candidate = $options[($start + $offset) % $count];
+            if (! in_array($candidate, $recentReplies, true)) {
+                return $candidate;
+            }
+        }
+
+        return $options[$start];
+    }
+
+    /** رد توضيحي لمسار الاستثمار قبل تنفيذ بحث واسع. */
+    public function investmentClarifyReply(): string
+    {
+        return 'ممتاز. أقدر أساعدك في البحث عن عقار مناسب للاستثمار، لكن ما راح أفترض هدفك أو العائد. قل لي المدينة أو المنطقة، والميزانية التقريبية، ونوع العقار إن كان لديك تفضيل، وسأبحث في العقارات المنشورة فعليًا.';
     }
 
     /** رد إحصاءات حقيقية من الفهرس (كم عقارًا متوفرًا). */

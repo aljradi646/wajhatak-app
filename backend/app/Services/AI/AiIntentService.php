@@ -32,6 +32,7 @@ class AiIntentService
             'keywords' => ['type' => ['array', 'null'], 'items' => ['type' => 'string']],
             'similar_to' => ['type' => ['integer', 'null']],
             'sort' => ['type' => ['string', 'null'], 'enum' => ['price_asc', 'price_desc', 'area_desc', 'relevance', null]],
+            'investment' => ['type' => ['boolean', 'null']],
             'out_of_scope' => ['type' => ['boolean', 'null']],
         ],
     ];
@@ -84,6 +85,13 @@ class AiIntentService
                 $filters['property_type'] = $value;
                 break;
             }
+        }
+
+        // «استثمار» يعامل كمسار عقاري، وغالبًا يعني شراء أصل عقاري؛
+        // لا نُصدر حكمًا ماليًا أو عائدًا غير موجود في البيانات.
+        if ($this->matches('/(استثمار|استثماري|استثمارية|دخل\s*استثماري|عائد|roi)/u', $text)) {
+            $filters['investment'] = true;
+            $filters['transaction_type'] ??= 'sale';
         }
 
         // الترتيب مقصود: نطاق «من .. إلى» أولًا، ثم الحالات المفردة.
