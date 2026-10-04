@@ -57,6 +57,51 @@ class AiAgentOrchestrator
             ];
         }
 
+        $pending = $this->stateService->pendingAction($conversation);
+        if ($pending !== null) {
+            $normalized = $this->normalizeTurn($message);
+
+            if ($this->isRejection($normalized)) {
+                $this->stateService->setPendingAction($conversation, null);
+                $this->conversationService->addUserMessage($conversation, $message, []);
+
+                return [
+                    'reply' => 'حسنًا، ألغيت العملية ولم يتم تنفيذ أي إجراء.',
+                    'status' => 'ok',
+                    'response_type' => 'text',
+                    'properties' => [],
+                    'filters' => [],
+                    'tool_calls' => [],
+                    'actions' => [],
+                    'intent' => 'action_cancelled',
+                ];
+            }
+
+            if ($this->isConfirmation($normalized)) {
+                $args = $pending['arguments'];
+                $args['confirmed'] = true;
+                $result = $this->executeTool((string) $pending['tool'], $args, $user);
+                $this->stateService->setPendingAction($conversation, null);
+                $this->conversationService->addUserMessage($conversation, $message, []);
+
+                return [
+                    'reply' => (bool) ($result['success'] ?? false)
+                        ? ($result['message'] ?? 'تم تنفيذ العملية بنجاح.')
+                        : ($result['message'] ?? 'تعذر تنفيذ العملية.'),
+                    'status' => (bool) ($result['success'] ?? false) ? 'ok' : 'error',
+                    'response_type' => 'text',
+                    'properties' => [],
+                    'filters' => [],
+                    'tool_calls' => [[
+                        'tool' => $pending['tool'],
+                        'ok' => (bool) ($result['success'] ?? false),
+                    ]],
+                    'actions' => [],
+                    'intent' => 'confirmed_action',
+                ];
+            }
+        }
+
         $previousFilters = $this->stateService->activeSearch($conversation);
         $previousPropertyIds = $this->stateService->retrievalPropertyIds($conversation);
         if ($previousPropertyIds === []) {
@@ -101,7 +146,12 @@ class AiAgentOrchestrator
 
         if ($intent === 'capability' || $intent === 'small_talk') {
             return $this->finish($userMessage, [
-                'reply' => $this->replyEngine->smallTalkReply($message, $route['sub_intent'] ?? ($intent === 'capability' ? 'capabilities' : 'greeting')),
+                'reply' => $this->replyEngine->smallTalkReply(
+                    $message,
+                    $route['sub_intent'] ?? ($intent === 'capability' ? 'capabilities' : 'greeting'),
+                    $conversation->messages()->where('role', 'assistant')->count(),
+                    $conversation->messages()->where('role', 'assistant')->latest('id')->limit(3)->pluck('content')->all(),
+                ),
                 'status' => 'ok',
                 'response_type' => 'text',
                 'properties' => [],
@@ -780,6 +830,23 @@ class AiAgentOrchestrator
         if (isset($filters['bedrooms_min'])) {
             $this->memoryService->remember($user, 'bedrooms', (string) $filters['bedrooms_min'], 0.85, 'conversation');
         }
+    }
+
+    private function normalizeTurn(string $text): string
+    {
+        $text = mb_strtolower(trim($text));
+        $text = preg_replace('/[\x{064B}-\x{0652}\x{0670}]/u', '', $text) ?? $text;
+        return str_replace(['أ', 'إ', 'آ', 'ة', 'ى'], ['ا', 'ا', 'ا', 'ه', 'ي'], $text);
+    }
+
+    private function isRejection(string $text): bool
+    {
+        return preg_match('/^(لا|لا لا|الغاء|إلغاء|الغي|cancel|no|مو موافق|ما اريد)$/u', $text) === 1;
+    }
+
+    private function isConfirmation(string $text): bool
+    {
+        return preg_match('/^(نعم|اي|ايوه|أيوه|موافق|موافقة|اكيد|أكيد|تمام|yes|ok|okay)$/u', $text) === 1;
     }
 
     private function hasSearchCriteria(array $filters): bool
