@@ -56,6 +56,10 @@ class AiChatIntentDetector
             return 'capabilities';
         }
 
+        if (mb_strlen($chatText) <= 120 && self::isPlatformSupport($chatText)) {
+            return 'platform_support';
+        }
+
         if (mb_strlen($chatText) <= 70
             && preg_match('/(كم عقار|كم شقه|ما المتوفر|وش عندكم|ايش عندكم|شن عندكم|كم العدد|احصائيات|عدد العقارات|عدد العقارات المتوفره)/u', $chatText) === 1) {
             return 'stats';
@@ -109,6 +113,12 @@ class AiChatIntentDetector
     /**
      * كشف التحية/السلام — يقبل صيغ الدردشة الشائعة وإطالة الحروف.
      */
+    /** أسئلة دعم استخدام التطبيق: التنقل، الإضافة، المفضلة، البحث والتواصل. */
+    private static function isPlatformSupport(string $text): bool
+    {
+        return preg_match('/(كيف (استخدم|اخل|اعمل|اسوي)|وين (الاق|اجد|الاقي)|اين (اجد|الاقي)|طريقة|طريقه|اضيف عقار|اضافة عقار|اضافه عقار|انشئ عقار|انشاء عقار|عقاراتي|المفضله|مفضلتي|احفظ عقار|حفظ عقار|اتواصل مع الوكيل|التواصل مع الوكيل|الفلاتر|فلتر|البحث المتقدم|استكشاف|الحساب|الملف الشخصي|الطلبات|طلب معاينه|الاشعارات|الرسائل|تسجيل الدخول|تسجيل حساب)/u', $text) === 1;
+    }
+
     private static function isGreeting(string $normalized): bool
     {
         $pattern = '^(?:'
