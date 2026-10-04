@@ -517,7 +517,7 @@ class AiPropertySearchService
         if ($detailed) {
             $data['description'] = $row->description;
             // رابط صورة الغلاف الحقيقية من جدول property_images (إن وجدت).
-            $images = $property = $row->relationLoaded('property') ? $row->property : null;
+            $property = $row->relationLoaded('property') ? $row->property : null;
             $images = $property?->relationLoaded('images') ? $property->images : collect();
             $image = $images
                 ->sortBy(fn ($image) => (! empty($image->is_cover) ? 0 : 1).'|'.str_pad((string) ($image->sort_order ?? 0), 10, '0', STR_PAD_LEFT))

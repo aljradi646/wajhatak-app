@@ -77,8 +77,21 @@ class AiAgentOrchestrator
             ];
         }
 
-        // افصل الحوار اليومي عن محرك البحث قبل أي إعادة استخدام لسياق المحادثة.
+        // افصل دعم استخدام المنصة والحوار اليومي عن محرك البحث قبل أي إعادة استخدام للسياق.
         $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
+        if ($smallTalk === 'platform_support') {
+            $this->conversationService->addUserMessage($conversation, $message, []);
+
+            return [
+                'reply' => $this->replyEngine->platformSupportReply($message),
+                'status' => 'ok',
+                'properties' => [],
+                'filters' => [],
+                'tool_calls' => [],
+                'intent' => 'platform_support',
+            ];
+        }
+
         if ($smallTalk !== null) {
             // نستخدم عدد الردود السابقة + آخر الردود لمنع التكرار الحرفي داخل المحادثة.
             $recentAssistantReplies = $conversation->messages()
@@ -140,7 +153,7 @@ class AiAgentOrchestrator
     ): array {
         $base = $this->processWithRules($user, $message, $conversation, $locale, $clientContext);
 
-        if (in_array($base['intent'] ?? '', ['small_talk', 'confirmation_required', 'action_cancelled', 'blocked'], true)) {
+        if (in_array($base['intent'] ?? '', ['small_talk', 'platform_support', 'unclear', 'investment_clarify', 'confirmation_required', 'action_cancelled', 'blocked'], true)) {
             return $base;
         }
 
@@ -441,6 +454,17 @@ class AiAgentOrchestrator
         array $clientContext
     ): array {
         $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
+        if ($smallTalk === 'platform_support') {
+            return [
+                'reply' => $this->replyEngine->platformSupportReply($message),
+                'status' => 'ok',
+                'properties' => [],
+                'filters' => [],
+                'tool_calls' => [],
+                'intent' => 'platform_support',
+            ];
+        }
+
         if ($smallTalk !== null) {
             return [
                 'reply' => $this->replyEngine->smallTalkReply($message, $smallTalk),
@@ -686,18 +710,13 @@ class AiAgentOrchestrator
         $this->conversationService->updateLatestUserFilters($conversation, $filters);
 
         if (!$this->hasSearchCriteria($filters)) {
-            $reply = $this->replyEngine->clarifyReply(
-                $this->conversationService->consecutiveFollowUps($conversation),
-                (int) config('ai.limits.max_followups', 2)
-            );
-
             return [
-                'reply' => $reply ?: 'أخبرني ما الذي تبحث عنه: شقة أم بيت أم أرض، وفي أي مدينة وبأي ميزانية تقريبًا؟',
+                'reply' => $this->replyEngine->unclearRequestReply(),
                 'status' => 'ok',
                 'properties' => [],
                 'filters' => $filters,
                 'tool_calls' => [],
-                'intent' => 'clarify',
+                'intent' => 'unclear',
             ];
         }
 
@@ -795,7 +814,7 @@ class AiAgentOrchestrator
 
         return [
             'reply' => $reason === 'out_of_domain'
-                ? 'أنا مساعد وجهتك الذكي، ومتخصص في عقارات المنصة وخدماتها فقط.'
+                ? $this->replyEngine->unclearRequestReply()
                 : 'عذرًا، لا أستطيع المساعدة في هذا الطلب.',
             'status' => 'blocked',
             'properties' => [],

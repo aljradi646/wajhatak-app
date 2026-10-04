@@ -149,6 +149,42 @@ class AiNaturalConversationRoutingTest extends TestCase
         }
     }
 
+    public function test_platform_support_is_classified_before_capabilities(): void
+    {
+        foreach ([
+            'كيف أضيف عقار؟',
+            'وين ألاقي المفضلة؟',
+            'كيف أستخدم الفلاتر؟',
+        ] as $message) {
+            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+
+            $response->assertOk();
+            $data = $response->json('data');
+
+            $this->assertSame('ok', $data['status'], $message);
+            $this->assertSame('platform_support', $data['intent'], $message);
+            $this->assertSame([], $data['properties'], $message);
+            $this->assertNotEmpty($data['reply'], $message);
+        }
+    }
+
+    public function test_unclear_request_uses_the_required_unified_message(): void
+    {
+        foreach (['أبحث عن عقار', 'سسسس غغغ', 'اكتب لي برنامج Flutter'] as $message) {
+            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+
+            $response->assertOk();
+            $data = $response->json('data');
+
+            $this->assertSame([], $data['properties'], $message);
+            $this->assertSame(
+                'عذراً، لم أفهم طلبك بوضوح. هل تبحث عن عقار معين أم تحتاج مساعدة في استخدام التطبيق؟',
+                $data['reply'],
+                $message
+            );
+        }
+    }
+
     public function test_acknowledgement_is_conversational_not_a_search(): void
     {
         $response = $this->postJson('/api/v1/ai/chat', ['message' => 'تمام']);
