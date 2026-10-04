@@ -263,8 +263,12 @@ class AiAgentOrchestrator
             return $this->finish($userMessage, [
                 'reply' => $reply,
                 'status' => 'ok',
-                'response_type' => $intent === 'property_detail' ? 'property_detail' : 'text',
-                'properties' => [$property],
+                'response_type' => in_array($intent, ['property_detail', 'property_features', 'property_agent/contact'], true)
+                    ? 'property_detail'
+                    : 'text',
+                'properties' => in_array($intent, ['property_detail', 'property_features', 'property_agent/contact'], true)
+                    ? [$property]
+                    : [],
                 'filters' => [],
                 'tool_calls' => [['tool' => 'get_property_details', 'ok' => true]],
                 'actions' => [
