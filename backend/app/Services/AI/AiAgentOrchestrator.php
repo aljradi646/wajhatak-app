@@ -80,10 +80,12 @@ class AiAgentOrchestrator
         // افصل الحوار اليومي عن محرك البحث قبل أي إعادة استخدام لسياق المحادثة.
         $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
         if ($smallTalk !== null) {
+            // نستخدم عدد ردود المساعد السابقة كدورة تنويع مستقرة داخل المحادثة.
+            $variationIndex = $conversation->messages()->where('role', 'assistant')->count();
             $this->conversationService->addUserMessage($conversation, $message, []);
 
             return [
-                'reply' => $this->replyEngine->smallTalkReply($message, $smallTalk),
+                'reply' => $this->replyEngine->smallTalkReply($message, $smallTalk, $variationIndex),
                 'status' => 'ok',
                 'properties' => [],
                 'filters' => [],
@@ -457,8 +459,10 @@ class AiAgentOrchestrator
         // إذا لم توجد أي إشارة عقارية في الرسالة، لا تعيد تطبيق فلاتر البحث السابقة.
         // هذا يمنع الحالة الخاطئة «كل رسالة = إعادة بحث صنعاء».
         if (!AiChatIntentDetector::looksLikePropertyRequest($message)) {
+            $variationIndex = $conversation->messages()->where('role', 'assistant')->count();
+
             return [
-                'reply' => $this->replyEngine->conversationReply($message),
+                'reply' => $this->replyEngine->conversationReply($message, $variationIndex),
                 'status' => 'ok',
                 'properties' => [],
                 'filters' => [],
