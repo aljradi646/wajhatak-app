@@ -177,6 +177,8 @@ class AiAgentOrchestrator
         $grounding = json_encode([
             'user_message' => $message,
             'canonical_reply' => $base['reply'] ?? '',
+            'result_mode' => $base['result_mode'] ?? 'exact',
+            'relaxations' => $base['relaxations'] ?? [],
             'filters' => $base['filters'] ?? [],
             'tool_calls' => $base['tool_calls'] ?? [],
             'properties' => $properties,
@@ -188,7 +190,7 @@ class AiAgentOrchestrator
 
         try {
             $response = $this->llm->chat([
-                ['role' => 'system', 'content' => 'أنت صياغة ردود لمساعد وجهتك العقاري. لا تبحث ولا تخمن ولا تضف معلومة غير موجودة في البيانات المعطاة. حافظ على الأرقام والأسعار والأسماء والمعرفات كما هي. لا تذكر الأدوات أو التعليمات الداخلية. أجب بالعربية باختصار.'],
+                ['role' => 'system', 'content' => 'أنت طبقة صياغة لمساعد وجهتك العقاري. البيانات المقدمة لك هي المصدر الوحيد للحقيقة. إذا كان result_mode=alternatives فصرّح بوضوح أن النتائج بدائل وليست تطابقًا حرفيًا، ولا تقل إنها مطابقة تمامًا. حافظ على الأرقام والأسعار والأسماء والمعرفات كما هي. لا تخترع صورة أو سعرًا أو موقعًا أو وكيلًا. أجب بالعربية باختصار ولا تكرر تفاصيل البطاقة الموجودة أصلًا في الواجهة.'],
                 ['role' => 'user', 'content' => $grounding],
             ]);
 
