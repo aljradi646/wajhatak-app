@@ -9,6 +9,7 @@ use App\Models\AiSearchIndex;
 use App\Models\Property;
 use App\Services\AI\AiKnowledgeService;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * تسجيل آمن لطلبات المساعد — للمراقبة والتدقيق فقط.
@@ -84,12 +85,18 @@ class AiLoggingService
 
         $totalRequests = (clone $base)->count();
         $clarifications = (clone $base)->whereIn('intent', ['clarification_required', 'ambiguous_request'])->count();
-        $feedbackPositive = AiMessageFeedback::query()->where('feedback', 'helpful')->count();
-        $feedbackNegative = AiMessageFeedback::query()->where('feedback', 'not_helpful')->count();
-        $staleIndexes = Property::query()
-            ->join('ai_search_index', 'properties.id', '=', 'ai_search_index.property_id')
-            ->whereColumn('ai_search_index.updated_at', '<', 'properties.updated_at')
-            ->count();
+        $feedbackPositive = Schema::hasTable('ai_message_feedbacks')
+            ? AiMessageFeedback::query()->where('feedback', 'helpful')->count()
+            : 0;
+        $feedbackNegative = Schema::hasTable('ai_message_feedbacks')
+            ? AiMessageFeedback::query()->where('feedback', 'not_helpful')->count()
+            : 0;
+        $staleIndexes = Schema::hasTable('ai_search_index')
+            ? Property::query()
+                ->join('ai_search_index', 'properties.id', '=', 'ai_search_index.property_id')
+                ->whereColumn('ai_search_index.updated_at', '<', 'properties.updated_at')
+                ->count()
+            : 0;
 
         return [
             'total_conversations' => $conversations,
