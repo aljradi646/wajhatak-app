@@ -31,10 +31,24 @@ class AiIntentRouter
             return $this->result('ambiguous_request');
         }
 
-        if (AiChatIntentDetector::detectDetailsTarget($message) !== null) {
-            return $this->result('property_detail', [
-                'property_reference_ids' => [AiChatIntentDetector::detectDetailsTarget($message)],
-            ]);
+        $directId = AiChatIntentDetector::detectDetailsTarget($message);
+        if ($directId !== null) {
+            if ($this->isAvailabilityQuestion($normalized)) {
+                return $this->result('property_availability', ['property_reference_ids' => [$directId]]);
+            }
+            if ($this->isPriceQuestion($normalized)) {
+                return $this->result('property_price', ['property_reference_ids' => [$directId]]);
+            }
+            if ($this->isLocationQuestion($normalized)) {
+                return $this->result('property_location', ['property_reference_ids' => [$directId]]);
+            }
+            if ($this->isFeaturesQuestion($normalized)) {
+                return $this->result('property_features', ['property_reference_ids' => [$directId]]);
+            }
+            if ($this->isAgentQuestion($normalized)) {
+                return $this->result('property_agent/contact', ['property_reference_ids' => [$directId]]);
+            }
+            return $this->result('property_detail', ['property_reference_ids' => [$directId]]);
         }
 
         if ($this->isSearchReset($normalized)) {
@@ -77,6 +91,11 @@ class AiIntentRouter
             return $this->result('compare_properties', [
                 'property_reference_ids' => $this->resolveReferences($normalized, $history, $previousPropertyIds),
             ]);
+        }
+
+        $referencedId = $this->extractSingleReference($normalized, $previousPropertyIds);
+        if ($referencedId !== null && $this->isPropertyReferencePhrase($normalized)) {
+            return $this->result('property_detail', ['property_reference_ids' => [$referencedId]]);
         }
 
         $parsed = $this->intentService->parse($message, $history, []);
@@ -192,6 +211,11 @@ class AiIntentRouter
     {
         return mb_strlen($text) <= 30
             && preg_match('/(شقه|فيلا|فله|فيله|بيت|منزل|ارض|محل|مكتب|عماره)/u', $text) === 1;
+    }
+
+    private function isPropertyReferencePhrase(string $text): bool
+    {
+        return preg_match('/^(الاول|الأول|الثاني|الثانيه|الثانية|هذا|هذه|نفسه|نفسها|اللي قبل|العقار السابق|الشقه السابقه|الفيلا السابقه)$/u', $text) === 1;
     }
 
     private function containsExplicitPropertyCriteria(string $message): bool
