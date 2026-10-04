@@ -217,6 +217,7 @@ class AiAgentOrchestrator
                 [],
                 $conversation,
                 true,
+                $user,
             );
         }
 
@@ -389,6 +390,7 @@ class AiAgentOrchestrator
                 $filters,
                 $conversation,
                 false,
+                $user,
             );
         }
 
@@ -508,6 +510,7 @@ class AiAgentOrchestrator
         array $filters,
         AiConversation $conversation,
         bool $nearby,
+        ?User $user,
     ): array {
         $properties = is_array($result['properties'] ?? null) ? $result['properties'] : [];
         $toolName = $nearby ? 'search_nearby_properties' : 'search_properties';
@@ -520,6 +523,7 @@ class AiAgentOrchestrator
             )));
             $this->stateService->updateState($conversation, $filters, $properties[0] ?? null, $ids);
             $this->conversationService->updateUserMessageFilters($userMessage, $filters);
+            $this->rememberSearchPreferences($user, $filters);
 
             return $this->finish($userMessage, [
                 'reply' => $this->replyEngine->summaryReply('',$properties,$filters),
