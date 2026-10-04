@@ -452,7 +452,16 @@ class AiPropertySearchService
             return ['row' => $row, 'score' => min(1.0, $score)];
         })->sortByDesc('score')->take($limit)->values();
 
-        return $scored->map(fn ($e) => $this->present($e['row'], $e['score']))->all();
+        $scoreById = $scored->mapWithKeys(fn ($e) => [(int) $e['row']->property_id => (float) $e['score']])->all();
+        $live = $this->hydrateLiveProperties(
+            $scored->map(fn ($e) => $this->present($e['row'], $e['score']))->all(),
+            [],
+        );
+
+        return array_values(array_map(function (array $item) use ($scoreById) {
+            $item['match_score'] = $scoreById[(int) $item['property_id']] ?? 0.0;
+            return $item;
+        }, $live));
     }
 
     // ------------------------------------------------------------------
