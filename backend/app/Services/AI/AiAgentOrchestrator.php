@@ -462,9 +462,16 @@ class AiAgentOrchestrator
                 ]);
             }
 
-            $reply = in_array($intent, ['property_availability', 'property_price', 'property_location'], true)
-                ? $this->replyEngine->propertyStatusReply($property, $intent)
-                : ($this->replyEngine->detailsReply((int) $property['property_id']) ?? 'هذه بيانات العقار الحالية من المنصة.');
+            $reply = match ($intent) {
+                'property_availability', 'property_price', 'property_location'
+                    => $this->replyEngine->propertyStatusReply($property, $intent),
+                'property_features'
+                    => $this->replyEngine->propertyFeaturesReply($property),
+                'property_agent/contact'
+                    => $this->replyEngine->propertyContactReply($property),
+                default
+                    => $this->replyEngine->detailsReplyFromProperty($property),
+            };
 
             return $this->finish($userMessage, [
                 'reply' => $reply,
