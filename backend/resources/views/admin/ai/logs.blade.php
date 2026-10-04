@@ -28,6 +28,8 @@
                             <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">النية</th>
                             <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">المعايير</th>
                             <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">النتائج</th>
+                            <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">الاستجابة</th>
+                            <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">إصدار المعرفة</th>
                             <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">الحالة</th>
                             <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">رمز الخطأ</th>
                             <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">الزمن</th>
@@ -41,6 +43,8 @@
                                 <td class="px-4 py-3 font-bold">{{ $log->intent ?? '—' }}</td>
                                 <td class="px-4 py-3 max-w-xs truncate text-xs text-gray-500" dir="ltr">{{ $log->structured_filters ? json_encode($log->structured_filters, JSON_UNESCAPED_UNICODE) : '—' }}</td>
                                 <td class="px-4 py-3">{{ $log->results_count }}</td>
+                                <td class="px-4 py-3 text-xs">{{ $log->response_type ?? 'text' }}</td>
+                                <td class="px-4 py-3 text-xs">{{ $log->knowledge_version ?? '—' }}</td>
                                 <td class="px-4 py-3">
                                     @php
                                         $colors = [
@@ -57,7 +61,7 @@
                                 <td class="px-4 py-3 whitespace-nowrap text-gray-500">{{ $log->search_ms }}ms</td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="px-4 py-12 text-center text-gray-400">لا توجد طلبات مسجلة بعد.</td></tr>
+                            <tr><td colspan="10" class="px-4 py-12 text-center text-gray-400">لا توجد طلبات مسجلة بعد.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

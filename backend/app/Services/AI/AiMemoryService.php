@@ -4,60 +4,84 @@ namespace App\Services\AI;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Schema;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
-/**
- * خدمة إدارة ذاكرة المستخدم طويلة المدى User Memory Service
- */
 class AiMemoryService
 {
-    /**
-     * استرجاع ذكريات وتفضيلات المستخدم المنهجية.
-     */
     public function getMemories(?User $user, ?string $query = null): array
     {
-        if (!$user) {
+        if (! $user || ! Schema::hasTable('ai_user_memories')) {
             return [];
         }
 
         try {
-            if (!Schema::hasTable('ai_user_memories')) {
-                return [];
-            }
-
-            $queryBuilder = DB::table('ai_user_memories')->where('user_id', $user->id);
+            $builder = DB::table('ai_user_memories')
+                ->where('user_id', $user->id)
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->orderByDesc('updated_at');
 
             if ($query) {
-                $queryBuilder->where('memory_value', 'like', '%' . $query . '%');
+                $builder->where(function ($q) use ($query) {
+                    $q->where('memory_key', 'like', '%'.mb_substr($query, 0, 80).'%')
+                        ->orWhere('memory_value', 'like', '%'.mb_substr($query, 0, 120).'%');
+                });
             }
 
-            return $queryBuilder->limit(10)->pluck('memory_value', 'memory_key')->toArray();
+            return $builder->limit(12)->pluck('memory_value', 'memory_key')->toArray();
         } catch (Throwable) {
             return [];
         }
     }
 
-    /**
-     * حفظ/تحديث ذاكرة مفيدة للمستخدم (مثل المدينة المفضلة أو الميزانية).
-     */
-    public function remember(?User $user, string $key, string $value): bool
-    {
-        if (!$user) {
+    public function remember(
+        ?User $user,
+        string $key,
+        string $value,
+        float $confidence = 1.0,
+        string $source = 'conversation',
+        ?\DateTimeInterface $expiresAt = null,
+    ): bool {
+        if (! $user || ! Schema::hasTable('ai_user_memories')) {
             return false;
         }
 
         try {
-            if (!Schema::hasTable('ai_user_memories')) {
+            $key = mb_substr(trim($key), 0, 80);
+            $value = mb_substr(trim($value), 0, 500);
+            if ($key === '' || $value === '') {
                 return false;
             }
 
-            DB::table('ai_user_memories')->updateOrInsert(
-                ['user_id' => $user->id, 'memory_key' => $key],
-                ['memory_value' => $value, 'updated_at' => now(), 'created_at' => now()]
-            );
+            $existing = DB::table('ai_user_memories')
+                ->where('user_id', $user->id)
+                ->where('memory_key', $key)
+                ->first();
 
-            return true;
+            $now = now();
+            $payload = [
+                'memory_value' => $value,
+                'confidence' => max(0, min(1, $confidence)),
+                'source' => mb_substr($source, 0, 30),
+                'last_used_at' => $now,
+                'updated_at' => $now,
+                'expires_at' => $expiresAt,
+            ];
+
+            if ($existing) {
+                return (bool) DB::table('ai_user_memories')
+                    ->where('user_id', $user->id)
+                    ->where('memory_key', $key)
+                    ->update($payload);
+            }
+
+            $payload['user_id'] = $user->id;
+            $payload['memory_key'] = $key;
+            $payload['created_at'] = $now;
+
+            return (bool) DB::table('ai_user_memories')->insert($payload);
         } catch (Throwable) {
             return false;
         }

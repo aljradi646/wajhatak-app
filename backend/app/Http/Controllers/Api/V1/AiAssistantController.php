@@ -8,12 +8,13 @@ use App\Http\Requests\AiSearchRequest;
 use App\Models\AiConversation;
 use App\Services\AI\AiAssistantService;
 use App\Services\AI\AiConversationService;
-use App\Services\AI\AiPropertySearchService;
 use App\Services\AI\AiSchemaService;
 use App\Services\AI\AiSettingsService;
 use App\Services\AI\AiLlmClient;
+use App\Services\AI\AiPropertySearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
@@ -22,10 +23,10 @@ class AiAssistantController extends Controller
     public function __construct(
         private readonly AiAssistantService $assistant,
         private readonly AiConversationService $conversations,
-        private readonly AiPropertySearchService $propertySearch,
         private readonly AiSettingsService $settings,
         private readonly AiSchemaService $schema,
         private readonly AiLlmClient $llm,
+        private readonly AiPropertySearchService $propertySearch,
     ) {}
 
     /** POST /api/v1/ai/chat — رسالة كاملة مع توليد رد ونتائج حقيقية. */
@@ -128,21 +129,12 @@ class AiAssistantController extends Controller
     /** POST /api/v1/ai/conversations — إنشاء محادثة جديدة صريحة. */
     public function createConversation(Request $request): JsonResponse
     {
-        $user = $request->user();
-        abort_unless($user, 401, 'يلزم تسجيل الدخول.');
-
-        $fresh = $this->conversations->createNew(
-            $user,
-            (string) $request->input('locale', 'ar')
-        );
-
-        return response()->json([
-            'data' => [
-                'id' => $fresh->id,
-                'title' => $fresh->title,
-                'is_pinned' => (bool) $fresh->is_pinned,
-            ],
-        ], 201);
+        $user=$request->user();
+        abort_unless($user,401,'يلزم تسجيل الدخول.');
+        $conversation=$this->conversations->currentFor($user,(string)$request->input('locale','ar'));
+        $conversation->update(['status'=>'archived','last_message_at'=>now()]);
+        $fresh=$this->conversations->currentFor($user,(string)$request->input('locale','ar'));
+        return response()->json(['data'=>['id'=>$fresh->id,'title'=>$fresh->title,'is_pinned'=>(bool)$fresh->is_pinned]],201);
     }
 
     /** PATCH /api/v1/ai/conversations/{id}/pin — تثبيت/إلغاء تثبيت. */
@@ -164,35 +156,37 @@ class AiAssistantController extends Controller
 
         $messages = $conversation->messages()
             ->where('status', '!=', 'blocked')
+            ->orderBy('id')
             ->limit((int) $this->settings->get('ai_max_messages', 50))
-            ->get(['id', 'role', 'content', 'property_ids', 'created_at']);
+            ->get(['id', 'role', 'content', 'property_ids', 'response_type', 'metadata', 'created_at']);
+
+        $ids = $messages->flatMap(fn ($m) => (array) ($m->property_ids ?? []))->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $propertyMap = collect($ids ? $this->propertySearch->detailsMany($ids) : [])->keyBy('property_id');
 
         return response()->json(['data' => [
             'id' => $conversation->id,
-            'messages' => $messages->map(function ($m) {
-                $propertyIds = collect($m->property_ids ?? [])
-                    ->map(fn ($id) => (int) $id)
-                    ->filter(fn ($id) => $id > 0)
-                    ->unique()
-                    ->values();
-
-                // إعادة قراءة العقارات المنشورة من الفهرس الحالي حتى تبقى
-                // البطاقات التاريخية مرتبطة ببيانات حقيقية وحديثة.
-                $properties = $propertyIds
-                    ->map(fn (int $id) => $this->propertySearch->details($id))
-                    ->filter()
-                    ->values()
-                    ->all();
+            'messages' => $messages->map(function ($m) use ($propertyMap) {
+                $type = $m->response_type ?: 'text';
+                $allowed = in_array($type, ['property_results', 'property_detail'], true);
+                $properties = $allowed
+                    ? collect((array) ($m->property_ids ?? []))
+                        ->map(fn ($id) => $propertyMap->get((int) $id))
+                        ->filter()
+                        ->values()
+                        ->all()
+                    : [];
 
                 return [
                     'id' => $m->id,
                     'role' => $m->role,
                     'content' => $m->content,
-                    'property_ids' => $propertyIds->all(),
+                    'response_type' => $type,
                     'properties' => $properties,
+                    'actions' => data_get($m->metadata, 'actions', []),
+                    'property_ids' => $m->property_ids,
                     'created_at' => optional($m->created_at)->toISOString(),
                 ];
-            })->values(),
+            }),
         ]]);
     }
 
@@ -206,6 +200,34 @@ class AiAssistantController extends Controller
         $this->conversations->clear($conversation, (string) $this->settings->get('ai_clear_policy', 'soft'));
 
         return response()->json(status: 204);
+    }
+
+    /** POST /api/v1/ai/messages/{message}/feedback — تقييم رسالة المساعد. */
+    public function feedback(Request $request, int $message): JsonResponse
+    {
+        $user = $request->user('sanctum') ?? $request->user();
+        abort_unless($user, 401, 'يلزم تسجيل الدخول.');
+
+        $value = (string) $request->input('feedback', '');
+        abort_unless(in_array($value, ['helpful', 'not_helpful'], true), 422, 'قيمة التقييم غير صالحة.');
+
+        $aiMessage = \App\Models\AiMessage::query()
+            ->whereKey($message)
+            ->where('role', 'assistant')
+            ->whereHas('conversation', fn ($q) => $q->where('user_id', $user->id))
+            ->firstOrFail();
+
+        $feedback = \App\Models\AiMessageFeedback::query()->updateOrCreate(
+            ['ai_message_id' => $aiMessage->id, 'user_id' => $user->id],
+            ['feedback' => $value, 'note' => null],
+        );
+
+        return response()->json([
+            'data' => [
+                'message_id' => $aiMessage->id,
+                'feedback' => $feedback->feedback,
+            ],
+        ]);
     }
 
     /** GET /api/v1/ai/health — صحة المحرك الحتمي (فحص حقيقي، بلا أسرار). */
@@ -226,19 +248,15 @@ class AiAssistantController extends Controller
             $missing[] = 'ai_search_index(غير قابل للقراءة)';
         }
 
-        $llmHealth = $this->llm->health();
-
         return response()->json(['data' => [
             'assistant_enabled' => $this->settings->enabled(),
-            'healthy' => $missing === []
-                && $this->settings->enabled()
-                && (! $this->llm->configured() || (bool) ($llmHealth['reachable'] ?? false)),
+            'healthy' => $missing === [] && $this->settings->enabled(),
             'tables_ready' => $missing === [],
             'missing' => $missing,
             'indexed_properties' => $indexed,
-            'latency_ms' => $llmHealth['latency_ms'] ?? null,
+            'latency_ms' => null,
             'engine' => $this->llm->configured() ? 'llm_agent' : 'rule_fallback',
-            'llm' => $llmHealth,
+            'llm' => $this->llm->health(),
         ]]);
     }
 

@@ -23,10 +23,7 @@ class AiPropertyResult {
     this.isNew = false,
     this.isFeatured = false,
     this.imageUrl,
-    this.referenceCode,
-    this.address,
-    this.agentPhone,
-    this.isAlternative = false,
+    this.distanceKm,
     this.matchScore = 0,
   });
 
@@ -48,10 +45,7 @@ class AiPropertyResult {
   final bool isFeatured;
   final bool available;
   final String? imageUrl;
-  final String? referenceCode;
-  final String? address;
-  final String? agentPhone;
-  final bool isAlternative;
+  final double? distanceKm;
   final double matchScore;
 
   bool get isRent => transactionType == 'rent';
@@ -87,10 +81,7 @@ class AiPropertyResult {
       isFeatured: json['is_featured'] as bool? ?? false,
       available: json['available'] as bool? ?? true,
       imageUrl: json['image_url'] as String?,
-      referenceCode: json['reference_code'] as String?,
-      address: json['address'] as String?,
-      agentPhone: json['agent_phone'] as String?,
-      isAlternative: json['is_alternative'] as bool? ?? false,
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
       matchScore: (json['match_score'] as num?)?.toDouble() ?? 0,
     );
   }
@@ -130,6 +121,8 @@ class AiChatMessage {
     required this.content,
     this.properties = const [],
     this.status = 'ok',
+    this.responseType = 'text',
+    this.actions = const [],
     this.createdAt,
   });
 
@@ -138,6 +131,8 @@ class AiChatMessage {
   final String content;
   final List<AiPropertyResult> properties;
   final String status; // ok | blocked | error
+  final String responseType; // text | property_results | property_detail | clarification | unsupported | security | error
+  final List<Map<String, dynamic>> actions;
   final DateTime? createdAt;
 
   bool get isUser => role == 'user';
@@ -147,6 +142,8 @@ class AiChatMessage {
     required String content,
     List<AiPropertyResult> properties = const [],
     String status = 'ok',
+    String responseType = 'text',
+    List<Map<String, dynamic>> actions = const [],
   }) {
     final stamp = DateTime.now().microsecondsSinceEpoch;
     return AiChatMessage(
@@ -155,6 +152,8 @@ class AiChatMessage {
       content: content,
       properties: properties,
       status: status,
+      responseType: responseType,
+      actions: actions,
       createdAt: DateTime.now(),
     );
   }
@@ -169,6 +168,10 @@ class AiChatMessage {
           .map(AiPropertyResult.fromJson)
           .toList(growable: false),
       status: json['status'] as String? ?? 'ok',
+      responseType: json['response_type'] as String? ?? 'text',
+      actions: (json['actions'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .toList(growable: false),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,

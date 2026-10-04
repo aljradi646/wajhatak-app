@@ -3,10 +3,12 @@
 namespace App\Services\AI;
 
 /**
- * محرك الردود الأساسي والاحتياطي.
+ * محرك الردود الحتمي — بديل كامل للنموذج اللغوي.
  *
- * يبني الردود من بيانات وجهتك الحقيقية ويضمن مسارًا آمنًا عند تعذر خادم
- * النموذج الصغير. في وضع LLM grounded يعمل كطبقة حقيقة قبل إعادة الصياغة.
+ * يبني ردودًا عربية طبيعية (كلام يومي) من نتائج البحث الحقيقية وسياق
+ * المحادثة فقط. لا يستدعي أي نموذج ولا مزودًا خارجيًا ولا يحمّل أي
+ * ملفات: كل جملة تُركَّب من بيانات قاعدة بيانات وجهتك نفسها، لذلك لا
+ * يمكن أن "يخترع" ردًا غير موجود أصلًا (بلا هلوسة إطلاقًا).
  */
 class AiReplyEngine
 {
@@ -24,14 +26,10 @@ class AiReplyEngine
         }
 
         $first = $items[0];
-        $lines = [];
+        $lines = [$this->introLine($count, $filters, $first)];
 
-        // البطاقات تُرسل كبنية بيانات منفصلة إلى الواجهة؛ لا نكررها كسطور نصية.
-        // هذا يمنع ظهور قائمة نصية مكررة بجانب Property Cards التفاعلية.
-        $lines[] = $this->introLine($count, $filters, $first);
-
-        if ($count > 3) {
-            $lines[] = 'عرضت لك أفضل النتائج في بطاقات تفاعلية أدناه، وبإمكانك فتح أي بطاقة للتفاصيل.';
+        if ($count > 1) {
+            $lines[] = 'عرضت لك الخيارات في بطاقات تفاعلية. افتح البطاقة التي تهمك للتفاصيل الحالية.';
         }
 
         $lines[] = $this->nextStepLine($filters, $count, (int) ($first['property_id'] ?? 0));
@@ -39,35 +37,14 @@ class AiReplyEngine
         return implode("\n", $lines);
     }
 
-    /** رد "عقار مشابه لهذا العقار" — التفاصيل تعرضها البطاقات التفاعلية. */
+    /** رد "عقار مشابه لهذا العقار". */
     public function similarReply(array $items): string
     {
         if ($items === []) {
-            return 'لم أجد عقارات مشابهة كافية حتى الآن، لكن أقدر أوسّع البحث إلى مدينة أو ميزانية مختلفة.';
+            return 'لم أجد عقارات مشابهة كافية حتى الآن، لكن عقارات جديدة تُنشر باستمرار — جرّب لاحقًا أو اسألني عن منطقة معينة.';
         }
 
-        return 'وجدت لك '.count($items).' خيارات مشابهة من العقارات المنشورة فعليًا. البطاقات أدناه تحتوي الصور والتفاصيل؛ افتح أي بطاقة لاختيار الخطوة التالية.';
-    }
-
-    /**
-     * رد صريح عند غياب التطابق الحرفي مع عرض البدائل القريبة في البطاقات.
-     *
-     * @param list<array<string,mixed>> $items
-     * @param list<string> $relaxations
-     */
-    public function alternativesReply(array $items, array $relaxations = []): string
-    {
-        if ($items === []) {
-            return 'لم أجد تطابقًا حرفيًا ولا بديلًا قريبًا من المعايير الحالية. يمكننا تعديل معيار واحد فقط ثم أعيد البحث.';
-        }
-
-        $message = 'عذراً، لا توجد عقارات متاحة تطابق طلبك حالياً، ولكن يمكنك تعديل شروط البحث. لم أجد تطابقًا حرفيًا لكل الشروط، لذلك عرضت فقط بدائل قريبة وموسومة بوضوح.';
-
-        if ($relaxations !== []) {
-            $message .= "\nخففت ".implode('، ', array_slice($relaxations, 0, 3)).' فقط، مع الحفاظ على بيانات العقارات الحقيقية.';
-        }
-
-        return $message."\nاختر أي بطاقة للتفاصيل، أو قل لي ما المعيار الذي تريد تضييقه.";
+        return 'وجدت لك '.count($items).' عقارًا مشابهًا من البيانات الحالية. افتح أي بطاقة أدناه لمراجعة التفاصيل.';
     }
 
     /**
@@ -114,7 +91,7 @@ class AiReplyEngine
         return implode("\n", $lines);
     }
 
-    /** رد حوار طبيعي متنوع؛ variationIndex يمنع تكرار نفس الصياغة في المحادثة. */
+    /** رد حوار عام قصير طبيعي (تحية/شكر/مساعدة/إحصاء). */
     public function smallTalkReply(
         string $message,
         string $intent,
@@ -162,7 +139,7 @@ class AiReplyEngine
                     "تحية طيبة. أنا {$name}. اذكروا ما تبحثون عنه وسأساعدكم في الوصول إلى الخيارات المناسبة.",
                 ])
                 : $pick([
-                    "وعليكم السلام ورحمة الله، أهلًا بك! 👋 أنا {$name}. كيف أقدر أخدمك اليوم؟",
+                    "وعليكم السلام ورحمة الله، أهلًا بك! 👋 أنا {$name}، مساعدك في وجهتك. كيف أقدر أخدمك اليوم؟",
                     "يا هلا والله! 🌿 نورت. أنا {$name}، قل لي وش تحتاج اليوم وأنا معك.",
                     "أهلًا وسهلًا! 😄 سعيد بوجودك. وش اللي في بالك اليوم؟",
                     "هلا بك! أتمنى يومك يكون طيب. أخبرني، نبدأ بالبحث عن عقار أم عندك شيء ثاني؟",
@@ -354,6 +331,146 @@ class AiReplyEngine
             .'مثال: «شقة ثلاث غرف في صنعاء أقل من 100 ألف» — وسأعرض لك البطاقات الحقيقية فورًا. 🌿';
     }
 
+    /** رد تعريف المساعد دون أي بحث عقاري. */
+    public function identityReply(): string
+    {
+        return 'أنا مساعد وجهتك. أساعدك في البحث عن العقارات المتاحة، فهم تفاصيل العقار ومواصفاته الحالية، وشرح استخدام ميزات منصة وجهتك المتاحة لحسابك.';
+    }
+
+    /** رد معلومات المنصة من مصدر المعرفة المعتمد فقط. */
+    public function knowledgeReply(array $items): string
+    {
+        if ($items === []) {
+            return 'لا أملك حاليًا معلومة موثوقة عن هذا الجزء من المنصة. يمكنك تحديد الميزة أو الصفحة التي تريد معرفة طريقة استخدامها.';
+        }
+
+        return collect($items)
+            ->take(3)
+            ->map(fn (array $item) => '• '.($item['content'] ?? ''))
+            ->implode("\n");
+    }
+
+    /** رد آمن لطلبات الأسرار. */
+    public function securityReply(): string
+    {
+        return 'لا أستطيع الوصول إلى كلمات المرور أو مفاتيح API أو الأسرار أو بيانات المستخدمين الخاصة أو عرضها. لاستعادة كلمة المرور استخدم إجراء الاستعادة في الحساب، ولأي صلاحية إدارية استخدم المسار الإداري المعتمد.';
+    }
+
+    public function ambiguousReply(): string
+    {
+        return 'عذراً، لم أفهم طلبك بوضوح. هل تبحث عن عقار معين أم تحتاج مساعدة في استخدام التطبيق؟';
+    }
+
+    public function technicalReply(): string
+    {
+        return 'أستطيع مساعدتك في الوظائف المتاحة داخل وجهتك. اذكر اسم الصفحة أو المشكلة التي تظهر لك وسأوجهك إلى المسار المدعوم في التطبيق.';
+    }
+
+    /** تفاصيل مختصرة من payload حي تم التحقق منه، دون إعادة استعلام قاعدة البيانات. */
+    public function detailsReplyFromProperty(array $item): string
+    {
+        $location = collect([$item['district'] ?? null, $item['neighborhood'] ?? null, $item['city'] ?? null])
+            ->filter()
+            ->unique()
+            ->implode(' - ');
+
+        $parts = [];
+        if (! empty($item['bedrooms'])) $parts[] = $item['bedrooms'].' غرف نوم';
+        if (! empty($item['bathrooms'])) $parts[] = $item['bathrooms'].' حمام';
+        if (($item['area'] ?? null) !== null) $parts[] = round((float) $item['area']).' م²';
+        if (array_key_exists('is_furnished', $item)) {
+            $parts[] = (bool) $item['is_furnished'] ? 'مفروش' : 'غير مفروش';
+        }
+
+        $lines = [
+            'تفاصيل العقار رقم '.(int) ($item['property_id'] ?? 0).':',
+            '• '.((string) ($item['title'] ?? 'عقار'))
+                .(($item['type'] ?? null) ? ' — '.$item['type'] : '')
+                .($location !== '' ? ' — '.$location : ''),
+        ];
+
+        if (($item['price'] ?? null) !== null) {
+            $lines[] = '• السعر: '.number_format((float) $item['price']).' '.((string) ($item['currency'] ?? ''));
+        }
+        if ($parts !== []) $lines[] = '• المواصفات: '.implode(' · ', $parts);
+
+        if (! empty($item['features']) && is_array($item['features'])) {
+            $names = array_values(array_filter(array_map(
+                fn ($feature) => is_array($feature) ? (string) ($feature['name_ar'] ?? '') : '',
+                $item['features'],
+            )));
+            if ($names !== []) {
+                $lines[] = '• المزايا: '.implode('، ', array_slice($names, 0, 12));
+            }
+        }
+
+        if (($item['status'] ?? null) !== 'published') {
+            $lines[] = '• الحالة الحالية: '.((string) ($item['status'] ?? 'غير معروفة'));
+        }
+
+        $description = trim((string) ($item['description'] ?? ''));
+        if ($description !== '') {
+            $lines[] = '• الوصف: '.mb_substr($description, 0, 180).(mb_strlen($description) > 180 ? '…' : '');
+        }
+
+        return implode("\n", $lines);
+    }
+
+    public function propertyFeaturesReply(array $item): string
+    {
+        $features = is_array($item['features'] ?? null) ? $item['features'] : [];
+        $names = array_values(array_filter(array_map(
+            fn ($feature) => is_array($feature) ? (string) ($feature['name_ar'] ?? '') : '',
+            $features,
+        )));
+
+        return $names !== []
+            ? 'المزايا المسجلة حاليًا للعقار رقم '.(int) ($item['property_id'] ?? 0).': '.implode('، ', array_slice($names, 0, 15)).'.'
+            : 'لا أرى في بيانات العقار الحالية مزايا موثقة يمكنني تأكيدها.';
+    }
+
+    public function propertyContactReply(array $item): string
+    {
+        $agent = is_array($item['agent'] ?? null) ? $item['agent'] : [];
+        $parts = [];
+
+        if (! empty($agent['name'])) $parts[] = 'الوكيل: '.$agent['name'];
+        if (! empty($agent['agency_name'])) $parts[] = 'الجهة: '.$agent['agency_name'];
+        if (! empty($agent['phone'])) $parts[] = 'الهاتف: '.$agent['phone'];
+        if (! empty($agent['whatsapp'])) $parts[] = 'واتساب: '.$agent['whatsapp'];
+
+        return $parts !== []
+            ? implode("\n", $parts)
+            : 'لا توجد في بيانات العقار الحالية وسيلة تواصل عامة مؤكدة يمكنني عرضها.';
+    }
+
+    /** رد الحالة أو السعر أو الموقع من السجل الحي فقط. */
+    public function propertyStatusReply(array $property, string $intent): string
+    {
+        $id = (int) ($property['property_id'] ?? 0);
+        $title = (string) ($property['title'] ?? 'العقار');
+        $status = (string) ($property['status'] ?? '');
+
+        $label = match ($status) {
+            'published' => 'منشور ومتاح للاكتشاف حاليًا',
+            'draft' => 'مسودة وغير متاح للاكتشاف',
+            'pending' => 'قيد المراجعة وغير متاح للاكتشاف',
+            'rejected' => 'مرفوض وغير متاح للاكتشاف',
+            'archived' => 'مؤرشف وغير متاح للاكتشاف',
+            default => 'حالته الحالية غير معروفة في البيانات المتاحة',
+        };
+
+        return match ($intent) {
+            'property_availability' => "العقار رقم {$id} «{$title}» حالته الحالية: {$label}.",
+            'property_price' => isset($property['price'])
+                ? "السعر الحالي للعقار رقم {$id} «{$title}»: ".number_format((float) $property['price']).' '.($property['currency'] ?? '').'.'
+                : "لا توجد قيمة سعر مؤكدة حاليًا للعقار رقم {$id}.",
+            'property_location' => 'موقع العقار رقم '.$id.' «'.$title.'»: '
+                .collect([$property['district'] ?? null, $property['neighborhood'] ?? null, $property['city'] ?? null])->filter()->implode(' - ').'.',
+            default => $this->detailsReply($id) ?? 'تعذر جلب بيانات العقار الحالية.',
+        };
+    }
+
     /** الرد المفتوح للدخول: نطاق المساعد. */
     public function scopeReply(): string
     {
@@ -361,6 +478,25 @@ class AiReplyEngine
     }
 
     /** رد عدم توفر نتائج بعد المتابعة الذكية. */
+    public function alternativesReply(array $filters, array $relaxations = []): string
+    {
+        $city = $filters['city'] ?? null;
+        $type = $filters['property_type'] ?? null;
+        $max = $filters['max_price'] ?? null;
+
+        $criteria = [];
+        if ($type) $criteria[] = 'نوع العقار';
+        if ($city) $criteria[] = 'المدينة ('.$city.')';
+        if ($max !== null) $criteria[] = 'الميزانية';
+
+        $message = 'لم أجد تطابقًا حرفيًا مع '.implode(' و', $criteria ?: ['الشروط']).' حاليًا، لكن وجدت بدائل حقيقية أقرب إلى طلبك.';
+        if ($relaxations !== []) {
+            $message .= "\n".implode(' ', array_slice($relaxations, 0, 2));
+        }
+
+        return $message;
+    }
+
     public function noResultsReply(array $filters): string
     {
         $city = $filters['city'] ?? null;
@@ -448,6 +584,7 @@ class AiReplyEngine
             return 'هل تريد ترتيبها من الأرخص، أو مقارنة اثنين منها؟';
         }
 
+        // لا نذكر معرفًا فارغًا: نستخدم معرف العقار المعروض فعلًا (أو نصيحة عامة).
         $id = $firstPropertyId > 0 ? $firstPropertyId : (int) ($filters['last_property_id'] ?? 0);
 
         return $id > 0

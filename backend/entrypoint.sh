@@ -21,9 +21,9 @@
 #   8. For the "app" service: starts the queue worker (deferred notifications)
 #      in the background and serves the app with `php artisan serve` on $PORT.
 #
-# المساعد العقاري الذكي: Laravel ينفذ الحماية والوصول والبحث والعمليات الحقيقية.
-# يمكن بعد ذلك استخدام خادم inference مستقل متوافق مع OpenAI لإعادة صياغة الرد.
-# النموذج لا يصل مباشرة إلى قاعدة البيانات ولا تُحمّل أوزانه داخل صورة Laravel.
+# المساعد العقاري الذكي محرك حتمي 100% يعمل داخل Laravel مباشرة:
+# لا نموذج لغوي، لا خادم استدلال، ولا أي ملفات تُحمّل — يعمل فورًا على
+# أي استضافة بأصغر موارد (حجم الصورة أقل من 500MB بلا أي نموذج).
 # =============================================================================
 set -e
 
@@ -83,7 +83,7 @@ if [ ! -f vendor/autoload.php ] || [ -d vendor/laravel/pail ]; then
     composer dump-autoload --optimize --no-dev --no-interaction --no-ansi >/dev/null 2>&1 || true
 fi
 
-# اختبار ذاتي لطبقة فهم المساعد (بلا قاعدة بيانات ولا vendor) — يكشف أي
+# اختبار ذاتي لمحرك المساعد الحتمي (بلا قاعدة بيانات ولا vendor) — يكشف أي
 # تعبير نمطي معطوب أو تراجع في فهم العربية قبل أن يصل للمستخدمين.
 if [ -f scripts/ai_selftest/run.php ]; then
     if php scripts/ai_selftest/run.php >/dev/null 2>&1; then
@@ -383,7 +383,7 @@ case "$SERVICE_TYPE" in
         # -------------------------------------------------------------------
         # المساعد الذكي محرك حتمي داخل Laravel نفسه — لا عملية خلفية إضافية.
         # -------------------------------------------------------------------
-        echo "==> [Wajhatak] AI assistant: Laravel-grounded engine; LLM synthesis is configured through AI_LLM_BASE_URL."
+        echo "==> [Wajhatak] AI assistant: deterministic in-process engine (no model download, no external provider)."
 
         export PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}"
         echo "==> [Wajhatak] Starting Laravel server: php artisan serve on :${PORT:-8080}"

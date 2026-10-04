@@ -9,6 +9,7 @@ use App\Http\Requests\UpdatePropertyRequest;
 use App\Http\Resources\PropertyResource;
 use App\Models\Property;
 use App\Models\PropertyLocation;
+use App\Services\AI\AiIndexSyncService;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -94,6 +95,7 @@ class PropertyController extends Controller
             return $property;
         });
 
+        app(AiIndexSyncService::class)->sync($property->refresh());
         // Refresh so database defaults (e.g. currency = YER) are reflected in the response.
         return response()->json(['data' => new PropertyResource($property->refresh()->load(['type', 'location.country', 'location.region', 'location.cityReference', 'location.area', 'agent.user', 'images', 'features']))], 201);
     }
@@ -154,6 +156,7 @@ class PropertyController extends Controller
             $property->update(collect($data)->except(['location', 'feature_ids'])->all());
         });
 
+        app(AiIndexSyncService::class)->sync($property->fresh());
         return new PropertyResource($property->fresh()->load(['type', 'location.country', 'location.region', 'location.cityReference', 'location.area', 'agent.user', 'images', 'features']));
     }
 

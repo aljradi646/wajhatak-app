@@ -76,20 +76,8 @@ class AiSettingsService
     /** @return array<string, mixed> كل الإعدادات بصيغة محوّلة الأنواع. */
     public function all(): array
     {
-        try {
-            $values = Cache::remember(
-                self::CACHE_KEY,
-                self::CACHE_TTL,
-                fn () => $this->readRaw(),
-            );
-        } catch (Throwable $e) {
-            // إعدادات لوحة الإدارة يجب ألا تُسقط صفحة كاملة إذا كان cache store
-            // غير مُرحّل بعد أو غير متاح أثناء الإقلاع. نعود مباشرة إلى DB/defaults.
-            Log::warning('ai.settings_cache_unavailable', [
-                'message' => $e->getMessage(),
-            ]);
-            $values = $this->readRaw();
-        }
+        $cached = Cache::remember(self::CACHE_KEY, self::CACHE_TTL, fn () => $this->readRaw());
+        $values = $cached;
 
         foreach (self::DEFAULTS as $key => [$default, $type]) {
             if (! array_key_exists($key, $values)) {

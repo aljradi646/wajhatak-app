@@ -16,6 +16,12 @@
                 'استدعاءات الأدوات' => $stats['tool_calls'],
                 'بحث بلا نتائج' => $stats['no_match_searches'],
                 'طلبات اليوم' => $stats['requests_today'],
+                'معدل طلبات التوضيح' => ($stats['clarification_rate'] ?? 0).'%',
+                'تقييمات مفيدة' => $stats['feedback_helpful'] ?? 0,
+                'تقييمات غير مفيدة' => $stats['feedback_not_helpful'] ?? 0,
+                'فهارس تحتاج تحققًا' => $stats['stale_index_count'] ?? 0,
+                'إصدار المعرفة' => $stats['knowledge_version'] ?? '—',
+                'الكاش العقاري' => $stats['property_cache'] ?? '—',
             ] as $label => $value)
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
                     <div class="text-xs font-bold text-gray-500 dark:text-gray-400">{{ $label }}</div>

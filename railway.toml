@@ -56,17 +56,9 @@ restartPolicyMaxRetries = 5
 # will not start unless MySQL is reachable.
 # =============================================================================
 
-# Tiny LLM service (separate Railway service):
-#   Service name: wajhatak-llm
-#   Root Directory: deploy/llm
-#   Volume mount: /models
-#   Do NOT create a public domain for the inference service.
-#   Laravel service variables:
-#     AI_LLM_ENABLED=true
-#     AI_LLM_MODE=grounded
-#     AI_LLM_BASE_URL=http://${{wajhatak-llm.RAILWAY_PRIVATE_DOMAIN}}:8080/v1
-#     AI_LLM_API_KEY=
-#     AI_LLM_MODEL=wajhatak-smollm2-135m-instruct-q8_0
-#     AI_LLM_MAX_OUTPUT_TOKENS=256
-# The model is downloaded on first inference-service boot from Hugging Face and
-# cached in /models; Laravel never downloads model weights.
+# AI Agent inference variables are configured in Railway service variables, not here:
+#   AI_LLM_ENABLED=true
+#   AI_LLM_BASE_URL=https://<private-inference-service>/v1
+#   AI_LLM_API_KEY=<secret-if-required>
+#   AI_LLM_MODEL=<tool-calling-model>
+# Keep inference as a separate service so Laravel deployments remain stateless.
