@@ -894,33 +894,25 @@ class AiAgentOrchestrator
 
     private function requiresClarificationForSearch(array $filters): bool
     {
-        $type = ! empty($filters['property_type']);
-        if (! $type) {
-            return false;
-        }
-
-        // نوع العقار وحده «فلة»/«شقة» لا يكفي؛ نطلب نوع العملية أولًا.
-        if (empty($filters['transaction_type'])
-            && empty($filters['city'])
-            && empty($filters['district'])
-            && empty($filters['nearby'])) {
+        // عند تحديد نوع العقار، لا نختار بيعًا أو إيجارًا من عندنا.
+        if (! empty($filters['property_type']) && empty($filters['transaction_type'])) {
             return true;
         }
 
-        // وجود مدينة/منطقة يجعل «شقة في صنعاء» طلبًا قابلًا للبحث حتى لو لم
-        // يحدد المستخدم بيعًا أو إيجارًا؛ يمكن استخدام النتيجة لتضييق العملية.
         return empty($filters['city'])
             && empty($filters['district'])
-            && empty($filters['nearby']);
+            && empty($filters['nearby'])
+            && empty($filters['transaction_type'])
+            && empty($filters['property_type']);
     }
 
     private function clarifySearchReply(array $filters): string
     {
-        if (! empty($filters['property_type']) && empty($filters['transaction_type'])) {
-            return 'هل تبحث عن هذا النوع للبيع أم للإيجار؟';
+        if (empty($filters['transaction_type'])) {
+            return 'هل تبحث عن شراء أم إيجار؟';
         }
 
-        if (! empty($filters['transaction_type']) && empty($filters['city']) && empty($filters['district'])) {
+        if (empty($filters['city']) && empty($filters['district']) && empty($filters['nearby'])) {
             return 'وفي أي مدينة أو منطقة تفضّل البحث؟';
         }
 
