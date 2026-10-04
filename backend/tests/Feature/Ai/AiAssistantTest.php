@@ -391,6 +391,30 @@ class AiAssistantTest extends TestCase
         $this->assertStringContainsString('تفاصيل العقار رقم', $data['reply']);
     }
 
+    /** ط1) الحالة غير المنشورة لا تظهر في نتائج المساعد حتى لو بقيت في الفهرس. */
+    public function test_non_published_index_status_is_never_recommended(): void
+    {
+        $indexed = \App\Models\AiSearchIndex::query()
+            ->where('status', 'published')
+            ->firstOrFail();
+
+        $propertyId = (int) $indexed->property_id;
+        $indexed->update(['status' => 'sold']);
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => "معلومات عن العقار {$propertyId}",
+        ]);
+
+        $response->assertOk();
+
+        $data = $response->json('data');
+        $this->assertSame([], $data['properties']);
+        $this->assertSame(
+            'عذراً، لم أفهم طلبك بوضوح. هل تبحث عن عقار معين أم تحتاج مساعدة في استخدام التطبيق؟',
+            $data['reply']
+        );
+    }
+
     /** ط) مزامنة الفهرس: تعديل السعر ينعكس فورًا على بحث المساعد. */
     public function test_property_update_syncs_search_index_immediately(): void
     {
