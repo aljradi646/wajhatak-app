@@ -44,7 +44,7 @@ class AiAgentOrchestrator
             $userMessage = $this->conversationService->addUserMessage($conversation, $message, []);
             return [
                 'reply' => $guard['reason'] === 'out_of_domain'
-                    ? 'أنا مساعد وجهتك، ومتخصص في عقارات المنصة وخدماتها.'
+                    ? $this->replyEngine->ambiguousReply()
                     : $this->replyEngine->securityReply(),
                 'status' => 'blocked',
                 'response_type' => $guard['reason'] === 'out_of_domain' ? 'unsupported' : 'security',
