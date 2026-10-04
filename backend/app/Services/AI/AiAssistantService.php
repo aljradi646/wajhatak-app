@@ -103,6 +103,7 @@ class AiAssistantService
                 'actions' => $contract['actions'] ?? [],
                 'citations' => $contract['citations'] ?? [],
                 'source' => $contract['source'] ?? [],
+                'ui' => $this->buildUiContract($contract['response_type'] ?? 'text', $properties),
                 'failed_stage' => $failedStage,
                 'message_id' => $assistantMessage?->id,
             ];
@@ -243,6 +244,24 @@ class AiAssistantService
         ));
 
         return $message instanceof AiMessage ? $message : null;
+    }
+
+    private function buildUiContract(string $responseType, array $properties): array
+    {
+        $isProperty = in_array($responseType, ['property_results', 'property_detail'], true);
+        $ids = $isProperty
+            ? array_values(array_filter(array_map(
+                static fn (array $item): int => (int) ($item['property_id'] ?? 0),
+                array_filter($properties, 'is_array'),
+            )))
+            : [];
+
+        return [
+            'response_component' => $isProperty && $ids !== [] ? 'property_results' : 'assistant_message',
+            'property_card_component' => 'property_card',
+            'property_card_click_action' => 'open_property',
+            'property_ids' => $ids,
+        ];
     }
 
     private function knowledgeVersion(array $metadata): ?string
