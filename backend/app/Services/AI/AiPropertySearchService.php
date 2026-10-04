@@ -434,10 +434,10 @@ class AiPropertySearchService
         $transaction = $property->transaction_type instanceof \BackedEnum
             ? $property->transaction_type->value
             : (string) $property->transaction_type;
-        $status = $property->status instanceof \BackedEnum
+        $image = $property->images->first();
+        $statusValue = $property->status instanceof \BackedEnum
             ? $property->status->value
             : (string) $property->status;
-        $image = $property->images->first();
 
         $data = [
             'property_id' => (int) $property->id,
@@ -453,57 +453,35 @@ class AiPropertySearchService
             'area' => $property->area !== null ? (float) $property->area : null,
             'bedrooms' => $property->bedrooms,
             'bathrooms' => $property->bathrooms,
-            'is_furnished' => (bool) $property->is_furnished,
-            'is_new' => (bool) $property->is_new,
-            'is_featured' => (bool) $property->is_featured,
-            'status' => $status,
-            'available' => $status === PropertyStatus::Published->value,
+            'is_furnished' => $property->is_furnished !== null ? (bool) $property->is_furnished : null,
+            'is_new' => $property->is_new !== null ? (bool) $property->is_new : null,
+            'is_featured' => $property->is_featured !== null ? (bool) $property->is_featured : null,
+            'status' => $statusValue,
+            'available' => $statusValue === PropertyStatus::Published->value,
             'match_score' => $score,
             'image_url' => $image ? asset('storage/'.$image->path) : null,
             'description' => (string) $property->description,
             'latitude' => $property->location?->latitude !== null ? (float) $property->location->latitude : null,
             'longitude' => $property->location?->longitude !== null ? (float) $property->location->longitude : null,
-            'features' => $property->relationLoaded('features')
-                ? $property->features
-                    ->filter(fn ($feature) => (bool) ($feature->is_active ?? true))
-                    ->map(fn ($feature) => [
-                        'id' => (int) $feature->id,
-                        'name_ar' => (string) $feature->name_ar,
-                        'slug' => $feature->slug,
-                    ])->values()->all()
-                : [],
-        ];
-
-        $agent = $property->relationLoaded('agent') ? $property->agent : null;
-        if ($agent && method_exists($agent, 'isApproved') && $agent->isApproved()) {
-            $data['agent'] = [
-                'id' => (int) $agent->id,
-                'name' => $agent->user?->name,
-                'agency_name' => $agent->agency_name,
-                'phone' => $agent->phone,
-                'whatsapp' => $agent->whatsapp,
-            ];
-        }
-
-        $data['is_alternative'] = $alternative;
-        $data['ui'] = [
-            'component' => 'property_card',
-            'variant' => $alternative ? 'close_match' : 'exact_match',
-            'badge' => $alternative ? 'قريب من طلبك' : null,
-            'image_priority' => true,
-            'open_action' => [
-                'type' => 'open_property',
-                'property_id' => (int) $property->id,
+            'is_alternative' => $alternative,
+            'ui' => [
+                'component' => 'property_card',
+                'variant' => $alternative ? 'close_match' : 'exact_match',
+                'badge' => $alternative ? 'قريب من طلبك' : null,
+                'image_priority' => true,
+                'open_action' => [
+                    'type' => 'open_property',
+                    'property_id' => (int) $property->id,
+                ],
+                'title_action' => [
+                    'type' => 'open_property',
+                    'property_id' => (int) $property->id,
+                ],
+                'share_action' => [
+                    'type' => 'share_property',
+                    'property_id' => (int) $property->id,
+                ],
             ],
-            'title_action' => [
-                'type' => 'open_property',
-                'property_id' => (int) $property->id,
-            ],
-            'share_action' => [
-                'type' => 'share_property',
-                'property_id' => (int) $property->id,
-            ],
-            'copy_actions' => [],
         ];
 
         return $data;
