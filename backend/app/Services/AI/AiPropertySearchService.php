@@ -202,7 +202,7 @@ class AiPropertySearchService
 
         try {
             return Property::query()
-                ->where('properties.status', PropertyStatus::Published)
+                ->where('properties.status', PropertyStatus::Published->value)
                 ->join('property_locations', 'properties.property_location_id', '=', 'property_locations.id')
                 ->when($term !== '', fn (Builder $q) => $q->where(function (Builder $q) use ($like) {
                     $q->where('property_locations.city', 'like', $like)
@@ -280,7 +280,7 @@ class AiPropertySearchService
                 'images' => fn ($q) => $q->orderByDesc('is_cover')->orderBy('sort_order'),
             ])
             ->whereIn('id', $ids)
-            ->where('status', PropertyStatus::Published)
+            ->where('status', PropertyStatus::Published->value)
             ->get()
             ->keyBy('id');
 
