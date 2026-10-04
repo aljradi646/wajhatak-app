@@ -243,10 +243,13 @@ class AiToolRegistry
         $results = $this->searchService->search($filters);
 
         return [
-            'success' => true,
+            'success' => ! ($results['degraded'] ?? false),
             'total' => $results['total'] ?? 0,
             'properties' => $results['items'] ?? [],
             'filters' => $filters,
+            'result_mode' => $results['result_mode'] ?? 'exact',
+            'relaxations' => $results['relaxations'] ?? [],
+            'degraded' => (bool) ($results['degraded'] ?? false),
         ];
     }
 
