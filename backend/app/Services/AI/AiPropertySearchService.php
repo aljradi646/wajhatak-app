@@ -535,8 +535,20 @@ class AiPropertySearchService
 
     private function runSimilar(int $propertyId, int $limit): array
     {
+        $baseProperty = Property::query()->find($propertyId);
+        if (! $baseProperty) {
+            return [];
+        }
+
         $base = AiSearchIndex::query()->where('property_id', $propertyId)->first();
         if (! $base) {
+            return [];
+        }
+
+        $baseStatus = $baseProperty->status instanceof \BackedEnum
+            ? $baseProperty->status->value
+            : (string) $baseProperty->status;
+        if ($baseStatus !== PropertyStatus::Published->value) {
             return [];
         }
 
