@@ -59,6 +59,12 @@ class AiIntentRouter
             return $this->result('security_sensitive_request');
         }
 
+        // الهوية لها أولوية على كاشف القدرات العام حتى تكون «من أنت؟»
+        // نية identity صريحة، لا مجرد capability.
+        if ($this->isIdentity($normalized)) {
+            return $this->result('identity');
+        }
+
         $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
         if ($smallTalk !== null) {
             return $this->result(
@@ -67,10 +73,6 @@ class AiIntentRouter
                     default => 'small_talk',
                 }
             , ['sub_intent' => $smallTalk]);
-        }
-
-        if ($this->isIdentity($normalized)) {
-            return $this->result('identity');
         }
 
         if ($this->isPlatformHowTo($normalized)) {
