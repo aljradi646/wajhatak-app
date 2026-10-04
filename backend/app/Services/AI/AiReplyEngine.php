@@ -262,6 +262,12 @@ class AiReplyEngine
         return $options[$start];
     }
 
+    /** الرد الموحد للرسائل غير الواضحة أو غير المدعومة. */
+    public function unclearRequestReply(): string
+    {
+        return 'عذراً، لم أفهم طلبك بوضوح. هل تبحث عن عقار معين أم تحتاج مساعدة في استخدام التطبيق؟';
+    }
+
     /** رد توضيحي لمسار الاستثمار قبل تنفيذ بحث واسع. */
     public function investmentClarifyReply(): string
     {
