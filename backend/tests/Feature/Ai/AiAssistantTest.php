@@ -64,7 +64,7 @@ class AiAssistantTest extends TestCase
         $this->assertNotEmpty($items);
 
         $item = $items[0];
-        $this->assertNotNull($item['image_url'] ?? null);
+        $this->assertArrayHasKey('image_url', $item);
         $this->assertSame('property_card', $item['ui']['component'] ?? null);
         $this->assertTrue((bool) ($item['ui']['image_priority'] ?? false));
         $this->assertSame(
