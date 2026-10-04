@@ -162,6 +162,68 @@ class AiReplyEngine
             .'مثال: «شقة ثلاث غرف في صنعاء أقل من 100 ألف» — وسأعرض لك البطاقات الحقيقية فورًا. 🌿';
     }
 
+    /** رد تعريف المساعد دون أي بحث عقاري. */
+    public function identityReply(): string
+    {
+        return 'أنا مساعد وجهتك. أساعدك في البحث عن العقارات المتاحة، فهم تفاصيل العقار ومواصفاته الحالية، وشرح استخدام ميزات منصة وجهتك المتاحة لحسابك.';
+    }
+
+    /** رد معلومات المنصة من مصدر المعرفة المعتمد فقط. */
+    public function knowledgeReply(array $items): string
+    {
+        if ($items === []) {
+            return 'لا أملك حاليًا معلومة موثوقة عن هذا الجزء من المنصة. يمكنك تحديد الميزة أو الصفحة التي تريد معرفة طريقة استخدامها.';
+        }
+
+        return collect($items)
+            ->take(3)
+            ->map(fn (array $item) => '• '.($item['content'] ?? ''))
+            ->implode("\n");
+    }
+
+    /** رد آمن لطلبات الأسرار. */
+    public function securityReply(): string
+    {
+        return 'لا أستطيع الوصول إلى كلمات المرور أو مفاتيح API أو الأسرار أو بيانات المستخدمين الخاصة أو عرضها. لاستعادة كلمة المرور استخدم إجراء الاستعادة في الحساب، ولأي صلاحية إدارية استخدم المسار الإداري المعتمد.';
+    }
+
+    public function ambiguousReply(): string
+    {
+        return 'عذرًا، لم أفهم قصدك بشكل كافٍ. هل تريد البحث عن عقار، أم تريد معرفة شيء عن منصة وجهتك؟';
+    }
+
+    public function technicalReply(): string
+    {
+        return 'أستطيع مساعدتك في الوظائف المتاحة داخل وجهتك. اذكر اسم الصفحة أو المشكلة التي تظهر لك وسأوجهك إلى المسار المدعوم في التطبيق.';
+    }
+
+    /** رد الحالة أو السعر أو الموقع من السجل الحي فقط. */
+    public function propertyStatusReply(array $property, string $intent): string
+    {
+        $id = (int) ($property['property_id'] ?? 0);
+        $title = (string) ($property['title'] ?? 'العقار');
+        $status = (string) ($property['status'] ?? '');
+
+        $label = match ($status) {
+            'published' => 'منشور ومتاح للاكتشاف حاليًا',
+            'draft' => 'مسودة وغير متاح للاكتشاف',
+            'pending' => 'قيد المراجعة وغير متاح للاكتشاف',
+            'rejected' => 'مرفوض وغير متاح للاكتشاف',
+            'archived' => 'مؤرشف وغير متاح للاكتشاف',
+            default => 'حالته الحالية غير معروفة في البيانات المتاحة',
+        };
+
+        return match ($intent) {
+            'property_availability' => "العقار رقم {$id} «{$title}» حالته الحالية: {$label}.",
+            'property_price' => isset($property['price'])
+                ? "السعر الحالي للعقار رقم {$id} «{$title}»: ".number_format((float) $property['price']).' '.($property['currency'] ?? '').'.'
+                : "لا توجد قيمة سعر مؤكدة حاليًا للعقار رقم {$id}.",
+            'property_location' => 'موقع العقار رقم '.$id.' «'.$title.'»: '
+                .collect([$property['district'] ?? null, $property['neighborhood'] ?? null, $property['city'] ?? null])->filter()->implode(' - ').'.',
+            default => $this->detailsReply($id) ?? 'تعذر جلب بيانات العقار الحالية.',
+        };
+    }
+
     /** الرد المفتوح للدخول: نطاق المساعد. */
     public function scopeReply(): string
     {
