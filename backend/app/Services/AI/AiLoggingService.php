@@ -85,10 +85,10 @@ class AiLoggingService
 
         $totalRequests = (clone $base)->count();
         $clarifications = (clone $base)->whereIn('intent', ['clarification_required', 'ambiguous_request'])->count();
-        $feedbackPositive = Schema::hasTable('ai_message_feedbacks')
+        $feedbackPositive = Schema::hasTable('ai_message_feedback')
             ? AiMessageFeedback::query()->where('feedback', 'helpful')->count()
             : 0;
-        $feedbackNegative = Schema::hasTable('ai_message_feedbacks')
+        $feedbackNegative = Schema::hasTable('ai_message_feedback')
             ? AiMessageFeedback::query()->where('feedback', 'not_helpful')->count()
             : 0;
         $staleIndexes = Schema::hasTable('ai_search_index')
