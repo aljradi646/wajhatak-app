@@ -172,7 +172,10 @@ class AiAgentOrchestrator
 
         if ($intent === 'ambiguous_request') {
             return $this->finish($userMessage, [
-                'reply' => $this->replyEngine->ambiguousReply(),
+                'reply' => $this->replyEngine->clarifyReply(
+                    $this->conversationService->consecutiveFollowUps($conversation),
+                    (int) config('ai.limits.max_followups', 2),
+                ),
                 'status' => 'ok',
                 'response_type' => 'clarification',
                 'properties' => [],
