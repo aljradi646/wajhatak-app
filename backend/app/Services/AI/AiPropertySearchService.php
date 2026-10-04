@@ -434,9 +434,12 @@ class AiPropertySearchService
         $transaction = $property->transaction_type instanceof \BackedEnum
             ? $property->transaction_type->value
             : (string) $property->transaction_type;
+        $status = $property->status instanceof \BackedEnum
+            ? $property->status->value
+            : (string) $property->status;
         $image = $property->images->first();
 
-        return [
+        $data = [
             'property_id' => (int) $property->id,
             'title' => (string) $property->title,
             'type' => $property->type?->name_ar,
@@ -453,16 +456,35 @@ class AiPropertySearchService
             'is_furnished' => (bool) $property->is_furnished,
             'is_new' => (bool) $property->is_new,
             'is_featured' => (bool) $property->is_featured,
-            'status' => $property->status instanceof \BackedEnum ? $property->status->value : (string) $property->status,
-            'available' => $property->status instanceof PropertyStatus
-                ? $property->status === PropertyStatus::Published
-                : (string) $property->status === PropertyStatus::Published->value,
+            'status' => $status,
+            'available' => $status === PropertyStatus::Published->value,
             'match_score' => $score,
             'image_url' => $image ? asset('storage/'.$image->path) : null,
             'description' => (string) $property->description,
             'latitude' => $property->location?->latitude !== null ? (float) $property->location->latitude : null,
             'longitude' => $property->location?->longitude !== null ? (float) $property->location->longitude : null,
+            'features' => $property->relationLoaded('features')
+                ? $property->features
+                    ->filter(fn ($feature) => (bool) ($feature->is_active ?? true))
+                    ->map(fn ($feature) => [
+                        'id' => (int) $feature->id,
+                        'name_ar' => (string) $feature->name_ar,
+                        'slug' => $feature->slug,
+                    ])->values()->all()
+                : [],
         ];
+
+        $agent = $property->relationLoaded('agent') ? $property->agent : null;
+        if ($agent && method_exists($agent, 'isApproved') && $agent->isApproved()) {
+            $data['agent'] = [
+                'id' => (int) $agent->id,
+                'name' => $agent->user?->name,
+                'agency_name' => $agent->agency_name,
+                'phone' => $agent->phone,
+                'whatsapp' => $agent->whatsapp,
+            ];
+        }
+
         $data['is_alternative'] = $alternative;
         $data['ui'] = [
             'component' => 'property_card',
