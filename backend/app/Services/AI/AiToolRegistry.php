@@ -167,7 +167,7 @@ class AiToolRegistry
         try {
             return match ($toolName) {
                 'search_properties' => $this->executeSearchProperties($arguments),
-                'get_property_details' => $this->executeGetPropertyDetails($arguments),
+                'get_property_details' => $this->executeGetPropertyDetails($user, $arguments),
                 'find_similar_properties' => $this->executeFindSimilarProperties($arguments),
                 'search_nearby_properties' => $this->executeSearchNearbyProperties($arguments),
                 'create_viewing_request' => $this->executeCreateViewingRequest($user, $arguments),
@@ -253,15 +253,33 @@ class AiToolRegistry
         ];
     }
 
-    private function executeGetPropertyDetails(array $args): array
+    private function executeGetPropertyDetails(?User $user, array $args): array
     {
         $propertyId = (int) ($args['property_id'] ?? 0);
-        $details = $this->searchService->details($propertyId);
+        $property = Property::query()->with(['agent.user'])->find($propertyId);
 
-        if (!$details) {
+        if (! $property) {
             return [
                 'success' => false,
-                'message' => "لم يتم العثور على عقار برقم {$propertyId}، أو قد لا يكون منشورًا.",
+                'error' => 'PROPERTY_NOT_FOUND',
+                'message' => "لم يتم العثور على عقار برقم {$propertyId}.",
+            ];
+        }
+
+        if (! app(\Illuminate\Contracts\Auth\Access\Gate::class)->forUser($user)->allows('view', $property)) {
+            return [
+                'success' => false,
+                'error' => 'PROPERTY_FORBIDDEN',
+                'message' => 'هذا العقار غير متاح لك وفق صلاحيات المنصة.',
+            ];
+        }
+
+        $details = $this->searchService->details($propertyId);
+        if (! $details) {
+            return [
+                'success' => false,
+                'error' => 'PROPERTY_UNAVAILABLE',
+                'message' => 'تعذر تحميل بيانات العقار الحالية.',
             ];
         }
 
