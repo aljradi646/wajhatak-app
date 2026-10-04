@@ -503,6 +503,18 @@ class _AiPropertyMiniCard extends StatelessWidget {
                             style: theme.textTheme.bodySmall,
                           ),
                         ],
+                        if (property.distanceKm != null) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.near_me_rounded,
+                            size: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          Text(
+                            ' ${property.distanceKm!.toStringAsFixed(1)} كم',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 6),
