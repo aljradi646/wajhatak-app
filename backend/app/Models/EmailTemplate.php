@@ -2,24 +2,17 @@
 
 namespace App\Models;
 
+use App\Services\Mail\EmailTemplateRenderer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmailTemplate extends Model
 {
     protected $fillable = [
-        'key',
-        'name',
-        'description',
-        'subject',
-        'html_content',
-        'text_content',
-        'css_styles',
-        'variables',
-        'is_active',
-        'is_system',
-        'thumbnail',
-        'version',
+        'key', 'name', 'description', 'subject', 'html_content', 'text_content',
+        'css_styles', 'variables', 'is_active', 'is_system', 'thumbnail', 'version',
+        'status', 'published_version', 'last_edited_by', 'published_at', 'archived_at', 'autosaved_at',
     ];
 
     protected $casts = [
@@ -28,6 +21,10 @@ class EmailTemplate extends Model
         'is_active' => 'boolean',
         'is_system' => 'boolean',
         'version' => 'integer',
+        'published_version' => 'integer',
+        'published_at' => 'datetime',
+        'archived_at' => 'datetime',
+        'autosaved_at' => 'datetime',
     ];
 
     public function versions(): HasMany
@@ -35,55 +32,52 @@ class EmailTemplate extends Model
         return $this->hasMany(EmailTemplateVersion::class)->orderByDesc('version');
     }
 
-    /**
-     * Get template by key.
-     */
-    public static function findByKey(string $key): ?self
+    public function lastEditor(): BelongsTo
     {
-        return static::where('key', $key)->where('is_active', true)->first();
+        return $this->belongsTo(User::class, 'last_edited_by');
     }
 
-    /**
-     * Render template with variables.
-     */
-    public function render(array $variables = []): array
+    public function publishedVersion(): ?EmailTemplateVersion
     {
-        $subject = $this->replaceVariables($this->subject, $variables);
-        $html = $this->html_content ? $this->replaceVariables($this->html_content, $variables) : null;
-        $text = $this->text_content ? $this->replaceVariables($this->text_content, $variables) : null;
-
-        return [
-            'subject' => $subject,
-            'html' => $html,
-            'text' => $text,
-        ];
-    }
-
-    /**
-     * Replace variables in content.
-     */
-    private function replaceVariables(string $content, array $variables): string
-    {
-        foreach ($variables as $key => $value) {
-            $content = str_replace("{{$key}}", $value, $content);
+        $version = $this->published_version;
+        if (! $version) {
+            return null;
         }
 
-        return $content;
+        return $this->versions()->where('version', $version)->first();
     }
 
-    /**
-     * Increment version and save.
-     */
+    public static function findByKey(string $key): ?self
+    {
+        return static::where('key', $key)->where('is_active', true)->where('status', 'published')->first();
+    }
+
+    public function render(array $variables = []): array
+    {
+        return app(EmailTemplateRenderer::class)->render($this, $variables);
+    }
+
+    public function renderPublished(array $variables = []): ?array
+    {
+        if ($this->status !== 'published') {
+            return null;
+        }
+
+        $version = $this->publishedVersion();
+        if (! $version) {
+            return $this->render($variables);
+        }
+
+        return app(EmailTemplateRenderer::class)->renderVersion($version, $variables);
+    }
+
     public function incrementVersion(): void
     {
         $this->increment('version');
     }
 
-    /**
-     * Check if template can be deleted (not system).
-     */
     public function canBeDeleted(): bool
     {
-        return !$this->is_system;
+        return ! $this->is_system;
     }
 }
