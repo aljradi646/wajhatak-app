@@ -51,6 +51,43 @@ class AiAssistantTest extends TestCase
         }
     }
 
+    /** ب1) نتائج البحث تحمل عقد Property Card تفاعلي وحقول النسخ العامة. */
+    public function test_property_results_include_grounded_ui_actions(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد شقة في صنعاء',
+        ]);
+
+        $response->assertOk();
+        $items = $response->json('data.properties');
+
+        $this->assertNotEmpty($items);
+
+        $item = $items[0];
+        $this->assertNotNull($item['image_url'] ?? null);
+        $this->assertSame('property_card', $item['ui']['component'] ?? null);
+        $this->assertTrue((bool) ($item['ui']['image_priority'] ?? false));
+        $this->assertSame(
+            (int) $item['property_id'],
+            (int) ($item['ui']['open_action']['property_id'] ?? 0)
+        );
+        $this->assertSame(
+            'open_property',
+            $item['ui']['title_action']['type'] ?? null
+        );
+        $this->assertSame(
+            'share_property',
+            $item['ui']['share_action']['type'] ?? null
+        );
+
+        $copyFields = collect($item['ui']['copy_actions'] ?? [])
+            ->pluck('field')
+            ->all();
+
+        $this->assertContains('price', $copyFields);
+        $this->assertContains('location', $copyFields);
+    }
+
     /** ب) بحث متعدد الشروط: شقة 2-3 غرف مفروشة أقل من 150 ألف. */
     public function test_multi_condition_search_applies_all_filters(): void
     {
