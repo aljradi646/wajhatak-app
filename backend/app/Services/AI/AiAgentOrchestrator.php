@@ -349,19 +349,24 @@ class AiAgentOrchestrator
                 ]);
             }
 
-            $result = $this->executeTool('create_viewing_request', ['property_id' => (int) $id, 'confirmed' => true], $user);
+            $args = [
+                'property_id' => (int) $id,
+                'scheduled_date' => $this->extractScheduledDate($message) ?? now()->addDay()->toDateString(),
+                'scheduled_time' => $this->extractScheduledTime($message) ?? '10:00:00',
+                'notes' => 'طلب معاينة من خلال المساعد الذكي',
+            ];
+
+            $this->stateService->setPendingAction($conversation, 'create_viewing_request', $args);
+
             return $this->finish($userMessage, [
-                'reply' => $result['message'] ?? 'تعذر إنشاء طلب المعاينة.',
-                'status' => ($result['success'] ?? false) ? 'ok' : 'error',
-                'response_type' => 'text',
+                'reply' => $this->confirmationPrompt('create_viewing_request', $args),
+                'status' => 'ok',
+                'response_type' => 'clarification',
                 'properties' => [],
-                'filters' => [],
-                'tool_calls' => [
-                    ['tool' => 'get_property_details', 'ok' => true],
-                    ['tool' => 'create_viewing_request', 'ok' => (bool) ($result['success'] ?? false)],
-                ],
-                'actions' => [['type' => 'open_property', 'label' => 'فتح العقار', 'payload' => ['property_id' => (int) $id]]],
-                'intent' => $result['intent'] ?? $intent,
+                'filters' => ['property_id' => (int) $id],
+                'tool_calls' => [['tool' => 'create_viewing_request', 'ok' => false, 'confirmation_required' => true]],
+                'actions' => [['type' => 'open_property', 'label' => 'فتح التفاصيل', 'payload' => ['property_id' => (int) $id]]],
+                'intent' => 'confirmation_required',
                 'source' => [
                     'type' => 'live_property',
                     'source_id' => (int) $id,
