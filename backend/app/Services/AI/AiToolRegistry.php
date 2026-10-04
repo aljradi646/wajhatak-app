@@ -73,6 +73,35 @@ class AiToolRegistry
                     ],
                 ],
             ],
+            'create_viewing_request' => [
+                'name' => 'create_viewing_request',
+                'description' => 'إنشاء طلب معاينة حقيقي لعقار منشور للمستخدم المسجل الدخول.',
+                'parameters' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => ['property_id'],
+                    'properties' => [
+                        'property_id' => ['type' => 'integer', 'minimum' => 1],
+                        'scheduled_date' => ['type' => 'string', 'maxLength' => 10],
+                        'scheduled_time' => ['type' => 'string', 'maxLength' => 8],
+                        'notes' => ['type' => 'string', 'maxLength' => 500],
+                        'confirmed' => ['type' => 'boolean'],
+                    ],
+                ],
+            ],
+            'find_similar_properties' => [
+                'name' => 'find_similar_properties',
+                'description' => 'البحث عن عقارات منشورة مشابهة لعقار حقيقي محدد.',
+                'parameters' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => ['property_id'],
+                    'properties' => [
+                        'property_id' => ['type' => 'integer', 'minimum' => 1],
+                        'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 8],
+                    ],
+                ],
+            ],
             'get_app_knowledge' => [
                 'name' => 'get_app_knowledge',
                 'description' => 'استرجاع معرفة منصة وجهتك الحالية فقط؛ ليست مصدرًا لبيانات العقارات التشغيلية.',
@@ -106,6 +135,8 @@ class AiToolRegistry
             'nearest_property' => ['search_nearby_properties'],
             'property_detail', 'property_availability', 'property_price', 'property_location',
             'property_features', 'property_agent/contact' => ['get_property_details'],
+            'property_recommendation' => ['find_similar_properties'],
+            'viewing_request' => ['create_viewing_request'],
             'platform_information', 'platform_how_to' => ['get_app_knowledge'],
             default => [],
         };
@@ -137,6 +168,7 @@ class AiToolRegistry
             return match ($toolName) {
                 'search_properties' => $this->executeSearchProperties($arguments),
                 'get_property_details' => $this->executeGetPropertyDetails($arguments),
+                'find_similar_properties' => $this->executeFindSimilarProperties($arguments),
                 'search_nearby_properties' => $this->executeSearchNearbyProperties($arguments),
                 'create_viewing_request' => $this->executeCreateViewingRequest($user, $arguments),
                 'get_agent_info' => $this->executeGetAgentInfo($arguments),
@@ -164,6 +196,7 @@ class AiToolRegistry
         $allowed = match ($toolName) {
             'search_properties' => ['city','district','property_type','transaction_type','bedrooms','min_price','max_price','furnished'],
             'get_property_details' => ['property_id'],
+            'find_similar_properties' => ['property_id','limit'],
             'search_nearby_properties' => ['latitude','longitude','radius_km'],
             'get_app_knowledge' => ['query'],
             'create_viewing_request' => ['property_id','scheduled_date','scheduled_time','notes','confirmed'],
@@ -232,6 +265,24 @@ class AiToolRegistry
         return [
             'success' => true,
             'property' => $details,
+        ];
+    }
+
+    private function executeFindSimilarProperties(array $args): array
+    {
+        $propertyId = (int) ($args['property_id'] ?? 0);
+        $limit = max(1, min(8, (int) ($args['limit'] ?? 4)));
+        $properties = $this->searchService->similar($propertyId, $limit);
+
+        return [
+            'success' => true,
+            'total' => count($properties),
+            'properties' => $properties,
+            'source' => [
+                'type' => 'live_property',
+                'reference_property_id' => $propertyId,
+                'retrieved_at' => now()->toISOString(),
+            ],
         ];
     }
 
