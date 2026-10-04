@@ -30,7 +30,7 @@ class AiSchemaService
     /** سقف إعادة بناء الفهرس تلقائيًا (حماية من تنفيذ ثقيل داخل طلب). */
     private const AUTO_INDEX_MAX_PROPERTIES = 5000;
 
-    private const TABLES = ['ai_conversations', 'ai_messages', 'ai_request_logs', 'ai_search_index'];
+    private const TABLES = ['ai_conversations', 'ai_messages', 'ai_request_logs', 'ai_search_index', 'ai_user_memories', 'ai_message_feedbacks'];
 
     public function __construct(private readonly AiIndexSyncService $indexer) {}
 
@@ -151,6 +151,36 @@ class AiSchemaService
             $created[] = 'ai_messages';
         }
 
+        if (! Schema::hasTable('ai_user_memories')) {
+            Schema::create('ai_user_memories', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+                $table->string('memory_key', 80);
+                $table->string('memory_value', 500);
+                $table->decimal('confidence', 4, 3)->default(1.000);
+                $table->string('source', 30)->default('conversation');
+                $table->timestamp('last_used_at')->nullable()->index();
+                $table->timestamp('expires_at')->nullable()->index();
+                $table->timestamps();
+                $table->unique(['user_id', 'memory_key']);
+            });
+            $created[] = 'ai_user_memories';
+        }
+
+        if (! Schema::hasTable('ai_message_feedbacks')) {
+            Schema::create('ai_message_feedbacks', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('ai_message_id')->constrained('ai_messages')->cascadeOnDelete();
+                $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+                $table->string('feedback', 20);
+                $table->string('note', 500)->nullable();
+                $table->timestamps();
+                $table->index(['ai_message_id', 'created_at']);
+                $table->index(['user_id', 'created_at']);
+            });
+            $created[] = 'ai_message_feedbacks';
+        }
+
         if (! Schema::hasTable('ai_request_logs')) {
             Schema::create('ai_request_logs', function (Blueprint $table) {
                 $table->id();
@@ -214,6 +244,7 @@ class AiSchemaService
         'ai_messages' => ['ai_conversation_id' => true, 'role' => true, 'content' => true, 'structured_filters' => true, 'property_ids' => true, 'status' => true, 'response_type' => true, 'metadata' => true],
         'ai_request_logs' => ['ai_conversation_id' => true, 'user_id' => true, 'request_id' => true, 'intent' => true, 'structured_filters' => true, 'tool_calls' => true, 'results_count' => true, 'status' => true, 'response_type' => true, 'error_code' => true, 'fallback_reason' => true, 'knowledge_version' => true, 'latency_ms' => true, 'search_ms' => true, 'tokens_used' => true],
         'ai_user_memories' => ['user_id' => true, 'memory_key' => true, 'memory_value' => true, 'confidence' => true, 'source' => true, 'last_used_at' => true, 'expires_at' => true],
+        'ai_message_feedbacks' => ['ai_message_id' => true, 'user_id' => true, 'feedback' => true, 'note' => true],
         'ai_search_index' => ['property_id' => true, 'title' => true, 'description' => true, 'transaction_type' => true, 'status' => true, 'type_slug' => true, 'type_name_ar' => true, 'city' => true, 'district' => true, 'neighborhood' => true, 'price' => true, 'currency' => true, 'area' => true, 'bedrooms' => true, 'bathrooms' => true, 'is_furnished' => true, 'is_new' => true, 'is_featured' => true, 'published_at' => true, 'latitude' => true, 'longitude' => true, 'search_text' => true, 'content_hash' => true],
     ];
 
@@ -263,6 +294,10 @@ class AiSchemaService
                 'source' => fn (Blueprint $t) => $t->string('source', 30)->default('conversation'),
                 'last_used_at' => fn (Blueprint $t) => $t->timestamp('last_used_at')->nullable()->index(),
                 'expires_at' => fn (Blueprint $t) => $t->timestamp('expires_at')->nullable()->index(),
+            ],
+            'ai_message_feedbacks' => [
+                'feedback' => fn (Blueprint $t) => $t->string('feedback', 20),
+                'note' => fn (Blueprint $t) => $t->string('note', 500)->nullable(),
             ],
             'ai_search_index' => [
                 'description' => fn (Blueprint $t) => $t->text('description')->nullable(),
