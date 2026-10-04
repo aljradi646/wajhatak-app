@@ -58,6 +58,10 @@ class AiAssistantRepository {
           .map(AiPropertyResult.fromJson)
           .toList(growable: false),
       status: data['status'] as String? ?? 'ok',
+      responseType: data['response_type'] as String? ?? 'text',
+      actions: (data['actions'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .toList(growable: false),
       createdAt: DateTime.now(),
     );
 
@@ -120,8 +124,6 @@ class AiAssistantRepository {
       // تجاهل — الجلسة ستجدد مفتاحًا جديدًا لاحقًا.
     }
   }
-}
-
 
   Future<int> createConversation() async {
     final json = await _api.post('/ai/conversations', data: {'locale': 'ar'});
