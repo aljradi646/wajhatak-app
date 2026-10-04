@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AiMessageFeedback extends Model
 {
+    protected $table = 'ai_message_feedback';
+
     protected $fillable = [
         'ai_message_id',
         'user_id',
