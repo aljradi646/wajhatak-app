@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api_client.dart';
@@ -74,6 +77,70 @@ class AiAssistantRepository {
       conversationId: conversation,
       sessionToken: token,
     );
+  }
+
+  Stream<AiStreamEvent> streamMessage(
+    String message, {
+    int? conversationId,
+    double? latitude,
+    double? longitude,
+    CancelToken? cancelToken,
+  }) async* {
+    final payload = <String, dynamic>{
+      'message': message,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (conversationId == null) 'session_token': await _sessionToken(),
+      'locale': 'ar',
+      if (latitude != null && longitude != null) ...{
+        'latitude': latitude,
+        'longitude': longitude,
+        'radius_km': 10,
+      },
+    };
+
+    final response = await _api.postStream(
+      '/ai/chat/stream',
+      data: payload,
+      cancelToken: cancelToken,
+    );
+    final body = response.data;
+    if (body == null) {
+      throw ApiFailure('تعذر بدء بث المساعد.', statusCode: response.statusCode);
+    }
+
+    String eventName = 'message';
+    final dataLines = <String>[];
+
+    AiStreamEvent? flushEvent() {
+      if (dataLines.isEmpty) return null;
+      try {
+        final decoded = jsonDecode(dataLines.join('\\n'));
+        if (decoded is! Map<String, dynamic>) return null;
+        return AiStreamEvent.fromJson({...decoded, 'event': decoded['event'] ?? eventName});
+      } catch (_) {
+        return null;
+      }
+    }
+
+    await for (final line in body.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())) {
+      if (line.isEmpty) {
+        final event = flushEvent();
+        if (event != null) yield event;
+        eventName = 'message';
+        dataLines.clear();
+        continue;
+      }
+      if (line.startsWith('event:')) {
+        eventName = line.substring(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.add(line.substring(5).trimLeft());
+      }
+    }
+
+    final event = flushEvent();
+    if (event != null) yield event;
   }
 
   /// مسح محادثة المستخدم المسجل (متطلب اختياري عند وجود حساب).

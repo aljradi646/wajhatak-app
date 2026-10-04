@@ -54,6 +54,9 @@ class AiPropertyResult {
   final bool isAlternative;
   final double matchScore;
 
+  // The API may supply distance later; keep the model/UI contract nullable.
+  double? get distanceKm => null;
+
   bool get isRent => transactionType == 'rent';
 
   String get transactionLabel => isRent ? 'للإيجار' : 'للبيع';
@@ -130,6 +133,8 @@ class AiChatMessage {
     required this.content,
     this.properties = const [],
     this.status = 'ok',
+    this.responseType = 'text',
+    this.actions = const [],
     this.createdAt,
   });
 
@@ -137,7 +142,9 @@ class AiChatMessage {
   final String role; // user | assistant
   final String content;
   final List<AiPropertyResult> properties;
-  final String status; // ok | blocked | error
+  final String status; // ok | blocked | error | streaming
+  final String responseType;
+  final List<Map<String, dynamic>> actions;
   final DateTime? createdAt;
 
   bool get isUser => role == 'user';
@@ -147,6 +154,8 @@ class AiChatMessage {
     required String content,
     List<AiPropertyResult> properties = const [],
     String status = 'ok',
+    String responseType = 'text',
+    List<Map<String, dynamic>> actions = const [],
   }) {
     final stamp = DateTime.now().microsecondsSinceEpoch;
     return AiChatMessage(
@@ -155,9 +164,31 @@ class AiChatMessage {
       content: content,
       properties: properties,
       status: status,
+      responseType: responseType,
+      actions: actions,
       createdAt: DateTime.now(),
     );
   }
+
+  AiChatMessage copyWith({
+    int? id,
+    String? role,
+    String? content,
+    List<AiPropertyResult>? properties,
+    String? status,
+    String? responseType,
+    List<Map<String, dynamic>>? actions,
+    DateTime? createdAt,
+  }) => AiChatMessage(
+    id: id ?? this.id,
+    role: role ?? this.role,
+    content: content ?? this.content,
+    properties: properties ?? this.properties,
+    status: status ?? this.status,
+    responseType: responseType ?? this.responseType,
+    actions: actions ?? this.actions,
+    createdAt: createdAt ?? this.createdAt,
+  );
 
   factory AiChatMessage.fromJson(Map<String, dynamic> json) {
     return AiChatMessage(
@@ -169,6 +200,10 @@ class AiChatMessage {
           .map(AiPropertyResult.fromJson)
           .toList(growable: false),
       status: json['status'] as String? ?? 'ok',
+      responseType: json['response_type'] as String? ?? 'text',
+      actions: (json['actions'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .toList(growable: false),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -202,4 +237,37 @@ class AiConversationItem {
       messageCount: json['messages_count'] as int? ?? json['message_count'] as int? ?? 0,
     );
   }
+}
+
+
+@immutable
+class AiStreamEvent {
+  const AiStreamEvent({
+    required this.event,
+    this.id,
+    this.delta,
+    this.data,
+    this.message,
+    this.statusCode,
+  });
+
+  final String event;
+  final int? id;
+  final String? delta;
+  final Map<String, dynamic>? data;
+  final String? message;
+  final int? statusCode;
+
+  factory AiStreamEvent.fromJson(Map<String, dynamic> json) => AiStreamEvent(
+    event: json['event']?.toString() ?? 'message',
+    id: (json['id'] as num?)?.toInt(),
+    delta: json['delta']?.toString(),
+    data: json['data'] is Map<String, dynamic>
+        ? json['data'] as Map<String, dynamic>
+        : json['result'] is Map<String, dynamic>
+            ? json['result'] as Map<String, dynamic>
+            : null,
+    message: json['message']?.toString(),
+    statusCode: (json['status_code'] as num?)?.toInt(),
+  );
 }

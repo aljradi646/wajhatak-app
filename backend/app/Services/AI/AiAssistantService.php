@@ -65,22 +65,24 @@ class AiAssistantService
             // 2) تفويض العملية إلى AiAgentOrchestrator
             $stage = 'orchestrator';
             $orchestratorResult = $this->orchestrator->process($user, $message, $conversation, $locale, $clientContext);
+            $contract = AiResponseContract::normalize($orchestratorResult);
 
-            $reply = $orchestratorResult['reply'] ?? 'تمت معالجة الطلب.';
-            $status = $orchestratorResult['status'] ?? 'ok';
-            $properties = $orchestratorResult['properties'] ?? [];
-            $filters = $orchestratorResult['filters'] ?? [];
-            $toolCalls = $orchestratorResult['tool_calls'] ?? [];
-            $intent = $orchestratorResult['intent'] ?? 'chat';
-            $failedStage = $orchestratorResult['failed_stage'] ?? null;
-            $resultMode = $orchestratorResult['result_mode'] ?? 'none';
+            $reply = $contract['reply'];
+            $status = $contract['status'];
+            $properties = $contract['properties'];
+            $filters = $contract['filters'];
+            $toolCalls = $contract['tool_calls'];
+            $intent = $contract['intent'];
+            $failedStage = $contract['failed_stage'];
+            $resultMode = $contract['result_mode'];
             $relaxations = $orchestratorResult['relaxations'] ?? [];
 
             // 3) تسجيل واستخراج رسالة الرد
             $propertyIds = array_map(fn ($p) => (int) ($p['property_id'] ?? $p['id'] ?? 0), $properties);
             $assistantMessage = $this->out(
                 $conversation, $user, $intent, $status, $filters, $toolCalls,
-                count($properties), $started, $searchMs, $failedStage, $reply, $propertyIds
+                count($properties), $started, $searchMs, $failedStage, $reply, $propertyIds,
+                $contract['response_type'], ['actions' => $contract['actions']]
             );
 
             return [
@@ -94,7 +96,9 @@ class AiAssistantService
                 'tool_calls' => $toolCalls,
                 'result_mode' => $resultMode,
                 'relaxations' => $relaxations,
-                'ui' => $this->buildUiContract($properties),
+                'response_type' => $contract['response_type'],
+                'actions' => $contract['actions'],
+                'ui' => $this->buildUiContract($contract['response_type'], $properties),
                 'failed_stage' => $failedStage,
                 'message_id' => $assistantMessage?->id,
             ];
@@ -200,8 +204,10 @@ class AiAssistantService
         ?string $errorCode,
         string $reply,
         array $propertyIds = [],
+        string $responseType = 'text',
+        array $metadata = [],
     ): ?AiMessage {
-        $message = $this->attempt('persist', fn () => $this->conversations->addAssistantMessage($conversation, $reply, $propertyIds, $status));
+        $message = $this->attempt('persist', fn () => $this->conversations->addAssistantMessage($conversation, $reply, $propertyIds, $status, $responseType, $metadata));
 
         $this->attempt('logging', fn () => $this->logging->record(
             $conversation, $user?->id, $intent, $filters, $toolCalls, $results,
@@ -218,15 +224,16 @@ class AiAssistantService
      * @param  list<array<string, mixed>>  $properties
      * @return array<string, mixed>
      */
-    private function buildUiContract(array $properties): array
+    private function buildUiContract(string $responseType, array $properties): array
     {
+        $isProperty = in_array($responseType, ['property_results', 'property_detail'], true);
         return [
-            'response_component' => $properties === [] ? 'assistant_message' : 'property_results',
+            'response_component' => $isProperty && $properties !== [] ? 'property_results' : 'assistant_message',
             'property_card_component' => 'property_card',
             'property_card_click_action' => 'open_property',
             'property_ids' => array_values(array_filter(array_map(
                 static fn (array $item): int => (int) ($item['property_id'] ?? 0),
-                $properties
+                $isProperty ? $properties : []
             ))),
         ];
     }

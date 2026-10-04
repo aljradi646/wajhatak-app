@@ -1,186 +1,330 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/services/location_service.dart';
 import '../data/api_client.dart';
 import '../data/models/ai_assistant.dart';
-import '../data/models/models.dart';
 import '../data/repositories/repositories.dart';
 import 'providers.dart';
 
-/// مزود المستودع والموارد.
 final aiAssistantRepositoryProvider = Provider<AiAssistantRepository>(
   (ref) => AiAssistantRepository(ref.watch(apiClientProvider)),
 );
 
 final aiBootstrapProvider = FutureProvider<AiBootstrap>((ref) async {
-  // إعدادات واجهة المساعد عامة (لا تحتاج تسجيلًا) — مع سقوط آمن عند فشل الشبكة.
-  try {
-    return await ref.watch(aiAssistantRepositoryProvider).bootstrap();
-  } on ApiFailure {
-    return const AiBootstrap(
-      enabled: false,
-      assistantName: 'مساعد وجهتك',
-      welcomeMessage:
-          'المساعد غير متاح حاليًا، لكن يمكنك استخدام البحث العقاري التقليدي.',
-      suggestions: [],
-    );
-  }
+  return ref.watch(aiAssistantRepositoryProvider).bootstrap();
 });
 
-/// حالة محادثة المساعد: رسائل مرتبة قديمًا → جديدًا + مؤشر انتظار.
+enum AiSendPhase {
+  bootstrapping,
+  ready,
+  sending,
+  streaming,
+  completed,
+  failed,
+  cancelled,
+  disabled,
+}
+
 class AiConversationState {
   const AiConversationState({
     this.messages = const [],
     this.loading = false,
     this.error,
     this.conversationId,
+    this.phase = AiSendPhase.bootstrapping,
   });
 
   final List<AiChatMessage> messages;
   final bool loading;
   final String? error;
   final int? conversationId;
+  final AiSendPhase phase;
 
   bool get isEmpty => messages.isEmpty;
+  bool get canSend =>
+      phase == AiSendPhase.ready ||
+      phase == AiSendPhase.completed ||
+      phase == AiSendPhase.failed ||
+      phase == AiSendPhase.cancelled;
 
   AiConversationState copyWith({
     List<AiChatMessage>? messages,
     bool? loading,
     String? error,
     int? conversationId,
+    AiSendPhase? phase,
     bool clearError = false,
     bool clearConversation = false,
-  }) {
-    return AiConversationState(
-      messages: messages ?? this.messages,
-      loading: loading ?? this.loading,
-      error: clearError ? null : (error ?? this.error),
-      conversationId: clearConversation
-          ? null
-          : (conversationId ?? this.conversationId),
-    );
-  }
+  }) => AiConversationState(
+    messages: messages ?? this.messages,
+    loading: loading ?? this.loading,
+    error: clearError ? null : (error ?? this.error),
+    conversationId: clearConversation
+        ? null
+        : (conversationId ?? this.conversationId),
+    phase: phase ?? this.phase,
+  );
 }
 
-/// متحكم المحادثة — يرسل عبر المستودع ويبقي السياق (المعايير تُدار على
-/// الخادم؛ هنا نحفظ فقط هوية المحادثة والرسائل).
 class AiConversationController extends Notifier<AiConversationState> {
   @override
   AiConversationState build() => const AiConversationState();
 
-  int _sendGeneration = 0;
+  CancelToken? _cancelToken;
+  int _generation = 0;
+
+  Future<void> ensureReady() async {
+    if (state.phase != AiSendPhase.bootstrapping) return;
+    try {
+      final bootstrap = await ref.read(aiBootstrapProvider.future);
+      if (!bootstrap.enabled) {
+        state = state.copyWith(loading: false, phase: AiSendPhase.disabled);
+        return;
+      }
+      state = state.copyWith(
+        messages: [
+          AiChatMessage.local(
+            isUser: false,
+            content: bootstrap.welcomeMessage,
+          ),
+        ],
+        loading: false,
+        phase: AiSendPhase.ready,
+        clearError: true,
+      );
+    } on ApiFailure catch (error) {
+      state = state.copyWith(
+        loading: false,
+        phase: AiSendPhase.failed,
+        error: error.message,
+      );
+    } on Object {
+      state = state.copyWith(
+        loading: false,
+        phase: AiSendPhase.failed,
+        error: 'bootstrap_failed',
+      );
+    }
+  }
 
   Future<void> send(String text) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || state.loading) return;
+    if (trimmed.isEmpty || !state.canSend) return;
 
-    final generation = ++_sendGeneration;
-    final userMessage = AiChatMessage.local(isUser: true, content: trimmed);
+    final generation = ++_generation;
     state = state.copyWith(
-      messages: [...state.messages, userMessage],
+      messages: [
+        ...state.messages,
+        AiChatMessage.local(isUser: true, content: trimmed),
+      ],
       loading: true,
+      phase: AiSendPhase.sending,
       clearError: true,
     );
 
     try {
       double? latitude;
       double? longitude;
-      if (RegExp(r'(قريب|بالقرب|حول[ي|ك]|بجانبي|موقعي|near|nearby)', caseSensitive: false).hasMatch(trimmed)) {
+      if (RegExp(
+        r'(قريب|بالقرب|حول[ي|ك]|بجانبي|موقعي|near|nearby)',
+        caseSensitive: false,
+      ).hasMatch(trimmed)) {
         final location = await LocationService.silentPosition();
         latitude = location.latitude;
         longitude = location.longitude;
       }
 
-      final result = await ref
+      final cancel = CancelToken();
+      _cancelToken = cancel;
+
+      await for (final event in ref
           .read(aiAssistantRepositoryProvider)
-          .sendMessage(
+          .streamMessage(
             trimmed,
             conversationId: state.conversationId,
             latitude: latitude,
             longitude: longitude,
+            cancelToken: cancel,
+          )) {
+        if (generation != _generation || cancel.isCancelled) return;
+
+        if (event.event == 'delta') {
+          final delta = event.delta ?? '';
+          if (delta.isEmpty) continue;
+          final messages = [...state.messages];
+          if (messages.isNotEmpty &&
+              !messages.last.isUser &&
+              messages.last.status == 'streaming') {
+            messages[messages.length - 1] = messages.last.copyWith(
+              content: messages.last.content + delta,
+            );
+          } else {
+            messages.add(
+              AiChatMessage.local(
+                isUser: false,
+                content: delta,
+                status: 'streaming',
+              ),
+            );
+          }
+          state = state.copyWith(
+            messages: messages,
+            loading: true,
+            phase: AiSendPhase.streaming,
           );
-      final reply = result.message;
-      if (generation != _sendGeneration) return;
-      state = state.copyWith(
-        messages: [...state.messages, reply],
-        loading: false,
-        conversationId: state.conversationId ?? result.conversationId,
-      );
+        } else if (event.event == 'done') {
+          final result = event.data ?? const <String, dynamic>{};
+          final finalMessage = AiChatMessage(
+            id: (result['message_id'] as num?)?.toInt() ??
+                DateTime.now().microsecondsSinceEpoch,
+            role: 'assistant',
+            content: result['reply']?.toString() ?? '',
+            properties: (result['properties'] as List<dynamic>? ?? const [])
+                .whereType<Map<String, dynamic>>()
+                .map(AiPropertyResult.fromJson)
+                .toList(growable: false),
+            status: result['status']?.toString() ?? 'ok',
+            responseType: result['response_type']?.toString() ?? 'text',
+            actions: (result['actions'] as List<dynamic>? ?? const [])
+                .whereType<Map<String, dynamic>>()
+                .toList(growable: false),
+            createdAt: DateTime.now(),
+          );
+
+          final messages = [...state.messages];
+          if (messages.isNotEmpty &&
+              !messages.last.isUser &&
+              messages.last.status == 'streaming') {
+            messages[messages.length - 1] = finalMessage;
+          } else {
+            messages.add(finalMessage);
+          }
+
+          state = state.copyWith(
+            messages: messages,
+            loading: false,
+            phase: AiSendPhase.completed,
+            conversationId: state.conversationId ??
+                (result['conversation_id'] as num?)?.toInt(),
+          );
+        } else if (event.event == 'error') {
+          throw ApiFailure(
+            event.message ?? 'تعذر إكمال بث المساعد.',
+            statusCode: event.statusCode,
+          );
+        }
+      }
+
+      if (generation == _generation &&
+          state.phase != AiSendPhase.completed &&
+          state.phase != AiSendPhase.cancelled) {
+        _fail('انقطع بث المساعد قبل اكتمال الرد.', 'stream_ended_early');
+      }
     } on ApiFailure catch (error) {
-      if (generation != _sendGeneration) return;
-      // Fallback لطيف دائمًا — التطبيق لا ينكسر بدون AI.
-      final fallback = AiChatMessage.local(
-        isUser: false,
-        content: error.statusCode == 503
-            ? 'المساعد غير متاح حاليًا، لكن يمكنك استخدام البحث العقاري التقليدي.'
-            : 'تعذر وصول الطلب الآن. حاول مرة أخرى بعد قليل.',
-        status: 'error',
-      );
-      state = state.copyWith(
-        messages: [...state.messages, fallback],
-        loading: false,
-        error: error.message,
-      );
+      if (generation == _generation && !(_cancelToken?.isCancelled ?? false)) {
+        _fail(
+          error.statusCode == 503
+              ? 'المساعد غير متاح حاليًا.'
+              : 'تعذر وصول الرد. حاول مرة أخرى.',
+          error.message,
+        );
+      }
     } on Object {
-      if (generation != _sendGeneration) return;
-      final fallback = AiChatMessage.local(
-        isUser: false,
-        content:
-            'المساعد غير متاح حاليًا، لكن يمكنك استخدام البحث العقاري التقليدي.',
-        status: 'error',
-      );
-      state = state.copyWith(
-        messages: [...state.messages, fallback],
-        loading: false,
-        error: 'ai_unavailable',
-      );
+      if (generation == _generation && !(_cancelToken?.isCancelled ?? false)) {
+        _fail('تعذر إكمال الطلب. حاول مرة أخرى بعد قليل.');
+      }
+    } finally {
+      if (generation == _generation) _cancelToken = null;
     }
   }
 
-  /// إعادة إرسال آخر رسالة مستخدم فاشلة.
-  Future<void> resendLast() async {
-    final lastUser = state.messages.lastWhere(
-      (m) => m.isUser,
-      orElse: () => const AiChatMessage(id: 0, role: 'user', content: ''),
+  void _fail(String message, [String? error]) {
+    final messages = [...state.messages];
+    if (messages.isNotEmpty &&
+        !messages.last.isUser &&
+        messages.last.status == 'streaming') {
+      messages.removeLast();
+    }
+    messages.add(
+      AiChatMessage.local(isUser: false, content: message, status: 'error'),
     );
-    if (lastUser.content.isEmpty) return;
-    // إزالة رسالة الخطوة الأخيرة الفاشلة ورسالة المستخدم ثم الإرسال من جديد.
+    state = state.copyWith(
+      messages: messages,
+      loading: false,
+      phase: AiSendPhase.failed,
+      error: error ?? message,
+    );
+  }
+
+  void cancel() {
+    _generation++;
+    _cancelToken?.cancel('user_cancelled');
+    _cancelToken = null;
+    state = state.copyWith(loading: false, phase: AiSendPhase.cancelled);
+  }
+
+  Future<void> resendLast() async {
+    AiChatMessage? lastUser;
+    for (final message in state.messages.reversed) {
+      if (message.isUser) {
+        lastUser = message;
+        break;
+      }
+    }
+    if (lastUser == null || lastUser.content.trim().isEmpty || !state.canSend) {
+      return;
+    }
+
     final messages = [...state.messages];
     if (messages.isNotEmpty && !messages.last.isUser) messages.removeLast();
-    messages.removeLast();
-    state = state.copyWith(messages: messages);
+    if (messages.isNotEmpty && messages.last.isUser) messages.removeLast();
+    state = state.copyWith(
+      messages: messages,
+      phase: AiSendPhase.completed,
+      loading: false,
+    );
     await send(lastUser.content);
   }
 
-  /// مسح المحادثة (محليًا؛ وعلى الخادم للمستخدم المسجل).
-  Future<void> clear() async {
-    final conversationId = state.conversationId;
+  Future<void> newConversation() async {
+    cancel();
+    int? conversationId;
     final session = ref.read(sessionProvider).asData?.value;
-    if (conversationId != null && session != null) {
+    if (session != null) {
       try {
-        await ref
+        conversationId = await ref
             .read(aiAssistantRepositoryProvider)
-            .clearConversation(conversationId);
+            .createConversation();
       } on Object {
-        // المسح المحلي يكفي إن فشل الخادم.
+        conversationId = null;
       }
     }
+    state = AiConversationState(
+      conversationId: conversationId,
+      phase: AiSendPhase.bootstrapping,
+    );
+    await ensureReady();
+  }
+
+  Future<void> clear() async {
+    cancel();
+    final id = state.conversationId;
+    final session = ref.read(sessionProvider).asData?.value;
+    if (id != null && session != null) {
+      try {
+        await ref.read(aiAssistantRepositoryProvider).clearConversation(id);
+      } on Object {}
+    }
     ref.invalidate(aiBootstrapProvider);
-    await _seedWelcome();
+    state = const AiConversationState();
+    await ensureReady();
   }
 
-  /// تهيئة رسالة الترحيب عند فتح المساعد.
-  Future<void> ensureStarted() async {
-    if (state.messages.isNotEmpty) return;
-    await _seedWelcome();
-  }
-
-  /// تحميل محادثة موجودة من القائمة.
   Future<void> loadConversation(int conversationId) async {
     final session = ref.read(sessionProvider).asData?.value;
     if (session == null) return;
-
-    state = state.copyWith(loading: true, clearError: true);
+    state = state.copyWith(loading: true, phase: AiSendPhase.sending, clearError: true);
     try {
       final messages = await ref
           .read(aiAssistantRepositoryProvider)
@@ -189,43 +333,31 @@ class AiConversationController extends Notifier<AiConversationState> {
         messages: messages,
         loading: false,
         conversationId: conversationId,
+        phase: AiSendPhase.completed,
       );
     } on ApiFailure catch (error) {
-      state = state.copyWith(loading: false, error: error.message);
-    } on Object {
-      state = state.copyWith(loading: false, error: 'failed_to_load');
-    }
-  }
-
-  Future<void> _seedWelcome() async {
-    try {
-      final bootstrap = await ref.read(aiBootstrapProvider.future);
-      state = AiConversationState(
-        messages: [
-          AiChatMessage.local(isUser: false, content: bootstrap.welcomeMessage),
-        ],
-        conversationId: state.conversationId,
+      state = state.copyWith(
+        loading: false,
+        phase: AiSendPhase.failed,
+        error: error.message,
       );
     } on Object {
-      state = const AiConversationState(
-        messages: [
-          AiChatMessage(id: 1, role: 'assistant', content: 'كيف أخدمك اليوم؟'),
-        ],
+      state = state.copyWith(
+        loading: false,
+        phase: AiSendPhase.failed,
+        error: 'failed_to_load',
       );
     }
   }
-
 }
 
 final aiConversationProvider =
     NotifierProvider<AiConversationController, AiConversationState>(
-      AiConversationController.new,
-    );
+  AiConversationController.new,
+);
 
-/// قائمة محادثات المستخدم المسجل.
-final aiConversationsListProvider = FutureProvider<List<AiConversationItem>>((
-  ref,
-) async {
+final aiConversationsListProvider =
+    FutureProvider<List<AiConversationItem>>((ref) async {
   final session = ref.watch(sessionProvider).asData?.value;
   if (session == null) return const [];
   try {
