@@ -226,6 +226,104 @@ class AiAgentOrchestrator
             fn ($id) => $id > 0,
         )));
 
+        if ($intent === 'viewing_request') {
+            if (! $user || ! $user->is_active) {
+                return $this->finish($userMessage, [
+                    'reply' => 'يلزم تسجيل الدخول بحساب نشط لطلب معاينة عقار.',
+                    'status' => 'ok',
+                    'response_type' => 'text',
+                    'properties' => [],
+                    'filters' => [],
+                    'tool_calls' => [],
+                    'actions' => [],
+                    'intent' => $intent,
+                ]);
+            }
+
+            $id = $references[0] ?? $this->stateService->state($conversation)['selected_property_id'] ?? null;
+            if (! $id) {
+                return $this->finish($userMessage, [
+                    'reply' => 'حدد رقم العقار أو افتح بطاقة العقار التي تريد طلب معاينتها.',
+                    'status' => 'ok',
+                    'response_type' => 'clarification',
+                    'properties' => [],
+                    'filters' => [],
+                    'tool_calls' => [],
+                    'actions' => [],
+                    'intent' => 'clarification_required',
+                ]);
+            }
+
+            $details = $this->executeTool('get_property_details', ['property_id' => (int) $id], $user);
+            $property = is_array($details['property'] ?? null) ? $details['property'] : null;
+            if (! $property || ($property['status'] ?? null) !== 'published') {
+                return $this->finish($userMessage, [
+                    'reply' => 'لا أستطيع إنشاء طلب معاينة لعقار غير منشور أو غير متاح للاكتشاف حاليًا.',
+                    'status' => 'ok',
+                    'response_type' => 'text',
+                    'properties' => [],
+                    'filters' => [],
+                    'tool_calls' => [['tool' => 'get_property_details', 'ok' => (bool) $property]],
+                    'actions' => [],
+                    'intent' => $intent,
+                ]);
+            }
+
+            $result = $this->executeTool('create_viewing_request', ['property_id' => (int) $id, 'confirmed' => true], $user);
+            return $this->finish($userMessage, [
+                'reply' => $result['message'] ?? 'تعذر إنشاء طلب المعاينة.',
+                'status' => ($result['success'] ?? false) ? 'ok' : 'error',
+                'response_type' => 'text',
+                'properties' => [],
+                'filters' => [],
+                'tool_calls' => [
+                    ['tool' => 'get_property_details', 'ok' => true],
+                    ['tool' => 'create_viewing_request', 'ok' => (bool) ($result['success'] ?? false)],
+                ],
+                'actions' => [['type' => 'open_property', 'label' => 'فتح العقار', 'payload' => ['property_id' => (int) $id]]],
+                'intent' => $intent,
+                'source' => [
+                    'type' => 'live_property',
+                    'source_id' => (int) $id,
+                    'retrieved_at' => now()->toISOString(),
+                ],
+            ]);
+        }
+
+        if ($intent === 'property_recommendation') {
+            $id = $references[0] ?? $this->stateService->state($conversation)['selected_property_id'] ?? null;
+            if (! $id) {
+                return $this->finish($userMessage, [
+                    'reply' => 'حدد العقار الذي تريد عقارات مشابهة له، مثل «عقار مشابه للعقار 11».',
+                    'status' => 'ok',
+                    'response_type' => 'clarification',
+                    'properties' => [],
+                    'filters' => [],
+                    'tool_calls' => [],
+                    'actions' => [],
+                    'intent' => 'clarification_required',
+                ]);
+            }
+
+            $result = $this->executeTool('find_similar_properties', ['property_id' => (int) $id, 'limit' => 4], $user);
+            $properties = is_array($result['properties'] ?? null) ? $result['properties'] : [];
+            $this->stateService->updateState($conversation, [], null, array_values(array_filter(
+                array_map(fn ($p) => (int) ($p['property_id'] ?? 0), $properties),
+                fn ($id) => $id > 0,
+            )));
+            return $this->finish($userMessage, [
+                'reply' => $this->replyEngine->similarReply($properties),
+                'status' => 'ok',
+                'response_type' => $properties !== [] ? 'property_results' : 'text',
+                'properties' => $properties,
+                'filters' => [],
+                'tool_calls' => [['tool' => 'find_similar_properties', 'ok' => (bool) ($result['success'] ?? false)]],
+                'actions' => [],
+                'intent' => $intent,
+                'source' => $result['source'] ?? ['type' => 'live_property', 'retrieved_at' => now()->toISOString()],
+            ]);
+        }
+
         if (in_array($intent, ['property_detail', 'property_availability', 'property_price', 'property_location', 'property_features', 'property_agent/contact'], true)) {
             $id = $references[0] ?? null;
             if ($id === null) {
