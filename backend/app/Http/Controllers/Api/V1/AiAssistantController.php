@@ -104,8 +104,8 @@ class AiAssistantController extends Controller
 
         return response()->stream(function () use ($data, $reply): void {
             $send = static function (string $event, array $payload): void {
-                echo 'event: '.$event."\\n";
-                echo 'data: '.json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\\n\\n";
+                echo 'event: '.$event."\n";
+                echo 'data: '.json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n\n";
                 if (ob_get_level() > 0) @ob_flush();
                 @flush();
             };

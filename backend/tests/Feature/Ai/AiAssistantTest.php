@@ -695,4 +695,21 @@ class AiAssistantTest extends TestCase
         $this->assertGreaterThanOrEqual($min, $value);
         $this->assertLessThanOrEqual($max, $value);
     }
+    /** SSE contract: endpoint emits protocol events instead of returning a JSON-only response. */
+    public function test_stream_endpoint_emits_sse_events(): void
+    {
+        $response = $this->post('/api/v1/ai/chat/stream', [
+            'message' => 'أريد شقة في صنعاء',
+        ]);
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+        $body = $response->streamedContent();
+        $this->assertStringContainsString("event: start\n", $body);
+        $this->assertStringContainsString("event: delta\n", $body);
+        $this->assertStringContainsString("event: done\n", $body);
+    }
+
+
 }

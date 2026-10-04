@@ -79,6 +79,14 @@ class AiAssistantRepository {
     );
   }
 
+  Future<void> _persistStreamSessionToken(AiStreamEvent event) async {
+    if (event.event != 'done') return;
+    final token = event.data?['session_token']?.toString();
+    if (token != null && token.isNotEmpty) {
+      await _saveSessionToken(token);
+    }
+  }
+
   Stream<AiStreamEvent> streamMessage(
     String message, {
     int? conversationId,

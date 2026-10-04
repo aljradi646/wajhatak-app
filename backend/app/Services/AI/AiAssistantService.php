@@ -120,7 +120,12 @@ class AiAssistantService
                     'session_token' => $conversation?->session_token,
                     'properties' => [],
                     'filters' => $filters,
+                    'result_mode' => 'none',
+                    'response_type' => 'error',
+                    'actions' => [],
+                    'tool_calls' => $toolCalls,
                     'failed_stage' => $stage,
+                    'ui' => ['response_component' => 'assistant_message', 'property_ids' => []],
                 ];
             } catch (Throwable) {
                 return [
@@ -131,6 +136,12 @@ class AiAssistantService
                     'session_token' => null,
                     'properties' => [],
                     'filters' => [],
+                    'result_mode' => 'none',
+                    'response_type' => 'error',
+                    'actions' => [],
+                    'tool_calls' => [],
+                    'failed_stage' => $stage,
+                    'ui' => ['response_component' => 'assistant_message', 'property_ids' => []],
                 ];
             }
         }
