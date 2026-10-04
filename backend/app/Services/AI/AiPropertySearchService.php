@@ -443,6 +443,16 @@ class AiPropertySearchService
             ? $property->transaction_type->value
             : (string) $property->transaction_type;
         $image = $property->images->first();
+        $imageUrl = null;
+        if ($image) {
+            $path = trim((string) $image->path);
+            if (preg_match('/^https?:\/\//i', $path) === 1) {
+                $imageUrl = $path;
+            } elseif ($path !== '' && \Illuminate\Support\Facades\Storage::disk('public')->exists(ltrim($path, '/'))) {
+                $imageUrl = asset('storage/'.ltrim($path, '/'));
+            }
+        }
+
         $statusValue = $property->status instanceof \BackedEnum
             ? $property->status->value
             : (string) $property->status;
@@ -467,7 +477,7 @@ class AiPropertySearchService
             'status' => $statusValue,
             'available' => $statusValue === PropertyStatus::Published->value,
             'match_score' => $score,
-            'image_url' => $image ? asset('storage/'.$image->path) : null,
+            'image_url' => $imageUrl,
             'description' => (string) $property->description,
             'latitude' => $property->location?->latitude !== null ? (float) $property->location->latitude : null,
             'longitude' => $property->location?->longitude !== null ? (float) $property->location->longitude : null,
