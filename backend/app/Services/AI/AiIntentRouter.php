@@ -89,6 +89,18 @@ class AiIntentRouter
             ]);
         }
 
+        if ($this->isViewingRequest($normalized)) {
+            return $this->result('viewing_request', [
+                'property_reference_ids' => $this->resolveReferences($normalized, $history, $previousPropertyIds),
+            ]);
+        }
+
+        if ($this->isSimilarRequest($normalized)) {
+            return $this->result('property_recommendation', [
+                'property_reference_ids' => $this->resolveReferences($normalized, $history, $previousPropertyIds),
+            ]);
+        }
+
         if ($this->isComparison($normalized)) {
             return $this->result('compare_properties', [
                 'property_reference_ids' => $this->resolveReferences($normalized, $history, $previousPropertyIds),
@@ -247,6 +259,16 @@ class AiIntentRouter
     private function isIdentity(string $text): bool
     {
         return preg_match('/^(من انت|مين انت|من هو المساعد|وش انت|ايش انت|ما وظيفتك|وش وظيفتك|ما عملك|وش عملك)\\b/u', $text) === 1;
+    }
+
+    private function isViewingRequest(string $text): bool
+    {
+        return preg_match('/(احجز|احجز لي|حجز|طلب معاينه|طلب معاينة|معاينه|معاينة|موعد للمعاينه|موعد للمعاينة|زياره العقار|زيارة العقار)/u', $text) === 1;
+    }
+
+    private function isSimilarRequest(string $text): bool
+    {
+        return preg_match('/(عقار مشابه|شقة مشابه|فيلا مشابه|مشابه لهذا|مشابهة لهذا|شبيه|مثل هذا العقار|مثلها|مثل هذا)/u', $text) === 1;
     }
 
     private function isComparison(string $text): bool
