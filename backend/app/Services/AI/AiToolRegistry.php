@@ -326,20 +326,22 @@ class AiToolRegistry
         $propertyId = (int) ($args['property_id'] ?? 0);
         $property = Property::query()->find($propertyId);
 
-        if (($property->status instanceof \BackedEnum
-                ? $property->status->value
-                : (string) $property->status) !== \App\Enums\PropertyStatus::Published->value) {
+        if (! $property) {
+            return [
+                'success' => false,
+                'message' => 'العقار المحدد غير موجود.',
+            ];
+        }
+
+        $status = $property->status instanceof \BackedEnum
+            ? $property->status->value
+            : (string) $property->status;
+
+        if ($status !== \App\Enums\PropertyStatus::Published->value) {
             return [
                 'success' => false,
                 'error' => 'PROPERTY_NOT_DISCOVERABLE',
                 'message' => 'لا يمكن طلب معاينة لعقار غير منشور حاليًا.',
-            ];
-        }
-
-        if (!$property) {
-            return [
-                'success' => false,
-                'message' => 'العقار المحدد غير موجود.',
             ];
         }
 
