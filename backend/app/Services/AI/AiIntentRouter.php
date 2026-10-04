@@ -113,7 +113,8 @@ class AiIntentRouter
         }
 
         $referencedId = $this->extractSingleReference($normalized, $previousPropertyIds);
-        if ($referencedId !== null && $this->isPropertyReferencePhrase($normalized)) {
+        if ($referencedId !== null
+            && ($this->isPropertyReferencePhrase($normalized) || $this->isDirectNumericPropertyReference($normalized))) {
             return $this->result('property_detail', ['property_reference_ids' => [$referencedId]]);
         }
 
@@ -258,6 +259,11 @@ class AiIntentRouter
     {
         return mb_strlen($text) <= 30
             && preg_match('/(شقه|فيلا|فله|فيله|بيت|منزل|ارض|محل|مكتب|عماره)/u', $text) === 1;
+    }
+
+    private function isDirectNumericPropertyReference(string $text): bool
+    {
+        return preg_match('/^(العقار|شقه|فيلا|فله|بيت|منزل)\s*(?:رقم|#)?\s*\d{1,10}$/u', trim($text)) === 1;
     }
 
     private function isPropertyReferencePhrase(string $text): bool
