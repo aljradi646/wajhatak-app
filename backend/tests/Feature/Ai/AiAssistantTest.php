@@ -169,6 +169,40 @@ class AiAssistantTest extends TestCase
         }
     }
 
+    /** ج1) الاستثمار وحده يطلب معايير حقيقية بدل عرض كامل السوق. */
+    public function test_investment_request_without_criteria_asks_for_focus(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد استثمار عقاري',
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame('investment_clarify', $data['intent']);
+        $this->assertSame([], $data['properties']);
+        $this->assertTrue((bool) ($data['filters']['investment'] ?? false));
+    }
+
+    /** ج2) الاستثمار مع مدينة يُحوّل إلى شراء عقاري مقيّد بالمدينة. */
+    public function test_investment_with_city_uses_sale_search_without_financial_claims(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد استثمار عقاري في صنعاء',
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame('sale', $data['filters']['transaction_type'] ?? null);
+        $this->assertSame('صنعاء', $data['filters']['city'] ?? null);
+        $this->assertNotSame('blocked', $data['status']);
+        $this->assertStringNotContainsString('مضمون', (string) $data['reply']);
+        $this->assertStringNotContainsString('عائد', (string) $data['reply']);
+    }
+
     /** د) خارج النطاق: طلب برمجة يُرفض من الحاجز (بلا نموذج). */
     public function test_out_of_domain_request_is_blocked(): void
     {
