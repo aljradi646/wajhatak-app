@@ -21,9 +21,28 @@ final class AiResponseContract
     /** @return array<string,mixed> */
     public static function normalize(array $response): array
     {
-        $type = (string) ($response['response_type'] ?? 'text');
-        if (! in_array($type, self::RESPONSE_TYPES, true)) {
-            $type = 'text';
+        // Legacy orchestrator paths do not always provide an explicit response_type.
+        // Infer it from the authoritative status/intent/results instead of discarding
+        // grounded property data.
+        $rawType = $response['response_type'] ?? null;
+        $type = is_string($rawType) ? $rawType : '';
+        if (! in_array($type, self::RESPONSE_TYPES, true) || $type === 'text') {
+            $status = (string) ($response['status'] ?? 'ok');
+            $intent = (string) ($response['intent'] ?? 'ambiguous_request');
+            $propertyCount = count((array) ($response['properties'] ?? []));
+            $type = match (true) {
+                $status === 'error' => 'error',
+                in_array($intent, ['blocked', 'security'], true) => 'security',
+                $intent === 'viewing_request_confirmation',
+                $intent === 'confirmation_required',
+                $intent === 'action_cancelled',
+                $intent === 'unclear',
+                $intent === 'investment_clarify' => 'clarification',
+                in_array($intent, ['details', 'property_detail'], true) && $propertyCount > 0 => 'property_detail',
+                $propertyCount > 0 => 'property_results',
+                in_array($intent, ['out_of_scope', 'unsupported'], true) => 'unsupported',
+                default => 'text',
+            };
         }
 
         $properties = [];
