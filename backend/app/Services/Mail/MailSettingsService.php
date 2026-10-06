@@ -27,6 +27,35 @@ class MailSettingsService
         'mail_require_mx_check' => ['1', 'boolean'],
     ];
 
+    /** قوالب الرسائل (subject + body) — قابلة للتعديل من اللوحة. */
+    public const TEMPLATES = [
+        'email_verification' => [
+            'label' => 'رمز التحقق من البريد',
+            'subject' => 'رمز التحقق من بريدك — وجهتك',
+            'body' => "أهلًا {name} 👋\n\nرمز التحقق الخاص بك في منصة وجهتك هو:\n\n{code}\n\nصالح لمدة {ttl} دقيقة. إن لم تطلب هذا الرمز فتجاهل هذه الرسالة.\n\nمع تحيات فريق وجهتك العقارية.",
+        ],
+        'agent_approved' => [
+            'label' => 'قبول توثيق الوكيل',
+            'subject' => 'تم توثيق حسابك كوكيل عقاري — وجهتك 🎉',
+            'body' => "مبارك {name}! 🎉\n\nتمت الموافقة على توثيق حسابك كوكيل عقاري في منصة وجهتك.\nيمكنك الآن إضافة عقاراتك ونشرها للباحثين مباشرة.\n\nنتمنى لك تجارة موفقة!\nفريق وجهتك.",
+        ],
+        'agent_rejected' => [
+            'label' => 'رفض توثيق الوكيل',
+            'subject' => 'بخصوص طلب توثيق حسابك — وجهتك',
+            'body' => "مرحبًا {name}،\n\nنأسف لإبلاغك بأنه لم يتم قبول طلب توثيق حسابك كوكيل بعد.\n\nالسبب: {reason}\n\nيمكنك تحديث بياناتك والتقدم مرة أخرى من خلال إدارة حسابك.\n\nفريق وجهتك.",
+        ],
+        'property_approved' => [
+            'label' => 'قبول عقار للنشر',
+            'subject' => 'تم نشر عقارك — وجهتك ✅',
+            'body' => "مرحبًا {name}،\n\nتمت الموافقة على نشر عقارك: «{property}».\nأصبح ظاهرًا الآن لجميع الباحثين في المنصة.\n\nفريق وجهتك.",
+        ],
+        'property_rejected' => [
+            'label' => 'رفض عقار',
+            'subject' => 'بخصوص عقارك المقدم للمراجعة — وجهتك',
+            'body' => "مرحبًا {name}،\n\nلم يتم اعتماد عقارك «{property}» للنشر.\n\nالسبب: {reason}\n\nيمكنك تعديل بياناته وإعادة إرساله للمراجعة.\n\nفريق وجهتك.",
+        ],
+    ];
+
     public function all(): array
     {
         $cached = Cache::remember(self::CACHE_KEY, self::CACHE_TTL, fn () => $this->readRaw());
@@ -80,8 +109,8 @@ class MailSettingsService
             }
         }
 
-        $subject = Setting::get('mail_template_'.$key.'_subject', '');
-        $body = Setting::get('mail_template_'.$key.'_body', '');
+        $subject = Setting::get('mail_template_'.$key.'_subject', self::TEMPLATES[$key]['subject'] ?? '');
+        $body = Setting::get('mail_template_'.$key.'_body', self::TEMPLATES[$key]['body'] ?? '');
         return ['subject' => (string) $subject, 'body' => (string) $body];
     }
 
