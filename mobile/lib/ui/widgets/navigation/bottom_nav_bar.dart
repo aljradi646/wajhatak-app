@@ -235,7 +235,7 @@ class _ProfileAvatar extends StatelessWidget {
           fit: BoxFit.cover,
           width: size,
           height: size,
-          errorWidget: (_, _, _) => Icon(
+          errorWidget: (_context, _error, _stackTrace) => Icon(
             Icons.person_rounded,
             size: size * .62,
             color: theme.colorScheme.onSurfaceVariant,
