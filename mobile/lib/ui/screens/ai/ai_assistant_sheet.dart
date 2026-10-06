@@ -141,7 +141,9 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
             icon: const Icon(Icons.add_comment_rounded),
             onPressed: state.loading
                 ? null
-                : () => ref.read(aiConversationProvider.notifier).newConversation(),
+                : () => ref
+                      .read(aiConversationProvider.notifier)
+                      .newConversation(),
           ),
           IconButton(
             tooltip: 'مسح المحادثة',
@@ -204,8 +206,7 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
             enabled: state.canSend,
             sending: state.loading,
             onSubmit: _send,
-            onCancel: () =>
-                ref.read(aiConversationProvider.notifier).cancel(),
+            onCancel: () => ref.read(aiConversationProvider.notifier).cancel(),
           ),
         ],
       ),
@@ -334,7 +335,7 @@ class _MessageBubble extends StatelessWidget {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: message.properties.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (_, index) {
                       final property = message.properties[index];
                       return SizedBox(
@@ -437,7 +438,8 @@ class _AiPropertyMiniCard extends StatelessWidget {
                       ? Image.network(
                           property.imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => _imageFallback(theme),
+                          errorBuilder: (context, error, stackTrace) =>
+                              _imageFallback(theme),
                         )
                       : _imageFallback(theme),
                 ),
@@ -462,9 +464,14 @@ class _AiPropertyMiniCard extends StatelessWidget {
                         if (property.isAlternative)
                           Container(
                             margin: const EdgeInsetsDirectional.only(start: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: WajhatakColors.amber.withValues(alpha: .16),
+                              color: WajhatakColors.amber.withValues(
+                                alpha: .16,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
@@ -579,7 +586,10 @@ class _AiPropertyMiniCard extends StatelessWidget {
                             ),
                             icon: const Icon(Icons.call_rounded, size: 15),
                             onPressed: () async {
-                              final uri = Uri(scheme: 'tel', path: property.agentPhone!);
+                              final uri = Uri(
+                                scheme: 'tel',
+                                path: property.agentPhone!,
+                              );
                               await launchUrl(uri);
                             },
                           ),
@@ -613,7 +623,11 @@ class _AiPropertyMiniCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          _copyButton(context, 'الرمز', property.referenceCode!),
+                          _copyButton(
+                            context,
+                            'الرمز',
+                            property.referenceCode!,
+                          ),
                         ],
                         if (!property.available)
                           _chip(context, 'غير متاح', WajhatakColors.terracotta)
@@ -728,7 +742,10 @@ class _AiPropertyMiniCard extends StatelessWidget {
 
     if (action == 'whatsapp') {
       final uri = Uri.https('wa.me', '/', {'text': summary});
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
       if (!launched && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تعذّر فتح واتساب على هذا الجهاز')),
@@ -899,29 +916,30 @@ class _InputBar extends StatelessWidget {
             const SizedBox(width: 8),
             AnimatedBuilder(
               animation: controller,
-              builder: (context, child) => ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, child) {
-                  final hasText = value.text.trim().isNotEmpty;
-                  return Opacity(
-                    opacity: enabled && hasText ? 1 : 0.5,
-                    child: CircleAvatar(
-                      radius: 23,
-                      backgroundColor: WajhatakColors.emeraldDeep,
-                      child: IconButton(
-                        onPressed: sending
-                            ? onCancel
-                            : (enabled && hasText ? onSubmit : null),
-                        icon: Icon(
-                          sending ? Icons.stop_rounded : Icons.send_rounded,
-                          color: Colors.white,
-                          size: 19,
+              builder: (context, child) =>
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: controller,
+                    builder: (context, value, child) {
+                      final hasText = value.text.trim().isNotEmpty;
+                      return Opacity(
+                        opacity: enabled && hasText ? 1 : 0.5,
+                        child: CircleAvatar(
+                          radius: 23,
+                          backgroundColor: WajhatakColors.emeraldDeep,
+                          child: IconButton(
+                            onPressed: sending
+                                ? onCancel
+                                : (enabled && hasText ? onSubmit : null),
+                            icon: Icon(
+                              sending ? Icons.stop_rounded : Icons.send_rounded,
+                              color: Colors.white,
+                              size: 19,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+                      );
+                    },
+                  ),
             ),
           ],
         ),
@@ -1024,7 +1042,9 @@ class _ConversationHistorySheet extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              tooltip: conv.isPinned ? 'إلغاء التثبيت' : 'تثبيت',
+                              tooltip: conv.isPinned
+                                  ? 'إلغاء التثبيت'
+                                  : 'تثبيت',
                               visualDensity: VisualDensity.compact,
                               icon: Icon(
                                 conv.isPinned
@@ -1043,7 +1063,10 @@ class _ConversationHistorySheet extends ConsumerWidget {
                                 }
                               },
                             ),
-                            Text('${conv.messageCount} رسالة', style: theme.textTheme.bodySmall),
+                            Text(
+                              '${conv.messageCount} رسالة',
+                              style: theme.textTheme.bodySmall,
+                            ),
                           ],
                         ),
                         onTap: () {
@@ -1057,7 +1080,7 @@ class _ConversationHistorySheet extends ConsumerWidget {
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, __) => Center(
+                error: (_, _) => Center(
                   child: Text(
                     'حدث خطأ في تحميل المحادثات',
                     style: theme.textTheme.bodyMedium,

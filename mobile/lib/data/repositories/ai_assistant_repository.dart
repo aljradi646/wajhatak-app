@@ -30,7 +30,8 @@ class AiAssistantRepository {
   }
 
   /// إرسال رسالة — الخادم يفهم، يبحث في القاعدة، يولّد الرد ويطهّره.
-  Future<({AiChatMessage message, int? conversationId, String? sessionToken})> sendMessage(
+  Future<({AiChatMessage message, int? conversationId, String? sessionToken})>
+  sendMessage(
     String message, {
     int? conversationId,
     List<Map<String, String>> history = const [],
@@ -39,7 +40,7 @@ class AiAssistantRepository {
   }) async {
     final payload = <String, dynamic>{
       'message': message,
-      if (conversationId != null) 'conversation_id': conversationId,
+      'conversation_id': ?conversationId,
       if (conversationId == null) 'session_token': await _sessionToken(),
       'locale': 'ar',
       if (latitude != null && longitude != null) ...{
@@ -72,11 +73,7 @@ class AiAssistantRepository {
     final token = data['session_token'] as String?;
     final conversation = data['conversation_id'] as int?;
     if (token != null && token.isNotEmpty) await _saveSessionToken(token);
-    return (
-      message: reply,
-      conversationId: conversation,
-      sessionToken: token,
-    );
+    return (message: reply, conversationId: conversation, sessionToken: token);
   }
 
   Future<void> _persistStreamSessionToken(AiStreamEvent event) async {
@@ -96,7 +93,7 @@ class AiAssistantRepository {
   }) async* {
     final payload = <String, dynamic>{
       'message': message,
-      if (conversationId != null) 'conversation_id': conversationId,
+      'conversation_id': ?conversationId,
       if (conversationId == null) 'session_token': await _sessionToken(),
       'locale': 'ar',
       if (latitude != null && longitude != null) ...{
@@ -124,16 +121,20 @@ class AiAssistantRepository {
       try {
         final decoded = jsonDecode(dataLines.join('\\n'));
         if (decoded is! Map<String, dynamic>) return null;
-        return AiStreamEvent.fromJson({...decoded, 'event': decoded['event'] ?? eventName});
+        return AiStreamEvent.fromJson({
+          ...decoded,
+          'event': decoded['event'] ?? eventName,
+        });
       } catch (_) {
         return null;
       }
     }
 
-    await for (final line in body.stream
-        .cast<List<int>>()
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())) {
+    await for (final line
+        in body.stream
+            .cast<List<int>>()
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
       if (line.isEmpty) {
         final event = flushEvent();
         if (event != null) {
@@ -169,7 +170,6 @@ class AiAssistantRepository {
     );
   }
 
-
   /// قائمة محادثات المستخدم (للمستخدمين المسجلين فقط).
   Future<List<AiConversationItem>> listConversations() async {
     final json = await _api.get('/ai/conversations');
@@ -186,7 +186,9 @@ class AiAssistantRepository {
     final json = await _api.get('/ai/conversations/$conversationId/messages');
     final root = json['data'] as Map<String, dynamic>? ?? const {};
     final data = root['messages'] as List<dynamic>? ?? const [];
-    return data.map((e) => AiChatMessage.fromJson(e as Map<String, dynamic>)).toList(growable: false);
+    return data
+        .map((e) => AiChatMessage.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
   }
 
   // ------------------------------------------------------------------
@@ -221,6 +223,8 @@ class AiAssistantRepository {
     return data['id'] as int;
   }
 
-  Future<void> pinConversation(int conversationId, bool pinned) =>
-      _api.patch('/ai/conversations/$conversationId/pin', data: {'pinned': pinned});
+  Future<void> pinConversation(int conversationId, bool pinned) => _api.patch(
+    '/ai/conversations/$conversationId/pin',
+    data: {'pinned': pinned},
+  );
 }

@@ -71,11 +71,14 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     try {
       final report = await ref
           .read(agentReportRepositoryProvider)
-          .fetch(type.key, filters: {
-            ..._filters,
-            if (_dateFrom != null) 'date_from': _dateFrom!,
-            if (_dateTo != null) 'date_to': _dateTo!,
-          });
+          .fetch(
+            type.key,
+            filters: {
+              ..._filters,
+              'date_from': ?_dateFrom,
+              'date_to': ?_dateTo,
+            },
+          );
       if (!mounted) return;
       setState(() {
         _report = report;
@@ -230,7 +233,10 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     );
   }
 
-  Widget _buildTypeSelector(List<AgentReportType> types, AgentReportType current) {
+  Widget _buildTypeSelector(
+    List<AgentReportType> types,
+    AgentReportType current,
+  ) {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -247,7 +253,9 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
   }
 
   Future<void> _pickDate({required bool from}) async {
-    final current = DateTime.tryParse(from ? (_dateFrom ?? '') : (_dateTo ?? '')) ?? DateTime.now();
+    final current =
+        DateTime.tryParse(from ? (_dateFrom ?? '') : (_dateTo ?? '')) ??
+        DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: current,
@@ -258,7 +266,8 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
       confirmText: 'اختيار',
     );
     if (picked == null || !mounted) return;
-    final value = '${picked.year.toString().padLeft(4,'0')}-${picked.month.toString().padLeft(2,'0')}-${picked.day.toString().padLeft(2,'0')}';
+    final value =
+        '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
     setState(() {
       if (from) {
         _dateFrom = value;
@@ -273,30 +282,44 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('الفترة الزمنية', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+        Text(
+          'الفترة الزمنية',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         const SizedBox(height: 6),
-        Row(children: [
-          Expanded(child: OutlinedButton.icon(
-            onPressed: () => _pickDate(from: true),
-            icon: const Icon(Icons.date_range_rounded, size: 17),
-            label: Text(_dateFrom ?? 'من تاريخ'),
-          )),
-          const SizedBox(width: 8),
-          Expanded(child: OutlinedButton.icon(
-            onPressed: () => _pickDate(from: false),
-            icon: const Icon(Icons.event_rounded, size: 17),
-            label: Text(_dateTo ?? 'إلى تاريخ'),
-          )),
-          if (_dateFrom != null || _dateTo != null)
-            IconButton(
-              tooltip: 'مسح الفترة',
-              onPressed: () {
-                setState(() { _dateFrom = null; _dateTo = null; });
-                _loadReport();
-              },
-              icon: const Icon(Icons.close_rounded),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickDate(from: true),
+                icon: const Icon(Icons.date_range_rounded, size: 17),
+                label: Text(_dateFrom ?? 'من تاريخ'),
+              ),
             ),
-        ]),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickDate(from: false),
+                icon: const Icon(Icons.event_rounded, size: 17),
+                label: Text(_dateTo ?? 'إلى تاريخ'),
+              ),
+            ),
+            if (_dateFrom != null || _dateTo != null)
+              IconButton(
+                tooltip: 'مسح الفترة',
+                onPressed: () {
+                  setState(() {
+                    _dateFrom = null;
+                    _dateTo = null;
+                  });
+                  _loadReport();
+                },
+                icon: const Icon(Icons.close_rounded),
+              ),
+          ],
+        ),
         const SizedBox(height: 10),
       ],
     );
@@ -309,7 +332,10 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(definition.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(
+            definition.label,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -397,8 +423,12 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: report.summary.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: MediaQuery.sizeOf(context).width >= 700 ? 3 : 2,
-                    childAspectRatio: MediaQuery.sizeOf(context).width >= 700 ? 2.7 : 2.2,
+                    crossAxisCount: MediaQuery.sizeOf(context).width >= 700
+                        ? 3
+                        : 2,
+                    childAspectRatio: MediaQuery.sizeOf(context).width >= 700
+                        ? 2.7
+                        : 2.2,
                     mainAxisSpacing: 10,
                     crossAxisSpacing: 10,
                   ),
@@ -406,14 +436,30 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
                     final item = report.summary[index];
                     return Card(
                       elevation: 0,
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .55),
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: .55),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(item.label, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.labelSmall),
-                          const Spacer(),
-                          Text(item.value, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
-                        ]),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall,
+                            ),
+                            const Spacer(),
+                            Text(
+                              item.value,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -466,7 +512,13 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
               cells: report.columns
                   .map(
                     (column) => DataCell(
-                      _cellContent(theme, column, row[column.key], index, report),
+                      _cellContent(
+                        theme,
+                        column,
+                        row[column.key],
+                        index,
+                        report,
+                      ),
                     ),
                   )
                   .toList(growable: false),
