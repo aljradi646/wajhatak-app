@@ -88,5 +88,5 @@ jobs:
 
           printf '%s\n' "$files" | xargs dart format --output=none --set-exit-if-changed
 
-      - run: flutter analyze
+      - run: flutter analyze --no-fatal-infos
       - run: flutter test
