@@ -131,11 +131,15 @@ class AiAssistantRepository {
     }
 
     await for (final line in body.stream
+        .cast<List<int>>()
         .transform(utf8.decoder)
         .transform(const LineSplitter())) {
       if (line.isEmpty) {
         final event = flushEvent();
-        if (event != null) yield event;
+        if (event != null) {
+          await _persistStreamSessionToken(event);
+          yield event;
+        }
         eventName = 'message';
         dataLines.clear();
         continue;
@@ -148,7 +152,10 @@ class AiAssistantRepository {
     }
 
     final event = flushEvent();
-    if (event != null) yield event;
+    if (event != null) {
+      await _persistStreamSessionToken(event);
+      yield event;
+    }
   }
 
   /// مسح محادثة المستخدم المسجل (متطلب اختياري عند وجود حساب).
