@@ -112,25 +112,6 @@ class AiConversationService
         $message->save();
     }
 
-    /**
-     * حفظ الفلاتر المهيكلة على آخر رسالة مستخدم في الدورة الحالية.
-     * يُستخدم بعد تحليل الطلب وقبل حفظ حالة المحادثة العامة.
-     */
-    public function updateLatestUserFilters(AiConversation $conversation, array $filters): void
-    {
-        $message = AiMessage::query()
-            ->where('ai_conversation_id', $conversation->id)
-            ->where('role', AiMessageRole::User->value)
-            ->latest('id')
-            ->first();
-
-        if (! $message) {
-            return;
-        }
-
-        $this->updateUserMessageFilters($message, $filters);
-    }
-
     public function addUserMessage(AiConversation $conversation, string $content, array $filters = []): AiMessage
     {
         return AiMessage::query()->create([
