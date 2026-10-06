@@ -103,7 +103,7 @@ final class EmailTemplateRenderer
             ) ?? $content;
         };
 
-        $renderedSubject = strip_tags($replace($subject, false) ?? '');
+        $renderedSubject = $replace(strip_tags($subject), false) ?? '';
         $renderedText = $replace($text, false);
 
         if ($html === null || trim($html) === '') {
