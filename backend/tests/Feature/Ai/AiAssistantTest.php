@@ -413,6 +413,7 @@ class AiAssistantTest extends TestCase
             'لم أجد عقارًا منشورًا بهذا الرقم.',
             $data['reply']
         );
+    }
 
     /** ط) مزامنة الفهرس: تعديل السعر ينعكس فورًا على بحث المساعد. */
     public function test_property_update_syncs_search_index_immediately(): void
