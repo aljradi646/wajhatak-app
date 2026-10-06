@@ -21,12 +21,13 @@ final class AiResponseContract
     /** @return array<string,mixed> */
     public static function normalize(array $response): array
     {
-        // Legacy orchestrator paths do not always provide an explicit response_type.
-        // Infer it from the authoritative status/intent/results instead of discarding
-        // grounded property data.
         $rawType = $response['response_type'] ?? null;
-        $type = is_string($rawType) ? $rawType : '';
-        if (! in_array($type, self::RESPONSE_TYPES, true) || $type === 'text') {
+        if (is_string($rawType) && in_array($rawType, self::RESPONSE_TYPES, true)) {
+            // An explicit response type is authoritative, including "text".
+            $type = $rawType;
+        } else {
+            // Legacy orchestrator paths may omit response_type entirely. Infer it from
+            // the authoritative status/intent/results instead of discarding grounded data.
             $status = (string) ($response['status'] ?? 'ok');
             $intent = (string) ($response['intent'] ?? 'ambiguous_request');
             $propertyCount = count((array) ($response['properties'] ?? []));
