@@ -139,6 +139,9 @@ class AiAssistantService
                     'source' => [],
                     'intent' => $intent !== 'chat' ? $intent : 'error',
                     'failed_stage' => $stage,
+                    'debug_exception' => app()->environment('testing')
+                        ? $e::class.': '.$e->getMessage().' @ '.$e->getFile().':'.$e->getLine()
+                        : null,
                 ];
             } catch (Throwable) {
                 return [
