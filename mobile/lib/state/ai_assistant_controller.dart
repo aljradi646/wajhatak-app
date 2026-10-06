@@ -314,7 +314,9 @@ class AiConversationController extends Notifier<AiConversationState> {
     if (id != null && session != null) {
       try {
         await ref.read(aiAssistantRepositoryProvider).clearConversation(id);
-      } on Object {}
+      } on Object catch (_) {
+        // Local state reset must continue even if the server-side delete fails.
+      }
     }
     ref.invalidate(aiBootstrapProvider);
     state = const AiConversationState();
