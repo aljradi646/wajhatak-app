@@ -67,22 +67,26 @@ class AiAssistantService
             $orchestratorResult = $this->orchestrator->process($user, $message, $conversation, $locale, $clientContext);
             $contract = AiResponseContract::normalize($orchestratorResult);
 
-            $reply = $contract['reply'];
-            $status = $contract['status'];
-            $properties = $contract['properties'];
-            $filters = $contract['filters'];
-            $toolCalls = $contract['tool_calls'];
-            $intent = $contract['intent'];
-            $failedStage = $contract['failed_stage'];
-            $resultMode = $contract['result_mode'];
-            $relaxations = $orchestratorResult['relaxations'] ?? [];
+            $reply = $contract['reply'] ?? 'تمت معالجة الطلب.';
+            $status = $contract['status'] ?? 'ok';
+            $properties = $contract['properties'] ?? [];
+            $filters = $contract['filters'] ?? [];
+            $toolCalls = $contract['tool_calls'] ?? [];
+            $intent = $contract['intent'] ?? 'ambiguous_request';
+            $failedStage = $contract['failed_stage'] ?? null;
 
             // 3) تسجيل واستخراج رسالة الرد
             $propertyIds = array_map(fn ($p) => (int) ($p['property_id'] ?? $p['id'] ?? 0), $properties);
             $assistantMessage = $this->out(
                 $conversation, $user, $intent, $status, $filters, $toolCalls,
                 count($properties), $started, $searchMs, $failedStage, $reply, $propertyIds,
-                $contract['response_type'], ['actions' => $contract['actions']]
+                $contract['response_type'] ?? 'text',
+                [
+                    'actions' => $contract['actions'] ?? [],
+                    'citations' => $contract['citations'] ?? [],
+                    'state_updates' => $contract['state_updates'] ?? [],
+                    'source' => $contract['source'] ?? [],
+                ],
             );
 
             return [
@@ -92,13 +96,15 @@ class AiAssistantService
                 'conversation_id' => $conversation->exists ? $conversation->id : null,
                 'session_token' => $conversation->exists ? $conversation->session_token : null,
                 'properties' => $properties,
+                'result_mode' => $contract['result_mode'] ?? 'exact',
+                'relaxations' => $orchestratorResult['relaxations'] ?? [],
                 'filters' => $filters,
                 'tool_calls' => $toolCalls,
-                'result_mode' => $resultMode,
-                'relaxations' => $relaxations,
-                'response_type' => $contract['response_type'],
-                'actions' => $contract['actions'],
-                'ui' => $this->buildUiContract($contract['response_type'], $properties),
+                'response_type' => $contract['response_type'] ?? 'text',
+                'actions' => $contract['actions'] ?? [],
+                'citations' => $contract['citations'] ?? [],
+                'source' => $contract['source'] ?? [],
+                'ui' => $this->buildUiContract($contract['response_type'] ?? 'text', $properties),
                 'failed_stage' => $failedStage,
                 'message_id' => $assistantMessage?->id,
             ];
@@ -120,12 +126,19 @@ class AiAssistantService
                     'session_token' => $conversation?->session_token,
                     'properties' => [],
                     'filters' => $filters,
-                    'result_mode' => 'none',
-                    'response_type' => 'error',
-                    'actions' => [],
                     'tool_calls' => $toolCalls,
+                    'response_type' => 'error',
+                    'ui' => [
+                        'response_component' => 'assistant_message',
+                        'property_card_component' => 'property_card',
+                        'property_card_click_action' => 'open_property',
+                        'property_ids' => [],
+                    ],
+                    'actions' => [],
+                    'citations' => [],
+                    'source' => [],
+                    'intent' => $intent !== 'chat' ? $intent : 'error',
                     'failed_stage' => $stage,
-                    'ui' => ['response_component' => 'assistant_message', 'property_ids' => []],
                 ];
             } catch (Throwable) {
                 return [
@@ -135,13 +148,15 @@ class AiAssistantService
                     'conversation_id' => null,
                     'session_token' => null,
                     'properties' => [],
-                    'filters' => [],
                     'result_mode' => 'none',
+                    'filters' => [],
+                    'tool_calls' => [],
                     'response_type' => 'error',
                     'actions' => [],
-                    'tool_calls' => [],
+                    'citations' => [],
+                    'source' => [],
+                    'intent' => 'error',
                     'failed_stage' => $stage,
-                    'ui' => ['response_component' => 'assistant_message', 'property_ids' => []],
                 ];
             }
         }
@@ -218,35 +233,48 @@ class AiAssistantService
         string $responseType = 'text',
         array $metadata = [],
     ): ?AiMessage {
-        $message = $this->attempt('persist', fn () => $this->conversations->addAssistantMessage($conversation, $reply, $propertyIds, $status, $responseType, $metadata));
+        $message = $this->attempt('persist', fn () => $this->conversations->addAssistantMessage(
+            $conversation,
+            $reply,
+            $propertyIds,
+            $status,
+            $responseType,
+            $metadata,
+        ));
 
         $this->attempt('logging', fn () => $this->logging->record(
             $conversation, $user?->id, $intent, $filters, $toolCalls, $results,
             $status, $this->ms() - $started, $searchMs, 0, $errorCode ?? $this->failedStage,
+            $responseType,
+            is_string($metadata['fallback_reason'] ?? null) ? $metadata['fallback_reason'] : null,
+            $this->knowledgeVersion($metadata),
         ));
 
         return $message instanceof AiMessage ? $message : null;
     }
 
-    /**
-     * عقد العرض للواجهات: يحدد أن نتائج العقار يجب أن تعرض كبطاقات
-     * تفاعلية، ويحتفظ بالمعرفات كمرجع وحيد لفتح التفاصيل.
-     *
-     * @param  list<array<string, mixed>>  $properties
-     * @return array<string, mixed>
-     */
     private function buildUiContract(string $responseType, array $properties): array
     {
         $isProperty = in_array($responseType, ['property_results', 'property_detail'], true);
+        $ids = $isProperty
+            ? array_values(array_filter(array_map(
+                static fn (array $item): int => (int) ($item['property_id'] ?? 0),
+                array_filter($properties, 'is_array'),
+            )))
+            : [];
+
         return [
-            'response_component' => $isProperty && $properties !== [] ? 'property_results' : 'assistant_message',
+            'response_component' => $isProperty && $ids !== [] ? 'property_results' : 'assistant_message',
             'property_card_component' => 'property_card',
             'property_card_click_action' => 'open_property',
-            'property_ids' => array_values(array_filter(array_map(
-                static fn (array $item): int => (int) ($item['property_id'] ?? 0),
-                $isProperty ? $properties : []
-            ))),
+            'property_ids' => $ids,
         ];
+    }
+
+    private function knowledgeVersion(array $metadata): ?string
+    {
+        $source = $metadata['source'] ?? [];
+        return is_array($source) && isset($source['version']) ? (string) $source['version'] : null;
     }
 
     private function ms(): int
