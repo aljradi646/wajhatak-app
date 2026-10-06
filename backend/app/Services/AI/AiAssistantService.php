@@ -113,6 +113,16 @@ class AiAssistantService
             $this->failedStage ??= $stage;
 
             try {
+                if (app()->environment('testing')) {
+                    fwrite(STDERR, "AI_DEBUG ".json_encode([
+                        'stage' => $stage,
+                        'exception' => $e::class,
+                        'message' => $e->getMessage(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL);
+                }
+
                 $this->logging->record(
                     $conversation ?? null, $user?->id, $intent, $filters, $toolCalls, 0,
                     AiRequestStatus::Error->value, $this->ms() - $started, $searchMs, 0, $this->errorCode($stage, $e),
