@@ -305,6 +305,8 @@ class AgentReportController extends Controller
     private function viewingRequestsReport(Agent $agent, array $params): array
     {
         $status = $params['status'] ?? null;
+        $from = $params['date_from'] ?? null;
+        $to = $params['date_to'] ?? null;
         if (! in_array($status, ['pending', 'confirmed', 'rejected', 'cancelled', 'completed'], true)) {
             $status = null;
         }
