@@ -312,7 +312,7 @@ class UserAvatar extends StatelessWidget {
         radius: radius,
         backgroundColor: fallbackColor,
         foregroundImage: CachedNetworkImageProvider(url),
-        onForegroundImageError: (_, _) {},
+        onForegroundImageError: (_error, _stackTrace) {},
         child: Icon(Icons.person_rounded, size: radius, color: fallbackIcon),
       );
     }
