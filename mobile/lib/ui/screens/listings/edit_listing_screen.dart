@@ -627,7 +627,7 @@ class _CurrencyField extends ConsumerWidget {
         padding: EdgeInsets.symmetric(vertical: 10),
         child: LuxSkeleton(height: 54),
       ),
-      error: (_, _) => const SizedBox.shrink(),
+      error: (_error, _stackTrace) => const SizedBox.shrink(),
     );
   }
 }
