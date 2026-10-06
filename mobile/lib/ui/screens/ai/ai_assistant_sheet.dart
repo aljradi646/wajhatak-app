@@ -55,7 +55,7 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(aiConversationProvider.notifier).ensureStarted();
+      ref.read(aiConversationProvider.notifier).ensureReady();
     });
   }
 
@@ -204,7 +204,8 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
             enabled: state.canSend,
             sending: state.loading,
             onSubmit: _send,
-            onCancel: () => ref.read(aiConversationProvider.notifier).cancel(),
+            onCancel: () =>
+                ref.read(aiConversationProvider.notifier).cancel(),
           ),
         ],
       ),
@@ -848,12 +849,16 @@ class _InputBar extends StatelessWidget {
   const _InputBar({
     required this.controller,
     required this.enabled,
+    required this.sending,
     required this.onSubmit,
+    required this.onCancel,
   });
 
   final TextEditingController controller;
   final bool enabled;
+  final bool sending;
   final VoidCallback onSubmit;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -871,7 +876,7 @@ class _InputBar extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
-                enabled: enabled,
+                enabled: enabled && !sending,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => onSubmit(),
                 minLines: 1,
@@ -904,9 +909,11 @@ class _InputBar extends StatelessWidget {
                       radius: 23,
                       backgroundColor: WajhatakColors.emeraldDeep,
                       child: IconButton(
-                        onPressed: enabled && hasText ? onSubmit : null,
-                        icon: const Icon(
-                          Icons.send_rounded,
+                        onPressed: sending
+                            ? onCancel
+                            : (enabled && hasText ? onSubmit : null),
+                        icon: Icon(
+                          sending ? Icons.stop_rounded : Icons.send_rounded,
                           color: Colors.white,
                           size: 19,
                         ),
