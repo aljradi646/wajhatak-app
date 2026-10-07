@@ -199,6 +199,21 @@ class AgentReportController extends Controller
             }
         }
 
+        foreach (['date_from', 'date_to'] as $dateKey) {
+            $value = $input[$dateKey] ?? null;
+            if (is_string($value) && preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $value) === 1) {
+                try {
+                    Carbon::createFromFormat('Y-m-d', $value);
+                    $filters[$dateKey] = $value;
+                } catch (\Throwable) {
+                }
+            }
+        }
+
+        if (isset($filters['date_from'], $filters['date_to']) && $filters['date_from'] > $filters['date_to']) {
+            [$filters['date_from'], $filters['date_to']] = [$filters['date_to'], $filters['date_from']];
+        }
+
         return $filters;
     }
 
@@ -208,7 +223,7 @@ class AgentReportController extends Controller
         $data = match ($type) {
             'properties' => $this->propertiesReport($agent, $params),
             'viewing_requests' => $this->viewingRequestsReport($agent, $params),
-            'performance' => $this->performanceReport($agent),
+            'performance' => $this->performanceReport($agent, $params),
             default => abort(404, 'نوع التقرير غير معروف.'),
         };
 
@@ -222,6 +237,8 @@ class AgentReportController extends Controller
     private function propertiesReport(Agent $agent, array $params): array
     {
         $status = $params['status'] ?? null;
+        $from = $params['date_from'] ?? null;
+        $to = $params['date_to'] ?? null;
         if (! in_array($status, ['draft', 'pending', 'published', 'rejected'], true)) {
             $status = null;
         }
@@ -230,11 +247,15 @@ class AgentReportController extends Controller
         if ($status) {
             $filters[] = ['label' => 'الحالة', 'value' => $this->propertyStatusLabel($status)];
         }
+        if ($from) $filters[] = ['label' => 'من', 'value' => $from];
+        if ($to) $filters[] = ['label' => 'إلى', 'value' => $to];
 
         $rows = Property::query()
             ->with(['type', 'location'])
             ->where('agent_id', $agent->id)
             ->when($status, fn ($q, $s) => $q->where('status', $s))
+            ->when($from, fn ($q, $date) => $q->whereDate('created_at', '>=', $date))
+            ->when($to, fn ($q, $date) => $q->whereDate('created_at', '<=', $date))
             ->latest('created_at')
             ->get()
             ->map(fn (Property $p) => [
@@ -284,6 +305,8 @@ class AgentReportController extends Controller
     private function viewingRequestsReport(Agent $agent, array $params): array
     {
         $status = $params['status'] ?? null;
+        $from = $params['date_from'] ?? null;
+        $to = $params['date_to'] ?? null;
         if (! in_array($status, ['pending', 'confirmed', 'rejected', 'cancelled', 'completed'], true)) {
             $status = null;
         }
@@ -292,11 +315,15 @@ class AgentReportController extends Controller
         if ($status) {
             $filters[] = ['label' => 'الحالة', 'value' => $this->requestStatusLabel($status)];
         }
+        if ($from) $filters[] = ['label' => 'من', 'value' => $from];
+        if ($to) $filters[] = ['label' => 'إلى', 'value' => $to];
 
         $rows = ViewingRequest::query()
             ->with(['property:id,title,reference_code', 'client:id,name,phone'])
             ->where('agent_id', $agent->id)
             ->when($status, fn ($q, $s) => $q->where('status', $s))
+            ->when($from, fn ($q, $date) => $q->whereDate('scheduled_date', '>=', $date))
+            ->when($to, fn ($q, $date) => $q->whereDate('scheduled_date', '<=', $date))
             ->latest('scheduled_date')
             ->get()
             ->map(fn (ViewingRequest $r) => [
@@ -341,12 +368,20 @@ class AgentReportController extends Controller
         ];
     }
 
-    private function performanceReport(Agent $agent): array
+    private function performanceReport(Agent $agent, array $params = []): array
     {
+        $from = $params['date_from'] ?? null;
+        $to = $params['date_to'] ?? null;
+        $filters = [];
+        if ($from) $filters[] = ['label' => 'من', 'value' => $from];
+        if ($to) $filters[] = ['label' => 'إلى', 'value' => $to];
+
         $properties = Property::query()
             ->selectRaw('property_type_id, count(*) as total, avg(price) as avg_price, sum(price) as total_value')
             ->with('type:id,name_ar')
             ->where('agent_id', $agent->id)
+            ->when($from, fn ($q, $date) => $q->whereDate('created_at', '>=', $date))
+            ->when($to, fn ($q, $date) => $q->whereDate('created_at', '<=', $date))
             ->groupBy('property_type_id')
             ->get();
 
@@ -357,14 +392,19 @@ class AgentReportController extends Controller
             'total_value' => round((float) $row->total_value, 0),
         ])->values()->all();
 
-        $requestsTotal = ViewingRequest::query()->where('agent_id', $agent->id)->count();
+        $requestsTotal = ViewingRequest::query()->where('agent_id', $agent->id)
+            ->when($from, fn ($q, $date) => $q->whereDate('scheduled_date', '>=', $date))
+            ->when($to, fn ($q, $date) => $q->whereDate('scheduled_date', '<=', $date))
+            ->count();
         $requestsCompleted = ViewingRequest::query()->where('agent_id', $agent->id)
+            ->when($from, fn ($q, $date) => $q->whereDate('scheduled_date', '>=', $date))
+            ->when($to, fn ($q, $date) => $q->whereDate('scheduled_date', '<=', $date))
             ->where('status', ViewingRequestStatus::Completed->value)->count();
 
         return [
             'heading' => 'تقرير أداء الوكيل',
             'description' => 'توزيع محفظتك العقارية حسب النوع ومؤشرات الاستجابة.',
-            'filters' => [],
+            'filters' => $filters,
             'columns' => [
                 ['key' => 'type', 'label' => 'نوع العقار', 'type' => 'text'],
                 ['key' => 'count', 'label' => 'عدد العقارات', 'type' => 'number'],

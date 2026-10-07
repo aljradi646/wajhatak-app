@@ -56,7 +56,7 @@ class AiLlmAgentFlowTest extends TestCase
             ], 200);
 
         $response = $this->postJson('/api/v1/ai/chat', [
-            'message' => 'ابحث عن عقار مناسب',
+            'message' => 'ابحث عن عقار في '.($property->location?->city ?? 'صنعاء'),
         ]);
 
         $response->assertOk();

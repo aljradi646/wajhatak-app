@@ -5,11 +5,8 @@ namespace App\Services\Mail;
 use App\Models\EmailSetting;
 use App\Models\EmailTemplate;
 use App\Services\Email\EmailDeliverabilityService;
+use Illuminate\Support\Str;
 
-/**
- * Unified mail service that routes to either SMTP or Resend based on settings.
- * This is the main entry point for all email sending in the application.
- */
 class UnifiedMailService
 {
     public function __construct(
@@ -18,36 +15,16 @@ class UnifiedMailService
         private readonly EmailDeliverabilityService $deliverability,
     ) {}
 
-    /**
-     * Send an email using the configured provider.
-     *
-     * @param  string  $to  Recipient email address
-     * @param  string  $subject  Email subject
-     * @param  string  $body  Email body (text or HTML)
-     * @param  array  $options  Additional options (html, attachments, etc.)
-     * @return void
-     */
     public function send(string $to, string $subject, string $body, array $options = []): void
     {
         $settings = EmailSetting::current();
+        $this->assertAllowedRecipient($settings, $to);
 
-        // Block sending if not active
-        if (!$settings->is_active) {
-            throw new \RuntimeException('إرسال البريد معطل حاليًا من لوحة التحكم.');
-        }
-
-        // Block test email domains
-        if (EmailSetting::isTestEmail($to)) {
-            throw new \RuntimeException('لا يمكن إرسال رسائل إلى عناوين بريد وهمية أو تجريبية.');
-        }
-
-        // Check deliverability
         $check = $this->deliverability->verify($to);
-        if (!$check['deliverable']) {
+        if (! $check['deliverable']) {
             throw new \RuntimeException($check['reason'] ?? 'البريد المستهدف غير قابل للتسليم.');
         }
 
-        // Route to appropriate provider
         if ($settings->isResend()) {
             $this->resendService->send(
                 $to,
@@ -56,158 +33,86 @@ class UnifiedMailService
                 $options['text'] ?? $body,
                 $options['attachments'] ?? [],
             );
-        } else {
-            // Use legacy SMTP service
-            $this->smtpService->send($to, $subject, $body, $options['headers'] ?? []);
+            return;
         }
+
+        $html = $options['html'] ?? null;
+        if (is_string($html) && $html !== '') {
+            $this->smtpService->sendHtml($to, $subject, $html, (string) ($options['text'] ?? $body), $options['headers'] ?? []);
+            return;
+        }
+
+        $this->smtpService->send($to, $subject, $body, $options['headers'] ?? []);
     }
 
-    /**
-     * Send a template email using the configured provider.
-     *
-     * @param  string  $to  Recipient email address
-     * @param  string  $templateKey  Template key from EmailTemplate
-     * @param  array  $variables  Variables to replace in template
-     * @return void
-     */
     public function sendTemplate(string $to, string $templateKey, array $variables = []): void
     {
         $settings = EmailSetting::current();
+        $this->assertAllowedRecipient($settings, $to);
 
-        // Block sending if not active
-        if (!$settings->is_active) {
-            throw new \RuntimeException('إرسال البريد معطل حاليًا من لوحة التحكم.');
-        }
-
-        // Block test email domains
-        if (EmailSetting::isTestEmail($to)) {
-            throw new \RuntimeException('لا يمكن إرسال رسائل إلى عناوين بريد وهمية أو تجريبية.');
-        }
-
-        // Check deliverability
-        $check = $this->deliverability->verify($to);
-        if (!$check['deliverable']) {
-            throw new \RuntimeException($check['reason'] ?? 'البريد المستهدف غير قابل للتسليم.');
-        }
-
-        // Get template from new system
         $template = EmailTemplate::findByKey($templateKey);
-        
-        // Fallback to legacy system if template not found
-        if (!$template) {
+        if (! $template) {
             $this->sendTemplateLegacy($to, $templateKey, $variables);
             return;
         }
 
-        // Render template with variables
-        $rendered = $template->render($variables);
-
-        // For SMTP: replace {{logo}} with URL or remove it
-        // For Resend: keep {{logo}} placeholder, ResendService will handle CID
-        if (!$settings->isResend()) {
-            $logoUrl = $settings->getLogoUrlForEmail();
-            if ($logoUrl) {
-                $rendered['html'] = str_replace('{{logo}}', '<img src="' . $logoUrl . '" alt="وجهتك" style="max-width: 150px; height: auto;">', $rendered['html']);
-            } else {
-                $rendered['html'] = str_replace('{{logo}}', '', $rendered['html']);
-            }
+        $variables = $this->normalizeVariables($variables, $settings);
+        $rendered = $template->renderPublished($variables);
+        if (! is_array($rendered)) {
+            throw new \RuntimeException('القالب المطلوب غير منشور حاليًا.');
         }
 
-        // Route to appropriate provider
-        if ($settings->isResend()) {
-            $this->resendService->send(
-                $to,
-                $rendered['subject'],
-                $rendered['html'],
-                $rendered['text'],
-            );
-        } else {
-            $html = (string) ($rendered['html'] ?? '');
-            $text = $rendered['text'] ?: strip_tags($html);
-            if ($html !== '') {
-                $this->smtpService->sendHtml($to, $rendered['subject'], $html, $text);
-            } else {
-                $this->smtpService->send($to, $rendered['subject'], $text);
-            }
-        }
+        $html = (string) ($rendered['html'] ?? '');
+        $text = (string) ($rendered['text'] ?? strip_tags($html));
+
+        $this->send($to, $rendered['subject'], $text, [
+            'html' => $html,
+            'text' => $text,
+        ]);
     }
 
-    /**
-     * Fallback to legacy template system for backward compatibility.
-     */
     private function sendTemplateLegacy(string $to, string $templateKey, array $variables = []): void
     {
-        $settings = EmailSetting::current();
-        $mailSettings = app(\App\Services\Mail\MailSettingsService::class);
-        
+        $mailSettings = app(MailSettingsService::class);
         $template = $mailSettings->renderTemplate($templateKey, $variables);
 
-        if ($settings->isResend()) {
-            $html = $this->convertToHtml($template['body'], $templateKey, $variables);
-            $this->resendService->send($to, $template['subject'], $html, $template['body']);
-        } else {
-            $this->smtpService->send($to, $template['subject'], $template['body']);
+        $this->send($to, $template['subject'], $template['body']);
+    }
+
+    private function normalizeVariables(array $variables, EmailSetting $settings): array
+    {
+        $name = $variables['user.name'] ?? $variables['name'] ?? null;
+        $email = $variables['user.email'] ?? $variables['email'] ?? null;
+        $property = $variables['property.title'] ?? $variables['property'] ?? null;
+        $variables['user.name'] ??= $name;
+        $variables['name'] ??= $name;
+        $variables['user.email'] ??= $email;
+        $variables['email'] ??= $email;
+        $variables['property.title'] ??= $property;
+        $variables['property'] ??= $property;
+        $variables['app.url'] ??= rtrim((string) config('app.url'), '/');
+        $variables['app.name'] ??= (string) config('app.name', 'وجهتك');
+        $variables['app.logo_url'] ??= $settings->getLogoUrlForEmail();
+
+        return $variables;
+    }
+
+    private function assertAllowedRecipient(EmailSetting $settings, string $to): void
+    {
+        if (! $settings->is_active) {
+            throw new \RuntimeException('إرسال البريد معطل حاليًا من لوحة التحكم.');
+        }
+
+        if (EmailSetting::isTestEmail($to) || Str::contains($to, ['example.com', 'example.org', 'example.net'])) {
+            throw new \RuntimeException('لا يمكن إرسال رسائل إلى عناوين بريد وهمية أو تجريبية.');
         }
     }
 
-    /**
-     * Convert plain text template to basic HTML for Resend (legacy fallback).
-     */
-    private function convertToHtml(string $text, string $templateKey, array $variables): string
-    {
-        $settings = EmailSetting::current();
-        $logoUrl = $settings->getLogoUrlForEmail();
-        
-        $logoHtml = $logoUrl 
-            ? '<div style="text-align: center; margin-bottom: 20px;">' .
-              '<img src="' . $logoUrl . '" alt="وجهتك" style="max-width: 150px; height: auto;">' .
-              '</div>' 
-            : '';
-
-        $body = nl2br(e($text));
-
-        return <<<HTML
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>رسالة من وجهتك</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5;">
-    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-        <div style="background: linear-gradient(135deg, #075E4A, #0E8A6D); padding: 30px; text-align: center;">
-            {$logoHtml}
-            <h1 style="color: white; margin: 0; font-size: 24px;">وجهتك</h1>
-        </div>
-        
-        <div style="padding: 30px;">
-            {$body}
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eee;">
-            <p style="margin: 0; color: #666; font-size: 12px;">
-                تم إرسال هذه الرسالة من منصة وجهتك العقارية
-            </p>
-        </div>
-    </div>
-</body>
-</html>
-HTML;
-    }
-
-    /**
-     * Check if email sending is configured and active.
-     */
     public function canSend(): bool
     {
-        $settings = EmailSetting::current();
-        return $settings->canSend();
+        return EmailSetting::current()->canSend();
     }
 
-    /**
-     * Get the current provider.
-     */
     public function getProvider(): string
     {
         return EmailSetting::current()->provider;

@@ -23,8 +23,12 @@ class AiPropertyResult {
     this.isNew = false,
     this.isFeatured = false,
     this.imageUrl,
-    this.distanceKm,
+    this.referenceCode,
+    this.address,
+    this.agentPhone,
+    this.isAlternative = false,
     this.matchScore = 0,
+    this.distanceKm,
   });
 
   final int propertyId;
@@ -45,8 +49,12 @@ class AiPropertyResult {
   final bool isFeatured;
   final bool available;
   final String? imageUrl;
-  final double? distanceKm;
+  final String? referenceCode;
+  final String? address;
+  final String? agentPhone;
+  final bool isAlternative;
   final double matchScore;
+  final double? distanceKm;
 
   bool get isRent => transactionType == 'rent';
 
@@ -81,8 +89,12 @@ class AiPropertyResult {
       isFeatured: json['is_featured'] as bool? ?? false,
       available: json['available'] as bool? ?? true,
       imageUrl: json['image_url'] as String?,
-      distanceKm: (json['distance_km'] as num?)?.toDouble(),
+      referenceCode: json['reference_code'] as String?,
+      address: json['address'] as String?,
+      agentPhone: json['agent_phone'] as String?,
+      isAlternative: json['is_alternative'] as bool? ?? false,
       matchScore: (json['match_score'] as num?)?.toDouble() ?? 0,
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
     );
   }
 }
@@ -130,8 +142,8 @@ class AiChatMessage {
   final String role; // user | assistant
   final String content;
   final List<AiPropertyResult> properties;
-  final String status; // ok | blocked | error
-  final String responseType; // text | property_results | property_detail | clarification | unsupported | security | error
+  final String status; // ok | blocked | error | streaming
+  final String responseType;
   final List<Map<String, dynamic>> actions;
   final DateTime? createdAt;
 
@@ -157,6 +169,26 @@ class AiChatMessage {
       createdAt: DateTime.now(),
     );
   }
+
+  AiChatMessage copyWith({
+    int? id,
+    String? role,
+    String? content,
+    List<AiPropertyResult>? properties,
+    String? status,
+    String? responseType,
+    List<Map<String, dynamic>>? actions,
+    DateTime? createdAt,
+  }) => AiChatMessage(
+    id: id ?? this.id,
+    role: role ?? this.role,
+    content: content ?? this.content,
+    properties: properties ?? this.properties,
+    status: status ?? this.status,
+    responseType: responseType ?? this.responseType,
+    actions: actions ?? this.actions,
+    createdAt: createdAt ?? this.createdAt,
+  );
 
   factory AiChatMessage.fromJson(Map<String, dynamic> json) {
     return AiChatMessage(
@@ -205,4 +237,37 @@ class AiConversationItem {
       messageCount: json['messages_count'] as int? ?? json['message_count'] as int? ?? 0,
     );
   }
+}
+
+
+@immutable
+class AiStreamEvent {
+  const AiStreamEvent({
+    required this.event,
+    this.id,
+    this.delta,
+    this.data,
+    this.message,
+    this.statusCode,
+  });
+
+  final String event;
+  final int? id;
+  final String? delta;
+  final Map<String, dynamic>? data;
+  final String? message;
+  final int? statusCode;
+
+  factory AiStreamEvent.fromJson(Map<String, dynamic> json) => AiStreamEvent(
+    event: json['event']?.toString() ?? 'message',
+    id: (json['id'] as num?)?.toInt(),
+    delta: json['delta']?.toString(),
+    data: json['data'] is Map<String, dynamic>
+        ? json['data'] as Map<String, dynamic>
+        : json['result'] is Map<String, dynamic>
+            ? json['result'] as Map<String, dynamic>
+            : null,
+    message: json['message']?.toString(),
+    statusCode: (json['status_code'] as num?)?.toInt(),
+  );
 }

@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api_client.dart';
@@ -27,7 +30,8 @@ class AiAssistantRepository {
   }
 
   /// إرسال رسالة — الخادم يفهم، يبحث في القاعدة، يولّد الرد ويطهّره.
-  Future<({AiChatMessage message, int? conversationId, String? sessionToken})> sendMessage(
+  Future<({AiChatMessage message, int? conversationId, String? sessionToken})>
+  sendMessage(
     String message, {
     int? conversationId,
     List<Map<String, String>> history = const [],
@@ -36,7 +40,7 @@ class AiAssistantRepository {
   }) async {
     final payload = <String, dynamic>{
       'message': message,
-      if (conversationId != null) 'conversation_id': conversationId,
+      'conversation_id': ?conversationId,
       if (conversationId == null) 'session_token': await _sessionToken(),
       'locale': 'ar',
       if (latitude != null && longitude != null) ...{
@@ -69,11 +73,90 @@ class AiAssistantRepository {
     final token = data['session_token'] as String?;
     final conversation = data['conversation_id'] as int?;
     if (token != null && token.isNotEmpty) await _saveSessionToken(token);
-    return (
-      message: reply,
-      conversationId: conversation,
-      sessionToken: token,
+    return (message: reply, conversationId: conversation, sessionToken: token);
+  }
+
+  Future<void> _persistStreamSessionToken(AiStreamEvent event) async {
+    if (event.event != 'done') return;
+    final token = event.data?['session_token']?.toString();
+    if (token != null && token.isNotEmpty) {
+      await _saveSessionToken(token);
+    }
+  }
+
+  Stream<AiStreamEvent> streamMessage(
+    String message, {
+    int? conversationId,
+    double? latitude,
+    double? longitude,
+    CancelToken? cancelToken,
+  }) async* {
+    final payload = <String, dynamic>{
+      'message': message,
+      'conversation_id': ?conversationId,
+      if (conversationId == null) 'session_token': await _sessionToken(),
+      'locale': 'ar',
+      if (latitude != null && longitude != null) ...{
+        'latitude': latitude,
+        'longitude': longitude,
+        'radius_km': 10,
+      },
+    };
+
+    final response = await _api.postStream(
+      '/ai/chat/stream',
+      data: payload,
+      cancelToken: cancelToken,
     );
+    final body = response.data;
+    if (body == null) {
+      throw ApiFailure('تعذر بدء بث المساعد.', statusCode: response.statusCode);
+    }
+
+    String eventName = 'message';
+    final dataLines = <String>[];
+
+    AiStreamEvent? flushEvent() {
+      if (dataLines.isEmpty) return null;
+      try {
+        final decoded = jsonDecode(dataLines.join('\\n'));
+        if (decoded is! Map<String, dynamic>) return null;
+        return AiStreamEvent.fromJson({
+          ...decoded,
+          'event': decoded['event'] ?? eventName,
+        });
+      } catch (_) {
+        return null;
+      }
+    }
+
+    await for (final line
+        in body.stream
+            .cast<List<int>>()
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
+      if (line.isEmpty) {
+        final event = flushEvent();
+        if (event != null) {
+          await _persistStreamSessionToken(event);
+          yield event;
+        }
+        eventName = 'message';
+        dataLines.clear();
+        continue;
+      }
+      if (line.startsWith('event:')) {
+        eventName = line.substring(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.add(line.substring(5).trimLeft());
+      }
+    }
+
+    final event = flushEvent();
+    if (event != null) {
+      await _persistStreamSessionToken(event);
+      yield event;
+    }
   }
 
   /// مسح محادثة المستخدم المسجل (متطلب اختياري عند وجود حساب).
@@ -86,7 +169,6 @@ class AiAssistantRepository {
       data: {'feedback': helpful ? 'helpful' : 'not_helpful'},
     );
   }
-
 
   /// قائمة محادثات المستخدم (للمستخدمين المسجلين فقط).
   Future<List<AiConversationItem>> listConversations() async {
@@ -104,7 +186,9 @@ class AiAssistantRepository {
     final json = await _api.get('/ai/conversations/$conversationId/messages');
     final root = json['data'] as Map<String, dynamic>? ?? const {};
     final data = root['messages'] as List<dynamic>? ?? const [];
-    return data.map((e) => AiChatMessage.fromJson(e as Map<String, dynamic>)).toList(growable: false);
+    return data
+        .map((e) => AiChatMessage.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
   }
 
   // ------------------------------------------------------------------
@@ -139,6 +223,8 @@ class AiAssistantRepository {
     return data['id'] as int;
   }
 
-  Future<void> pinConversation(int conversationId, bool pinned) =>
-      _api.patch('/ai/conversations/$conversationId/pin', data: {'pinned': pinned});
+  Future<void> pinConversation(int conversationId, bool pinned) => _api.patch(
+    '/ai/conversations/$conversationId/pin',
+    data: {'pinned': pinned},
+  );
 }

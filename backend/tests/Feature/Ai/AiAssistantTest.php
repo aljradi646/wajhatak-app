@@ -51,34 +51,224 @@ class AiAssistantTest extends TestCase
         }
     }
 
+    /** ب1) نتائج البحث تحمل عقد Property Card تفاعلي وحقول النسخ العامة. */
+    public function test_property_results_include_grounded_ui_actions(): void
+    {
+        $first = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد شقة في صنعاء',
+        ]);
+
+        $first->assertOk();
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'إيجار',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
+        ]);
+
+        $response->assertOk();
+        $items = $response->json('data.properties');
+
+        $this->assertNotEmpty($items);
+
+        $item = $items[0];
+        $this->assertArrayHasKey('image_url', $item);
+        $this->assertSame('property_card', $item['ui']['component'] ?? null);
+        $this->assertTrue((bool) ($item['ui']['image_priority'] ?? false));
+        $this->assertSame(
+            (int) $item['property_id'],
+            (int) ($item['ui']['open_action']['property_id'] ?? 0)
+        );
+        $this->assertSame(
+            'open_property',
+            $item['ui']['title_action']['type'] ?? null
+        );
+        $this->assertSame(
+            'share_property',
+            $item['ui']['share_action']['type'] ?? null
+        );
+
+        $copyFields = collect($item['ui']['copy_actions'] ?? [])
+            ->pluck('field')
+            ->all();
+
+        $this->assertContains('price', $copyFields);
+        $this->assertContains('location', $copyFields);
+        $this->assertSame('property_results', $response->json('data.ui.response_component'));
+        $this->assertSame(
+            (int) $item['property_id'],
+            (int) $response->json('data.ui.property_ids.0')
+        );
+    }
+
+    /** ب2) البطاقة التاريخية تُعاد عند فتح المحادثة من جديد عبر نفس endpoint الذي يستخدمه Flutter. */
+    public function test_conversation_history_restores_property_cards(): void
+    {
+        $user = User::factory()->create();
+
+        $first = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
+            'message' => 'شقة في صنعاء',
+        ]);
+
+        $first->assertOk();
+        $conversationId = (int) $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $search = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
+            'message' => 'إيجار',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
+        ]);
+
+        $search->assertOk();
+        $propertyId = (int) $search->json('data.properties.0.property_id');
+
+        $history = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/ai/conversations/'.$conversationId.'/messages');
+
+        $history->assertOk();
+
+        $messages = collect($history->json('data.messages'));
+        $assistant = $messages->first(
+            fn ($m) => ($m['role'] ?? null) === 'assistant' && ($m['response_type'] ?? null) === 'property_results'
+        );
+
+        $this->assertNotNull($assistant, 'No property_results assistant message in history.');
+        $this->assertNotEmpty($assistant['properties'] ?? []);
+        $this->assertSame(
+            $propertyId,
+            (int) ($assistant['properties'][0]['property_id'] ?? 0)
+        );
+        $this->assertSame(
+            'property_card',
+            $assistant['properties'][0]['ui']['component'] ?? null
+        );
+    }
+
     /** ب) بحث متعدد الشروط: شقة 2-3 غرف مفروشة أقل من 150 ألف. */
     public function test_multi_condition_search_applies_all_filters(): void
     {
-        $response = $this->postJson('/api/v1/ai/chat', [
+        $first = $this->postJson('/api/v1/ai/chat', [
             'message' => 'أريد شقة 2-3 غرف مفروشة أقل من 150 ألف في صنعاء',
         ]);
 
-        $response->assertOk();
-        $data = $response->json('data');
+        $first->assertOk();
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
 
-        foreach ($data['properties'] as $property) {
-            $this->assertTrue((bool) $property['is_furnished']);
-            $this->assertLessThanOrEqual(150_000, $property['price']);
-            $this->assertBetween($property['bedrooms'], 2, 3);
-        }
-    }
-
-    /** ج) لا نتائج: ميزانية مستحيلة — يجب رد صريح بلا اختراع. */
-    public function test_no_results_returns_honest_reply(): void
-    {
         $response = $this->postJson('/api/v1/ai/chat', [
-            'message' => 'أريد شقة في صنعاء أقل من 1000 ريال',
+            'message' => 'إيجار',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
         ]);
 
         $response->assertOk();
         $data = $response->json('data');
+
+        $this->assertSame('rent', $data['filters']['transaction_type'] ?? null);
+        $this->assertSame('صنعاء', $data['filters']['city'] ?? null);
+        $this->assertSame(150000, (int) ($data['filters']['max_price'] ?? 0));
+        $this->assertTrue((bool) ($data['filters']['furnished'] ?? false));
+        $this->assertNotEmpty($data['properties']);
+
+        foreach ($data['properties'] as $property) {
+            $this->assertGreaterThan(0, (int) ($property['property_id'] ?? 0));
+            if (($data['result_mode'] ?? 'exact') === 'exact') {
+                $this->assertTrue((bool) $property['is_furnished']);
+                $this->assertLessThanOrEqual(150_000, $property['price']);
+                $this->assertBetween($property['bedrooms'], 2, 3);
+            } else {
+                $this->assertTrue((bool) ($property['is_alternative'] ?? false));
+            }
+        }
+    }
+
+    /** ج) لا تطابق حرفي: يعرض النظام أقرب بدائل حقيقية بدل رسالة آلية فقط. */
+    public function test_no_exact_results_offer_grounded_close_alternatives(): void
+    {
+        $first = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد شقة في صنعاء أقل من 1000 ريال',
+        ]);
+
+        $first->assertOk();
+        $this->assertSame('clarification', $first->json('data.response_type'));
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'إيجار',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame('alternatives', $data['result_mode']);
+        $this->assertNotEmpty($data['properties']);
+        $this->assertStringContainsString('تطابقًا حرفيًا', $data['reply']);
+
+        foreach ($data['properties'] as $property) {
+            $this->assertDatabaseHas('properties', [
+                'id' => $property['property_id'],
+                'status' => 'published',
+            ]);
+            $this->assertTrue((bool) ($property['is_alternative'] ?? false));
+            $this->assertSame('close_match', $property['ui']['variant'] ?? null);
+        }
+    }
+
+    /** ج1) الاستثمار وحده يطلب معايير حقيقية بدل عرض كامل السوق. */
+    public function test_investment_request_without_criteria_asks_for_focus(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد استثمار عقاري',
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame('investment_clarify', $data['intent']);
         $this->assertSame([], $data['properties']);
-        $this->assertStringContainsString('لا توجد', $data['reply']);
+        $this->assertTrue((bool) ($data['filters']['investment'] ?? false));
+    }
+
+    /** ج2) الاستثمار مع مدينة يُحوّل إلى شراء عقاري مقيّد بالمدينة. */
+    public function test_investment_with_city_uses_sale_search_without_financial_claims(): void
+    {
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد استثمار عقاري في صنعاء',
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame('sale', $data['filters']['transaction_type'] ?? null);
+        $this->assertSame('صنعاء', $data['filters']['city'] ?? null);
+        $this->assertNotSame('blocked', $data['status']);
+        $this->assertStringNotContainsString('مضمون', (string) $data['reply']);
+        $this->assertStringNotContainsString('عائد', (string) $data['reply']);
+    }
+
+    /** Intent B: أسئلة استخدام التطبيق لا تبحث عن عقارات. */
+    public function test_platform_support_is_not_property_search(): void
+    {
+        foreach (['كيف أضيف عقار؟', 'وين ألاقي المفضلة؟', 'كيف أستخدم الفلاتر؟'] as $message) {
+            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+
+            $response->assertOk();
+            $data = $response->json('data');
+
+            $this->assertSame('ok', $data['status'], $message);
+            $this->assertSame('platform_support', $data['intent'], $message);
+            $this->assertSame([], $data['properties'], $message);
+            $this->assertNotEmpty($data['reply'], $message);
+        }
     }
 
     /** د) خارج النطاق: طلب برمجة يُرفض من الحاجز (بلا نموذج). */
@@ -89,7 +279,10 @@ class AiAssistantTest extends TestCase
         $response->assertOk();
         $data = $response->json('data');
         $this->assertSame('blocked', $data['status']);
-        $this->assertStringContainsString('مساعد وجهتك', $data['reply']);
+        $this->assertSame(
+            'عذراً، لم أفهم طلبك بوضوح. هل تبحث عن عقار معين أم تحتاج مساعدة في استخدام التطبيق؟',
+            $data['reply']
+        );
         $this->assertDatabaseHas('ai_request_logs', ['status' => 'blocked']);
     }
 
@@ -146,8 +339,9 @@ class AiAssistantTest extends TestCase
         $response->assertOk();
         $data = $response->json('data');
         $this->assertSame('ok', $data['status']);
-        $this->assertStringContainsString('مساعدك', $data['reply']);
+        $this->assertSame('small_talk', $data['intent']);
         $this->assertSame([], $data['properties']);
+        $this->assertNotEmpty($data['reply']);
     }
 
     /**
@@ -248,6 +442,29 @@ class AiAssistantTest extends TestCase
         $this->assertSame('ok', $data['status']);
         $this->assertSame($property->id, (int) ($data['properties'][0]['property_id'] ?? 0));
         $this->assertStringContainsString('تفاصيل العقار رقم', $data['reply']);
+    }
+
+    /** ط1) الحالة غير المنشورة لا تُعرض كبطاقة ولا يُوصى بها حتى لو بقيت في الفهرس. */
+    public function test_non_published_index_status_is_never_recommended(): void
+    {
+        $indexed = \App\Models\AiSearchIndex::query()
+            ->where('status', 'published')
+            ->firstOrFail();
+
+        $propertyId = (int) $indexed->property_id;
+        $indexed->update(['status' => 'sold']);
+        Property::query()->whereKey($propertyId)->update(['status' => \App\Enums\PropertyStatus::Archived]);
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => "هل العقار {$propertyId} متاح؟",
+        ]);
+
+        $response->assertOk();
+
+        $data = $response->json('data');
+        $this->assertSame('ok', $data['status']);
+        $this->assertSame([], $data['properties']);
+        $this->assertStringContainsString('مؤرشف', $data['reply']);
     }
 
     /** ط) مزامنة الفهرس: تعديل السعر ينعكس فورًا على بحث المساعد. */
@@ -531,4 +748,21 @@ class AiAssistantTest extends TestCase
         $this->assertGreaterThanOrEqual($min, $value);
         $this->assertLessThanOrEqual($max, $value);
     }
+    /** SSE contract: endpoint emits protocol events instead of returning a JSON-only response. */
+    public function test_stream_endpoint_emits_sse_events(): void
+    {
+        $response = $this->post('/api/v1/ai/chat/stream', [
+            'message' => 'أريد شقة في صنعاء',
+        ]);
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+        $body = $response->streamedContent();
+        $this->assertStringContainsString("event: start\n", $body);
+        $this->assertStringContainsString("event: delta\n", $body);
+        $this->assertStringContainsString("event: done\n", $body);
+    }
+
+
 }

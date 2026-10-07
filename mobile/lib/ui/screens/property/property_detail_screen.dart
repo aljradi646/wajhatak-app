@@ -370,12 +370,12 @@ class _DetailGalleryState extends State<_DetailGallery> {
               return CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => const LuxSkeleton(
+                placeholder: (_context, _error) => const LuxSkeleton(
                   radius: 0,
                   width: double.infinity,
                   height: double.infinity,
                 ),
-                errorWidget: (_, _, _) => Container(
+                errorWidget: (_context, _error, _stackTrace) => Container(
                   color: WajhatakColors.emeraldDeep,
                   child: const Center(
                     child: Icon(

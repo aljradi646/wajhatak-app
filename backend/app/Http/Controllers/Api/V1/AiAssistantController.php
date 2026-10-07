@@ -89,6 +89,46 @@ class AiAssistantController extends Controller
         return response()->json(['data' => $result]);
     }
 
+
+    /** POST /api/v1/ai/chat/stream — SSE حقيقي على مستوى HTTP؛ التوليد الداخلي يُنفذ مرة واحدة ثم يُرسل الرد على دفعات. */
+    public function streamChat(AiChatRequest $request)
+    {
+        $json = $this->chat($request);
+        if ($json->getStatusCode() >= 400) {
+            return $json;
+        }
+
+        $payload = $json->getData(true);
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+        $reply = (string) ($data['reply'] ?? '');
+
+        return response()->stream(function () use ($data, $reply): void {
+            $send = static function (string $event, array $payload): void {
+                echo 'event: '.$event."\n";
+                echo 'data: '.json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n\n";
+                if (ob_get_level() > 0) @ob_flush();
+                @flush();
+            };
+
+            $send('start', ['event' => 'start']);
+            if ($reply !== '') {
+                $chunks = preg_split('/(?<=\\s|[،.!؟\\n])/u', $reply, -1, PREG_SPLIT_NO_EMPTY) ?: [$reply];
+                foreach ($chunks as $index => $chunk) {
+                    if (connection_aborted()) return;
+                    $send('delta', ['event' => 'delta', 'id' => $index + 1, 'delta' => $chunk]);
+                }
+            }
+            if (! connection_aborted()) {
+                $send('done', ['event' => 'done', 'id' => 999999, 'data' => $data]);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream; charset=utf-8',
+            'Cache-Control' => 'no-cache, no-transform',
+            'X-Accel-Buffering' => 'no',
+            'Connection' => 'keep-alive',
+        ]);
+    }
+
     /** POST /api/v1/ai/search — بحث منظّم مباشر بلا رد نصي. */
     public function search(AiSearchRequest $request): JsonResponse
     {

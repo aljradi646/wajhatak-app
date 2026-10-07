@@ -92,11 +92,13 @@ class AiAssistantService
             return [
                 'reply' => $reply,
                 'status' => $status,
+                'intent' => $intent,
                 'error' => $failedStage,
                 'conversation_id' => $conversation->exists ? $conversation->id : null,
                 'session_token' => $conversation->exists ? $conversation->session_token : null,
                 'properties' => $properties,
                 'result_mode' => $contract['result_mode'] ?? 'exact',
+                'relaxations' => $orchestratorResult['relaxations'] ?? [],
                 'filters' => $filters,
                 'tool_calls' => $toolCalls,
                 'response_type' => $contract['response_type'] ?? 'text',
@@ -112,6 +114,16 @@ class AiAssistantService
             $this->failedStage ??= $stage;
 
             try {
+                if (app()->environment('testing')) {
+                    fwrite(STDERR, "AI_DEBUG ".json_encode([
+                        'stage' => $stage,
+                        'exception' => $e::class,
+                        'message' => $e->getMessage(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL);
+                }
+
                 $this->logging->record(
                     $conversation ?? null, $user?->id, $intent, $filters, $toolCalls, 0,
                     AiRequestStatus::Error->value, $this->ms() - $started, $searchMs, 0, $this->errorCode($stage, $e),
@@ -138,6 +150,9 @@ class AiAssistantService
                     'source' => [],
                     'intent' => $intent !== 'chat' ? $intent : 'error',
                     'failed_stage' => $stage,
+                    'debug_exception' => app()->environment('testing')
+                        ? $e::class.': '.$e->getMessage().' @ '.$e->getFile().':'.$e->getLine()
+                        : null,
                 ];
             } catch (Throwable) {
                 return [

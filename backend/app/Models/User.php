@@ -28,6 +28,7 @@ class User extends Authenticatable
         'password',
         'avatar_path',
         'locale',
+        'ui_preferences',
         'is_active',
     ];
 
@@ -51,6 +52,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'ui_preferences' => 'array',
             'is_active' => 'boolean',
         ];
     }

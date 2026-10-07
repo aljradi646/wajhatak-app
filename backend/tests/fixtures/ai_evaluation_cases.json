@@ -62,7 +62,7 @@
   {
     "id": "platform_howto",
     "input": "كيف أستخدم الفلاتر؟",
-    "intent": "platform_how_to"
+    "intent": "platform_support"
   },
   {
     "id": "security_db",

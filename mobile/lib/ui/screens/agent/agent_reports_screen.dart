@@ -24,6 +24,8 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
 
   AgentReportType? _type;
   final Map<String, String> _filters = {};
+  String? _dateFrom;
+  String? _dateTo;
 
   AgentReport? _report;
   Object? _reportError;
@@ -69,7 +71,14 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     try {
       final report = await ref
           .read(agentReportRepositoryProvider)
-          .fetch(type.key, filters: Map.of(_filters));
+          .fetch(
+            type.key,
+            filters: {
+              ..._filters,
+              'date_from': ?_dateFrom,
+              'date_to': ?_dateTo,
+            },
+          );
       if (!mounted) return;
       setState(() {
         _report = report;
@@ -89,6 +98,8 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     setState(() {
       _type = type;
       _filters.clear();
+      _dateFrom = null;
+      _dateTo = null;
       _report = null;
     });
     _loadReport();
@@ -158,10 +169,7 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
 
   Widget _buildBody(ThemeData theme) {
     if (_loadingCatalog) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 60),
-        child: Center(child: CircularProgressIndicator()),
-      );
+      return const AgentReportSkeleton();
     }
 
     if (_catalogError != null) {
@@ -189,6 +197,7 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
       children: [
         _buildTypeSelector(catalog.types, type),
         const SizedBox(height: 12),
+        _buildDateRange(theme),
         if (type.filters.isNotEmpty) ...[
           ...type.filters.map(_buildFilterRow),
           const SizedBox(height: 8),
@@ -224,7 +233,10 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     );
   }
 
-  Widget _buildTypeSelector(List<AgentReportType> types, AgentReportType current) {
+  Widget _buildTypeSelector(
+    List<AgentReportType> types,
+    AgentReportType current,
+  ) {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -240,6 +252,79 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     );
   }
 
+  Future<void> _pickDate({required bool from}) async {
+    final current =
+        DateTime.tryParse(from ? (_dateFrom ?? '') : (_dateTo ?? '')) ??
+        DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: from ? 'اختر تاريخ البداية' : 'اختر تاريخ النهاية',
+      cancelText: 'إلغاء',
+      confirmText: 'اختيار',
+    );
+    if (picked == null || !mounted) return;
+    final value =
+        '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    setState(() {
+      if (from) {
+        _dateFrom = value;
+      } else {
+        _dateTo = value;
+      }
+    });
+    _loadReport();
+  }
+
+  Widget _buildDateRange(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'الفترة الزمنية',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickDate(from: true),
+                icon: const Icon(Icons.date_range_rounded, size: 17),
+                label: Text(_dateFrom ?? 'من تاريخ'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _pickDate(from: false),
+                icon: const Icon(Icons.event_rounded, size: 17),
+                label: Text(_dateTo ?? 'إلى تاريخ'),
+              ),
+            ),
+            if (_dateFrom != null || _dateTo != null)
+              IconButton(
+                tooltip: 'مسح الفترة',
+                onPressed: () {
+                  setState(() {
+                    _dateFrom = null;
+                    _dateTo = null;
+                  });
+                  _loadReport();
+                },
+                icon: const Icon(Icons.close_rounded),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+      ],
+    );
+  }
+
   Widget _buildFilterRow(AgentReportFilterDefinition definition) {
     final selected = _filters[definition.key];
     return Padding(
@@ -247,7 +332,10 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(definition.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(
+            definition.label,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -280,10 +368,7 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
 
   Widget _buildReport(ThemeData theme) {
     if (_loadingReport) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 40),
-        child: Center(child: CircularProgressIndicator()),
-      );
+      return const AgentReportSkeleton();
     }
 
     if (_reportError != null) {
@@ -333,41 +418,51 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
                   ),
                 ],
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: report.summary
-                      .map(
-                        (item) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withValues(
-                              alpha: 0.08,
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: report.summary.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: MediaQuery.sizeOf(context).width >= 700
+                        ? 3
+                        : 2,
+                    childAspectRatio: MediaQuery.sizeOf(context).width >= 700
+                        ? 2.7
+                        : 2.2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                  ),
+                  itemBuilder: (_, index) {
+                    final item = report.summary[index];
+                    return Card(
+                      elevation: 0,
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: .55),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall,
                             ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.label,
-                                style: theme.textTheme.labelSmall,
+                            const Spacer(),
+                            Text(
+                              item.value,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w900,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                item.value,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      )
-                      .toList(growable: false),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -417,7 +512,13 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
               cells: report.columns
                   .map(
                     (column) => DataCell(
-                      _cellContent(theme, column, row[column.key], index, report),
+                      _cellContent(
+                        theme,
+                        column,
+                        row[column.key],
+                        index,
+                        report,
+                      ),
                     ),
                   )
                   .toList(growable: false),

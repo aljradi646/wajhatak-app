@@ -369,6 +369,23 @@ class LuxApiClient {
     }
   }
 
+  Future<Response<ResponseBody>> postStream(
+    String path, {
+    Object? data,
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      return await _dio.post<ResponseBody>(
+        path,
+        data: data,
+        cancelToken: cancelToken,
+        options: Options(responseType: ResponseType.stream),
+      );
+    } on DioException catch (error) {
+      throw _toFailure(error);
+    }
+  }
+
   Future<Map<String, dynamic>> patch(
     String path, {
     Object? data,

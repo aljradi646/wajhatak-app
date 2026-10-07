@@ -41,7 +41,18 @@ class AiAgentE2ETest extends TestCase
     /** Scenario 2: Search */
     public function test_scenario_2_property_search(): void
     {
-        $response = $this->postJson('/api/v1/ai/chat', ['message' => 'أريد شقة غرفتين في صنعاء']);
+        $first = $this->postJson('/api/v1/ai/chat', ['message' => 'أريد شقة غرفتين في صنعاء']);
+
+        $first->assertOk();
+        $this->assertSame('clarification', $first->json('data.response_type'));
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'إيجار',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
+        ]);
 
         $response->assertOk();
         $data = $response->json('data');
@@ -98,14 +109,23 @@ class AiAgentE2ETest extends TestCase
 
         $second = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
             'message' => "احجز لي معاينة للعقار {$property->id}",
+            'conversation_id' => $convId,
+            'session_token' => $sessionToken,
         ]);
 
         $second->assertOk();
-        $data = $second->json('data');
-        if ($data['status'] === 'error') {
-            dump($data);
-        }
-        $this->assertSame('ok', $data['status']);
+        $this->assertSame('ok', $second->json('data.status'));
+        $this->assertSame('confirmation_required', $second->json('data.intent'));
+
+        $confirmed = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
+            'message' => 'نعم',
+            'conversation_id' => $convId,
+            'session_token' => $sessionToken,
+        ]);
+
+        $confirmed->assertOk();
+        $this->assertSame('ok', $confirmed->json('data.status'));
+
         $this->assertDatabaseHas('viewing_requests', [
             'client_id' => $user->id,
             'property_id' => $property->id,

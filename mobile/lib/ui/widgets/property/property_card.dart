@@ -324,7 +324,7 @@ class _CarouselPreloader {
       CachedNetworkImageProvider(urls[index]),
       context,
       size: const Size(640, 480),
-      onError: (_, _) => failed = true,
+      onError: (_error, _stackTrace) => failed = true,
     ).whenComplete(() {
       final ok = !failed;
       if (ok) _ready.add(index);
@@ -403,12 +403,12 @@ class _CachedPropertyImage extends StatelessWidget {
       imageUrl: url,
       fit: BoxFit.cover,
       memCacheWidth: 640,
-      placeholder: (_, _) => const LuxSkeleton(
+      placeholder: (_context, _error) => const LuxSkeleton(
         width: double.infinity,
         height: double.infinity,
         radius: 0,
       ),
-      errorWidget: (_, _, _) => const _FallbackImage(),
+      errorWidget: (_context, _error, _stackTrace) => const _FallbackImage(),
     );
   }
 }

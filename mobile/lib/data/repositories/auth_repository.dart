@@ -91,7 +91,7 @@ class AuthRepository {
           'agent_city': agentCity.trim(),
         if (nationalId != null && nationalId.trim().isNotEmpty)
           'national_id': nationalId.trim(),
-        if (experienceYears != null) 'experience_years': experienceYears,
+        'experience_years': ?experienceYears,
         if (address != null && address.trim().isNotEmpty)
           'address': address.trim(),
         if (bio != null && bio.trim().isNotEmpty) 'bio': bio.trim(),

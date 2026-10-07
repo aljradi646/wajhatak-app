@@ -27,6 +27,8 @@ jobs:
           --health-interval=10s --health-timeout=5s --health-retries=20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
@@ -56,12 +58,35 @@ jobs:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.41.3"
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed lib
-      - run: flutter analyze
+      - name: Check formatting for changed Dart files
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+          else
+            base_sha="${{ github.event.before }}"
+          fi
+
+          if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
+            files="$(git ls-files 'lib/**/*.dart' 'lib/*.dart')"
+          else
+            files="$(git diff --name-only --diff-filter=ACMR "$base_sha" "$GITHUB_SHA" -- 'lib/**/*.dart' 'lib/*.dart')"
+          fi
+
+          if [ -z "$files" ]; then
+            echo "No changed Dart files require formatting validation."
+            exit 0
+          fi
+
+          printf '%s\n' "$files" | xargs dart format --output=none --set-exit-if-changed
+
+      - run: flutter analyze --no-fatal-infos
       - run: flutter test

@@ -6,10 +6,15 @@
     $siteLogo = public_path('storage/branding/logo.png');
     $pendingPropertiesCount = \App\Models\Property::query()->where('status', 'pending')->count();
     $pendingAgentsCount = \App\Models\Agent::query()->where('verification_status', 'pending')->count();
+    $uiPreferences = auth()->check() && is_array(auth()->user()->ui_preferences) ? auth()->user()->ui_preferences : [];
+    $serverTheme = in_array($uiPreferences['theme'] ?? null, ['light', 'dark', 'system'], true) ? $uiPreferences['theme'] : null;
+    $cookieTheme = request()->cookie('lux_theme');
+    $cookieTheme = in_array($cookieTheme, ['light', 'dark', 'system'], true) ? $cookieTheme : null;
+    $initialTheme = $serverTheme ?? $cookieTheme ?? 'system';
 @endphp
 
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="{{ $initialTheme }}">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,6 +23,25 @@
         <title>{{ $title }} — {{ config('app.name', 'وجهتك') }}</title>
 
         <link rel="icon" type="image/png" href="{{ asset('storage/branding/logo-small.png') }}">
+
+        <script>
+            (() => {
+                const serverTheme = @json($serverTheme);
+                const cookieTheme = @json($cookieTheme);
+                let theme = serverTheme || cookieTheme || 'system';
+                try {
+                    if (!serverTheme && !cookieTheme) {
+                        const local = localStorage.getItem('lux_theme');
+                        if (['light', 'dark', 'system'].includes(local)) theme = local;
+                    }
+                } catch (_) {}
+                document.documentElement.classList.toggle('dark', theme === 'dark' || (theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches));
+                document.documentElement.dataset.theme = theme;
+                window.__LUX_THEME_SERVER__ = serverTheme;
+                window.__LUX_UI__ = @json($uiPreferences);
+                window.__LUX_PREFERENCES_ENDPOINT__ = @json(route('admin.preferences.ui'));
+            })();
+        </script>
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=cairo:400,500,600,700,800&display=swap" rel="stylesheet" />
@@ -48,8 +72,8 @@
     </head>
     <body class="font-sans antialiased bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100" style="font-family:'Cairo',ui-sans-serif,system-ui,sans-serif;">
         <div
-            x-data="{ sidebarOpen: false, collapsed: (window.matchMedia('(min-width: 1024px)').matches && localStorage.getItem('lux_sidebar') === '1') }"
-            x-init="$watch('collapsed', value => localStorage.setItem('lux_sidebar', value ? '1' : '0'))"
+            x-data="{ sidebarOpen: false, collapsed: Boolean(window.__LUX_UI__?.sidebar_collapsed ?? (window.matchMedia('(min-width: 1024px)').matches && localStorage.getItem('lux_sidebar') === '1')) }"
+            x-init="$watch('collapsed', value => { localStorage.setItem('lux_sidebar', value ? '1' : '0'); window.LuxPreferences?.persist({sidebar_collapsed: value}); })"
             class="min-h-screen flex"
         >
             {{-- Sidebar overlay (mobile) --}}
@@ -212,7 +236,7 @@
                         @endisset
 
                         <div class="ms-auto flex items-center gap-2">
-                            <x-admin.theme-switcher theme="system" />
+                            <x-admin.theme-switcher theme="{{ $serverTheme ?? $initialTheme }}" />
 
                             <div x-data="{ open: false }" class="relative">
                                 <button @click="open = ! open" class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white">

@@ -43,6 +43,7 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
     Route::get('ai/bootstrap', [AiAssistantController::class, 'bootstrap'])->name('ai.bootstrap');
     Route::get('ai/health', [AiAssistantController::class, 'health'])->name('ai.health');
     Route::post('ai/chat', [AiAssistantController::class, 'chat'])->name('ai.chat');
+    Route::post('ai/chat/stream', [AiAssistantController::class, 'streamChat'])->name('ai.chat.stream');
     Route::post('ai/search', [AiAssistantController::class, 'search'])->name('ai.search');
 
     Route::middleware('inject.sanctum.token')->middleware('auth:sanctum')->group(function (): void {

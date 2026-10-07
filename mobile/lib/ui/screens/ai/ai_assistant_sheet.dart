@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/format_money.dart';
@@ -54,7 +55,7 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(aiConversationProvider.notifier).ensureStarted();
+      ref.read(aiConversationProvider.notifier).ensureReady();
     });
   }
 
@@ -136,6 +137,15 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
             onPressed: () => _showConversationHistory(context),
           ),
           IconButton(
+            tooltip: 'محادثة جديدة',
+            icon: const Icon(Icons.add_comment_rounded),
+            onPressed: state.loading
+                ? null
+                : () => ref
+                      .read(aiConversationProvider.notifier)
+                      .newConversation(),
+          ),
+          IconButton(
             tooltip: 'مسح المحادثة',
             icon: const Icon(Icons.refresh_rounded),
             onPressed: state.loading
@@ -164,7 +174,6 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
                 return _MessageBubble(
                   message: message,
                   onPropertyTap: (propertyId) => _openProperty(propertyId),
-                  onFeedback: _canFavorite ? (helpful) => _feedback(message, helpful) : null,
                   onFavoriteTap: _canFavorite
                       ? (property) => _favorite(property)
                       : null,
@@ -194,8 +203,10 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
             ),
           _InputBar(
             controller: _inputController,
-            enabled: !state.loading,
+            enabled: state.canSend,
+            sending: state.loading,
             onSubmit: _send,
+            onCancel: () => ref.read(aiConversationProvider.notifier).cancel(),
           ),
         ],
       ),
@@ -210,22 +221,6 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
         builder: (_) => PropertyDetailScreen(propertyId: propertyId),
       ),
     );
-  }
-
-  Future<void> _feedback(AiChatMessage message, bool helpful) async {
-    if (message.id <= 0 || !mounted) return;
-    try {
-      await ref.read(aiAssistantRepositoryProvider).submitFeedback(message.id, helpful);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(helpful ? 'شكرًا، تم تسجيل تقييمك.' : 'تم تسجيل ملاحظتك لتحسين المساعد.')),
-      );
-    } on Object {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر تسجيل التقييم الآن.')),
-      );
-    }
   }
 
   Future<void> _favorite(AiPropertyResult property) async {
@@ -270,13 +265,11 @@ class _MessageBubble extends StatelessWidget {
     required this.message,
     required this.onPropertyTap,
     this.onFavoriteTap,
-    this.onFeedback,
   });
 
   final AiChatMessage message;
   final ValueChanged<int> onPropertyTap;
   final ValueChanged<AiPropertyResult>? onFavoriteTap;
-  final ValueChanged<bool>? onFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -332,51 +325,17 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
             ),
-            if (!isUser)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'نسخ',
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.copy_rounded, size: 17),
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: message.content));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('تم نسخ الرد'), duration: Duration(seconds: 1)),
-                          );
-                        }
-                      },
-                    ),
-                    if (message.status == 'ok' && onFeedback != null) ...[
-                      IconButton(
-                        tooltip: 'مفيد',
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.thumb_up_alt_outlined, size: 17),
-                        onPressed: () => onFeedback!(true),
-                      ),
-                      IconButton(
-                        tooltip: 'غير مفيد',
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.thumb_down_alt_outlined, size: 17),
-                        onPressed: () => onFeedback!(false),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            if (message.responseType == 'property_results' || message.responseType == 'property_detail')
+            if (!isUser && message.content.trim().isNotEmpty)
+              _CopyMessageButton(text: message.content),
+            if (message.properties.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: SizedBox(
-                  height: 160,
+                  height: 224,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: message.properties.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (_, index) {
                       final property = message.properties[index];
                       return SizedBox(
@@ -401,6 +360,50 @@ class _MessageBubble extends StatelessWidget {
 }
 
 /// بطاقة عقار مصغّرة داخل المحادثة — مربوطة بعقار حقيقي عبر propertyId.
+class _CopyMessageButton extends StatefulWidget {
+  const _CopyMessageButton({required this.text});
+
+  final String text;
+
+  @override
+  State<_CopyMessageButton> createState() => _CopyMessageButtonState();
+}
+
+class _CopyMessageButtonState extends State<_CopyMessageButton> {
+  bool _copied = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.text));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم نسخ الرد'),
+        duration: Duration(milliseconds: 900),
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (mounted) setState(() => _copied = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: AlignmentDirectional.centerEnd,
+      child: IconButton(
+        tooltip: _copied ? 'تم النسخ' : 'نسخ الرد',
+        visualDensity: VisualDensity.compact,
+        icon: Icon(
+          _copied ? Icons.check_rounded : Icons.copy_rounded,
+          size: 17,
+          color: _copied ? Theme.of(context).colorScheme.primary : null,
+        ),
+        onPressed: _copy,
+      ),
+    );
+  }
+}
+
 class _AiPropertyMiniCard extends StatelessWidget {
   const _AiPropertyMiniCard({
     required this.property,
@@ -435,7 +438,8 @@ class _AiPropertyMiniCard extends StatelessWidget {
                       ? Image.network(
                           property.imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => _imageFallback(theme),
+                          errorBuilder: (context, error, stackTrace) =>
+                              _imageFallback(theme),
                         )
                       : _imageFallback(theme),
                 ),
@@ -445,21 +449,59 @@ class _AiPropertyMiniCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      property.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            property.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        if (property.isAlternative)
+                          Container(
+                            margin: const EdgeInsetsDirectional.only(start: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: WajhatakColors.amber.withValues(
+                                alpha: .16,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'قريب من طلبك',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} • ${property.transactionLabel}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} • ${property.transactionLabel}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        _copyButton(
+                          context,
+                          'السعر',
+                          '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} ${property.transactionLabel}',
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Row(
@@ -472,13 +514,22 @@ class _AiPropertyMiniCard extends StatelessWidget {
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
-                            property.locationLabel,
+                            property.address?.isNotEmpty == true
+                                ? property.address!
+                                : property.locationLabel,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
+                        ),
+                        _copyButton(
+                          context,
+                          'الموقع',
+                          property.address?.isNotEmpty == true
+                              ? property.address!
+                              : property.locationLabel,
                         ),
                         if (property.bedrooms != null) ...[
                           Icon(
@@ -503,23 +554,81 @@ class _AiPropertyMiniCard extends StatelessWidget {
                             style: theme.textTheme.bodySmall,
                           ),
                         ],
-                        if (property.distanceKm != null) ...[
-                          const SizedBox(width: 6),
+                      ],
+                    ),
+                    if (property.agentPhone?.isNotEmpty == true) ...[
+                      Row(
+                        children: [
                           Icon(
-                            Icons.near_me_rounded,
+                            Icons.phone_outlined,
                             size: 13,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
-                          Text(
-                            ' ${property.distanceKm!.toStringAsFixed(1)} كم',
-                            style: theme.textTheme.bodySmall,
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              property.agentPhone!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'اتصال بالوكيل',
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(2),
+                            constraints: const BoxConstraints(
+                              minWidth: 28,
+                              minHeight: 28,
+                            ),
+                            icon: const Icon(Icons.call_rounded, size: 15),
+                            onPressed: () async {
+                              final uri = Uri(
+                                scheme: 'tel',
+                                path: property.agentPhone!,
+                              );
+                              await launchUrl(uri);
+                            },
+                          ),
+                          _copyButton(
+                            context,
+                            'هاتف الوكيل',
+                            property.agentPhone!,
                           ),
                         ],
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
                     const SizedBox(height: 6),
                     Row(
                       children: [
+                        if (property.referenceCode?.isNotEmpty == true) ...[
+                          Icon(
+                            Icons.tag_rounded,
+                            size: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: Text(
+                              property.referenceCode!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          _copyButton(
+                            context,
+                            'الرمز',
+                            property.referenceCode!,
+                          ),
+                        ],
                         if (!property.available)
                           _chip(context, 'غير متاح', WajhatakColors.terracotta)
                         else if (property.isFurnished)
@@ -562,27 +671,86 @@ class _AiPropertyMiniCard extends StatelessWidget {
     );
   }
 
-  /// مشاركة بطاقة العقار الحقيقي (معرف من الخادم) عبر مشاركة النظام —
-  /// بنسخ النص إلى الحافظة وفتح حوار المشاركة المتاح دون مكتبات إضافية.
+  Widget _copyButton(BuildContext context, String label, String value) {
+    return IconButton(
+      tooltip: 'نسخ $label',
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.all(2),
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      icon: const Icon(Icons.copy_rounded, size: 14),
+      onPressed: () async {
+        await Clipboard.setData(ClipboardData(text: value));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم نسخ $label'),
+              duration: const Duration(milliseconds: 900),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  /// مشاركة بطاقة العقار الحقيقية — نسخ سريع أو فتح واتساب بالمحتوى الجاهز.
   Future<void> _share(BuildContext context) async {
     final summary =
         '🏠 ${property.title}\n'
         '💰 ${formatMoney(property.price ?? 0, property.currency ?? 'YER')} '
         '• ${property.transactionLabel}\n'
-        '📍 ${property.locationLabel}\n'
+        '📍 ${property.address?.isNotEmpty == true ? property.address : property.locationLabel}\n'
         '🛏 ${property.bedrooms ?? '-'} غرف  🛁 ${property.bathrooms ?? '-'} '
-        '📐 ${property.area ?? '-'} م²\n'
+        '📐 ${property.area ?? '-'} م²'
+        '${property.referenceCode?.isNotEmpty == true ? '\n🔖 ${property.referenceCode}' : ''}\n'
         '— عبر تطبيق وجهتك';
-    await Clipboard.setData(ClipboardData(text: summary));
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'نُسخت تفاصيل العقار — يمكنك لصقها في أي تطبيق للمشاركة',
-          ),
-          duration: Duration(seconds: 2),
+
+    if (!context.mounted) return;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy_rounded),
+              title: const Text('نسخ تفاصيل العقار'),
+              onTap: () => Navigator.pop(sheetContext, 'copy'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_rounded),
+              title: const Text('مشاركة عبر واتساب'),
+              onTap: () => Navigator.pop(sheetContext, 'whatsapp'),
+            ),
+          ],
         ),
+      ),
+    );
+
+    if (!context.mounted) return;
+
+    if (action == 'copy') {
+      await Clipboard.setData(ClipboardData(text: summary));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم نسخ تفاصيل العقار'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (action == 'whatsapp') {
+      final uri = Uri.https('wa.me', '/', {'text': summary});
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
       );
+      if (!launched && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذّر فتح واتساب على هذا الجهاز')),
+        );
+      }
     }
   }
 
@@ -698,12 +866,16 @@ class _InputBar extends StatelessWidget {
   const _InputBar({
     required this.controller,
     required this.enabled,
+    required this.sending,
     required this.onSubmit,
+    required this.onCancel,
   });
 
   final TextEditingController controller;
   final bool enabled;
+  final bool sending;
   final VoidCallback onSubmit;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -721,7 +893,7 @@ class _InputBar extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
-                enabled: enabled,
+                enabled: enabled && !sending,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => onSubmit(),
                 minLines: 1,
@@ -744,27 +916,30 @@ class _InputBar extends StatelessWidget {
             const SizedBox(width: 8),
             AnimatedBuilder(
               animation: controller,
-              builder: (context, child) => ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, child) {
-                  final hasText = value.text.trim().isNotEmpty;
-                  return Opacity(
-                    opacity: enabled && hasText ? 1 : 0.5,
-                    child: CircleAvatar(
-                      radius: 23,
-                      backgroundColor: WajhatakColors.emeraldDeep,
-                      child: IconButton(
-                        onPressed: enabled && hasText ? onSubmit : null,
-                        icon: const Icon(
-                          Icons.send_rounded,
-                          color: Colors.white,
-                          size: 19,
+              builder: (context, child) =>
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: controller,
+                    builder: (context, value, child) {
+                      final hasText = value.text.trim().isNotEmpty;
+                      return Opacity(
+                        opacity: enabled && hasText ? 1 : 0.5,
+                        child: CircleAvatar(
+                          radius: 23,
+                          backgroundColor: WajhatakColors.emeraldDeep,
+                          child: IconButton(
+                            onPressed: sending
+                                ? onCancel
+                                : (enabled && hasText ? onSubmit : null),
+                            icon: Icon(
+                              sending ? Icons.stop_rounded : Icons.send_rounded,
+                              color: Colors.white,
+                              size: 19,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+                      );
+                    },
+                  ),
             ),
           ],
         ),
@@ -866,9 +1041,32 @@ class _ConversationHistorySheet extends ConsumerWidget {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (conv.isPinned) const Icon(Icons.push_pin_rounded, size: 16),
-                            const SizedBox(width: 6),
-                            Text('${conv.messageCount} رسالة', style: theme.textTheme.bodySmall),
+                            IconButton(
+                              tooltip: conv.isPinned
+                                  ? 'إلغاء التثبيت'
+                                  : 'تثبيت',
+                              visualDensity: VisualDensity.compact,
+                              icon: Icon(
+                                conv.isPinned
+                                    ? Icons.push_pin_rounded
+                                    : Icons.push_pin_outlined,
+                                size: 17,
+                              ),
+                              onPressed: () async {
+                                try {
+                                  await ref
+                                      .read(aiAssistantRepositoryProvider)
+                                      .pinConversation(conv.id, !conv.isPinned);
+                                  ref.invalidate(aiConversationsListProvider);
+                                } on Object catch (_) {
+                                  // تعذر التثبيت دون التأثير على المحادثة الحالية.
+                                }
+                              },
+                            ),
+                            Text(
+                              '${conv.messageCount} رسالة',
+                              style: theme.textTheme.bodySmall,
+                            ),
                           ],
                         ),
                         onTap: () {
@@ -882,7 +1080,7 @@ class _ConversationHistorySheet extends ConsumerWidget {
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, __) => Center(
+                error: (_, _) => Center(
                   child: Text(
                     'حدث خطأ في تحميل المحادثات',
                     style: theme.textTheme.bodyMedium,
