@@ -268,9 +268,14 @@ class AiAgentOrchestrator
         }
 
         if ($intent === 'ambiguous_request') {
+            $followUps = $this->conversationService->consecutiveFollowUps($conversation);
+            $maxFollowUps = (int) config('ai.limits.max_followups', 2);
+
             $this->stateService->clearRetrievalState($conversation, (int) $userMessage->id);
             return $this->finish($userMessage, [
-                'reply' => $this->replyEngine->ambiguousReply(),
+                'reply' => $followUps < $maxFollowUps
+                    ? $this->replyEngine->unclearRequestReply()
+                    : $this->replyEngine->clarifyReply($followUps, $maxFollowUps),
                 'status' => 'ok',
                 'response_type' => 'clarification',
                 'properties' => [],
@@ -632,11 +637,14 @@ class AiAgentOrchestrator
 
             $this->conversationService->updateUserMessageFilters($userMessage, $filters);
             if ($filters === [] || ! $this->hasSearchCriteria($filters) || $this->requiresClarificationForSearch($filters)) {
+                $followUps = $this->conversationService->consecutiveFollowUps($conversation);
+                $maxFollowUps = (int) config('ai.limits.max_followups', 2);
+
                 $this->stateService->updateState($conversation, $filters, null, [], (int) $userMessage->id);
                 $this->conversationService->updateUserMessageFilters($userMessage, $filters);
 
                 return $this->finish($userMessage, [
-                    'reply' => $this->clarifySearchReply($filters),
+                    'reply' => $this->clarifySearchReply($filters, $previousFilters, $followUps, $maxFollowUps),
                     'status' => 'ok',
                     'response_type' => 'clarification',
                     'properties' => [],
@@ -900,7 +908,7 @@ class AiAgentOrchestrator
                 'filters' => $filters,
                 'tool_calls' => $result['tool_calls'] ?? [['tool' => $toolName, 'ok' => $ok]],
                 'actions' => [['type' => 'open_property', 'label' => 'فتح التفاصيل', 'payload' => ['property_id' => (int) $properties[0]['property_id']]]],
-                'intent' => $intent,
+                'intent' => (string) ($result['intent'] ?? $intent),
                 'source' => [
                     'type' => 'live_property',
                     'retrieved_at' => now()->toISOString(),
@@ -918,7 +926,7 @@ class AiAgentOrchestrator
                 'filters' => $filters,
                 'tool_calls' => [['tool' => $toolName, 'ok' => false]],
                 'actions' => [],
-                'intent' => $intent,
+                'intent' => (string) ($result['intent'] ?? $intent),
             ]);
         }
 
@@ -931,7 +939,7 @@ class AiAgentOrchestrator
             'filters' => $filters,
             'tool_calls' => [['tool' => $toolName, 'ok' => true]],
             'actions' => [],
-            'intent' => $intent,
+            'intent' => (string) ($result['intent'] ?? $intent),
             'source' => ['type' => 'live_property', 'retrieved_at' => now()->toISOString(), 'result_count' => 0],
         ]);
     }
@@ -960,9 +968,21 @@ class AiAgentOrchestrator
             && empty($filters['property_type']);
     }
 
-    private function clarifySearchReply(array $filters): string
+    private function clarifySearchReply(array $filters, array $previousFilters, int $followUps, int $maxFollowUps): string
     {
+        if ($filters === []) {
+            return $followUps < $maxFollowUps
+                ? $this->replyEngine->unclearRequestReply()
+                : $this->replyEngine->clarifyReply($followUps, $maxFollowUps);
+        }
+
         if (empty($filters['transaction_type'])) {
+            $previousTransaction = is_array($previousFilters) ? ($previousFilters['transaction_type'] ?? null) : null;
+            if (! empty($filters['property_type']) && in_array($previousTransaction, ['sale', 'rent'], true)) {
+                return 'هل تبحث عن '.$this->propertyTypeLabel((string) $filters['property_type'])
+                    .' '.($previousTransaction === 'sale' ? 'للبيع' : 'للإيجار').'؟';
+            }
+
             return 'هل تبحث عن شراء أم إيجار؟';
         }
 
@@ -971,6 +991,23 @@ class AiAgentOrchestrator
         }
 
         return $this->replyEngine->ambiguousReply();
+    }
+
+    private function propertyTypeLabel(string $type): string
+    {
+        return match ($type) {
+            'apartment' => 'شقة',
+            'villa' => 'فيلا',
+            'land' => 'أرض',
+            'shop' => 'محل',
+            'office' => 'مكتب',
+            'building' => 'عمارة',
+            'floor' => 'دور',
+            'townhouse' => 'تاون هاوس',
+            'farm' => 'مزرعة',
+            'house' => 'بيت',
+            default => 'عقار',
+        };
     }
 
     private function rememberSearchPreferences(?User $user, array $filters): void
@@ -1001,6 +1038,96 @@ class AiAgentOrchestrator
         $text = mb_strtolower(trim($text));
         $text = preg_replace('/[\x{064B}-\x{0652}\x{0670}]/u', '', $text) ?? $text;
         return str_replace(['أ', 'إ', 'آ', 'ة', 'ى'], ['ا', 'ا', 'ا', 'ه', 'ي'], $text);
+    }
+
+    private function extractScheduledDate(string $message): ?string
+    {
+        $text = $this->normalizeTurn($message);
+
+        if (preg_match('/سنة\s*(?:(\d{1,2})\s*)?(\d{4})/u', $text) === 1) {
+            return null;
+        }
+
+        $dow = [
+            'السبت' => 7, 'الاحد' => 1, 'الاثنين' => 2, 'الثلاثاء' => 3,
+            'الاربعاء' => 4, 'الخميس' => 5, 'الجمعة' => 6,
+        ];
+        foreach ($dow as $name => $day) {
+            if (preg_match('/'.$name.'\s*(?:القادم|الجاي|اللي جاية|هذا)?/u', $text) === 1) {
+                $target = \Illuminate\Support\Carbon::parse('this '.$name);
+                if ($target->isBefore(\Illuminate\Support\Carbon::today())) {
+                    $target = $target->addWeek();
+                }
+                return $target->toDateString();
+            }
+        }
+
+        if (preg_match('/(غدا|بكرة|بكره)/u', $text) === 1) {
+            return now()->addDay()->toDateString();
+        }
+        if (preg_match('/(بعد\s*بكرة|بعد\s*بكره|بعد\s*غد)/u', $text) === 1) {
+            return now()->addDays(2)->toDateString();
+        }
+        if (preg_match('/(اليوم|النهار\s*ده|النهارده)/u', $text) === 1) {
+            return now()->toDateString();
+        }
+
+        if (preg_match('/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/u', $text, $m) === 1) {
+            $day = (int) $m[1];
+            $month = (int) $m[2];
+            $year = isset($m[3]) ? (int) $m[3] : (int) now()->year;
+            if ($day >= 1 && $day <= 31 && $month >= 1 && $month <= 12) {
+                return \Illuminate\Support\Carbon::create($year, $month, $day)->toDateString();
+            }
+        }
+
+        return null;
+    }
+
+    private function extractScheduledTime(string $message): ?string
+    {
+        $text = $this->normalizeTurn($message);
+        $isMorning = preg_match('/(صباح|الفجر|الظهر|الضحى)/u', $text) === 1;
+        $isEvening = preg_match('/(مساء|العصر|المغرب|العشاء|ليلا|بالليل|الليلة)/u', $text) === 1;
+
+        if (preg_match('/(\d{1,2})(?::(\d{2}))?\s*(?:(صباحا|صباح|مساء|مساءا|مساءً|ليلا|مساءا))?/u', $text, $m) === 1) {
+            $hour = (int) $m[1];
+            $minute = isset($m[2]) ? (int) $m[2] : 0;
+            if ($hour >= 1 && $hour <= 12) {
+                if ($isEvening && $hour < 12) {
+                    $hour += 12;
+                } elseif ($isMorning && $hour === 12) {
+                    $hour = 0;
+                }
+                return sprintf('%02d:%02d:00', $hour, $minute);
+            }
+            if ($hour >= 0 && $hour <= 23) {
+                return sprintf('%02d:%02d:00', $hour, $minute);
+            }
+        }
+
+        if ($isMorning) {
+            return '10:00:00';
+        }
+        if ($isEvening) {
+            return '18:00:00';
+        }
+
+        return null;
+    }
+
+    private function confirmationPrompt(string $tool, array $args): string
+    {
+        return match ($tool) {
+            'create_viewing_request' => sprintf(
+                'سأنشئ طلب معاينة للعقار رقم %d بتاريخ %s الساعة %s. هل تريد تأكيد الحجز؟',
+                (int) ($args['property_id'] ?? 0),
+                (string) ($args['scheduled_date'] ?? now()->addDay()->toDateString()),
+                (string) ($args['scheduled_time'] ?? '10:00:00'),
+            ),
+            'cancel_viewing_request' => 'هل تريد فعلاً إلغاء طلب المعاينة؟ أرسل «نعم» للتأكيد.',
+            default => 'هل تريد تأكيد هذه العملية؟',
+        };
     }
 
     private function isRejection(string $text): bool

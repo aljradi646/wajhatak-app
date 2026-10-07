@@ -66,9 +66,9 @@ class AiIntentRouter
         }
 
         // أسئلة «كيف أستخدم...» تعني إرشادًا للمنصة، وليست small talk.
-        // يجب حسمها قبل كاشف الدعم العام.
+        // يجب حسمها قبل كاشف الدعم العام. النية الموحدة في الواجهة «platform_support».
         if ($this->isPlatformHowTo($normalized)) {
-            return $this->result('platform_how_to');
+            return $this->result('platform_support');
         }
 
         $smallTalk = AiChatIntentDetector::detectSmallTalk($message);
@@ -131,8 +131,7 @@ class AiIntentRouter
         if (! empty($filters['investment'])
             && empty($filters['property_type'])
             && empty($filters['city'])
-            && empty($filters['district'])
-            && empty($filters['transaction_type'])) {
+            && empty($filters['district'])) {
             return $this->result('investment_clarify', ['filters' => $filters]);
         }
 
@@ -141,31 +140,33 @@ class AiIntentRouter
 
         if ($hasExplicitProperty) {
             $propertyId = $this->extractSingleReference($normalized, $previousPropertyIds);
-            if ($this->isAvailabilityQuestion($normalized) && $propertyId !== null) {
+            $isSearchPhrase = $this->hasParsedSearchCriteria($filters);
+
+            if (!$isSearchPhrase && $this->isAvailabilityQuestion($normalized) && $propertyId !== null) {
                 return $this->result('property_availability', [
                     'property_reference_ids' => [$propertyId],
                 ]);
             }
 
-            if ($this->isPriceQuestion($normalized) && $propertyId !== null) {
+            if (!$isSearchPhrase && $this->isPriceQuestion($normalized) && $propertyId !== null) {
                 return $this->result('property_price', [
                     'property_reference_ids' => [$propertyId],
                 ]);
             }
 
-            if ($this->isLocationQuestion($normalized) && $propertyId !== null) {
+            if (!$isSearchPhrase && $this->isLocationQuestion($normalized) && $propertyId !== null) {
                 return $this->result('property_location', [
                     'property_reference_ids' => [$propertyId],
                 ]);
             }
 
-            if ($this->isFeaturesQuestion($normalized) && $propertyId !== null) {
+            if (!$isSearchPhrase && $this->isFeaturesQuestion($normalized) && $propertyId !== null) {
                 return $this->result('property_features', [
                     'property_reference_ids' => [$propertyId],
                 ]);
             }
 
-            if ($this->isAgentQuestion($normalized) && $propertyId !== null) {
+            if (!$isSearchPhrase && $this->isAgentQuestion($normalized) && $propertyId !== null) {
                 return $this->result('property_agent/contact', [
                     'property_reference_ids' => [$propertyId],
                 ]);
@@ -353,7 +354,18 @@ class AiIntentRouter
 
     private function isSecuritySensitive(string $text): bool
     {
-        return preg_match('/(كلمه? المرور|كلمات السر|كلمة السر|password|token|api key|مفتاح سري|بيانات المستخدمين|قاعدة البيانات كاملة|system prompt|تعليماتك النظاميه|تعليماتك النظامية)/u', $text) === 1;
+        return preg_match('/(كلمه? المرور|كلمات السر|كلمه السر|password|token|api key|مفتاح سري|بيانات المستخدمين|قاعده البيانات كامله|system prompt|تعليماتك النظاميه)/u', $text) === 1;
+    }
+
+    private function hasParsedSearchCriteria(array $filters): bool
+    {
+        foreach (['property_type', 'city', 'district', 'neighborhood', 'transaction_type', 'bedrooms_min', 'min_price', 'max_price', 'furnished', 'is_new'] as $key) {
+            if (isset($filters[$key]) && $filters[$key] !== '' && $filters[$key] !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isSearchReset(string $text): bool
@@ -364,7 +376,7 @@ class AiIntentRouter
     /** @return list<int> */
     private function resolveReferences(string $text, array $history, array $previousPropertyIds): array
     {
-        if (preg_match_all('/(?:العقار|شقه|فيلا|فله|رقم|#)\\s*(?:رقم|#)?\\s*(\\d{1,10})/u', $text, $m) > 0) {
+        if (preg_match_all('/(?:عقار|شقه|فيلا|فله|رقم|#)\\s*(?:رقم|#)?\\s*(\\d{1,10})/u', $text, $m) > 0) {
             return array_values(array_unique(array_map('intval', $m[1])));
         }
 

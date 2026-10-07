@@ -145,8 +145,9 @@ class AiToolRegistry
         return match ($intent) {
             'property_search', 'search_refinement', 'search_correction' => ['search_properties'],
             'nearest_property' => ['search_nearby_properties'],
-            'property_detail', 'property_availability', 'property_price', 'property_location',
+            'property_detail', 'property_price', 'property_location',
             'property_features', 'property_agent/contact' => ['get_property_details'],
+            'property_availability' => ['get_property_availability'],
             'property_recommendation' => ['find_similar_properties'],
             'viewing_request' => ['create_viewing_request'],
             'platform_information', 'platform_how_to' => ['get_app_knowledge'],

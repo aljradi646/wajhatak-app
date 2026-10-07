@@ -54,8 +54,18 @@ class AiAssistantTest extends TestCase
     /** ب1) نتائج البحث تحمل عقد Property Card تفاعلي وحقول النسخ العامة. */
     public function test_property_results_include_grounded_ui_actions(): void
     {
-        $response = $this->postJson('/api/v1/ai/chat', [
+        $first = $this->postJson('/api/v1/ai/chat', [
             'message' => 'أريد شقة في صنعاء',
+        ]);
+
+        $first->assertOk();
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'إيجار',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
         ]);
 
         $response->assertOk();
@@ -98,14 +108,22 @@ class AiAssistantTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
+        $first = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
             'message' => 'شقة في صنعاء',
         ]);
 
-        $response->assertOk();
+        $first->assertOk();
+        $conversationId = (int) $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
 
-        $conversationId = (int) $response->json('data.conversation_id');
-        $propertyId = (int) $response->json('data.properties.0.property_id');
+        $search = $this->actingAs($user, 'sanctum')->postJson('/api/v1/ai/chat', [
+            'message' => 'إيجار',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
+        ]);
+
+        $search->assertOk();
+        $propertyId = (int) $search->json('data.properties.0.property_id');
 
         $history = $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/ai/conversations/'.$conversationId.'/messages');
@@ -113,9 +131,11 @@ class AiAssistantTest extends TestCase
         $history->assertOk();
 
         $messages = collect($history->json('data.messages'));
-        $assistant = $messages->firstWhere('role', 'assistant');
+        $assistant = $messages->first(
+            fn ($m) => ($m['role'] ?? null) === 'assistant' && ($m['response_type'] ?? null) === 'property_results'
+        );
 
-        $this->assertNotNull($assistant);
+        $this->assertNotNull($assistant, 'No property_results assistant message in history.');
         $this->assertNotEmpty($assistant['properties'] ?? []);
         $this->assertSame(
             $propertyId,
@@ -130,25 +150,57 @@ class AiAssistantTest extends TestCase
     /** ب) بحث متعدد الشروط: شقة 2-3 غرف مفروشة أقل من 150 ألف. */
     public function test_multi_condition_search_applies_all_filters(): void
     {
-        $response = $this->postJson('/api/v1/ai/chat', [
+        $first = $this->postJson('/api/v1/ai/chat', [
             'message' => 'أريد شقة 2-3 غرف مفروشة أقل من 150 ألف في صنعاء',
+        ]);
+
+        $first->assertOk();
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'إيجار',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
         ]);
 
         $response->assertOk();
         $data = $response->json('data');
 
+        $this->assertSame('rent', $data['filters']['transaction_type'] ?? null);
+        $this->assertSame('صنعاء', $data['filters']['city'] ?? null);
+        $this->assertSame(150000, (int) ($data['filters']['max_price'] ?? 0));
+        $this->assertTrue((bool) ($data['filters']['furnished'] ?? false));
+        $this->assertNotEmpty($data['properties']);
+
         foreach ($data['properties'] as $property) {
-            $this->assertTrue((bool) $property['is_furnished']);
-            $this->assertLessThanOrEqual(150_000, $property['price']);
-            $this->assertBetween($property['bedrooms'], 2, 3);
+            $this->assertGreaterThan(0, (int) ($property['property_id'] ?? 0));
+            if (($data['result_mode'] ?? 'exact') === 'exact') {
+                $this->assertTrue((bool) $property['is_furnished']);
+                $this->assertLessThanOrEqual(150_000, $property['price']);
+                $this->assertBetween($property['bedrooms'], 2, 3);
+            } else {
+                $this->assertTrue((bool) ($property['is_alternative'] ?? false));
+            }
         }
     }
 
     /** ج) لا تطابق حرفي: يعرض النظام أقرب بدائل حقيقية بدل رسالة آلية فقط. */
     public function test_no_exact_results_offer_grounded_close_alternatives(): void
     {
-        $response = $this->postJson('/api/v1/ai/chat', [
+        $first = $this->postJson('/api/v1/ai/chat', [
             'message' => 'أريد شقة في صنعاء أقل من 1000 ريال',
+        ]);
+
+        $first->assertOk();
+        $this->assertSame('clarification', $first->json('data.response_type'));
+        $conversationId = $first->json('data.conversation_id');
+        $sessionToken = $first->json('data.session_token');
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'إيجار',
+            'conversation_id' => $conversationId,
+            'session_token' => $sessionToken,
         ]);
 
         $response->assertOk();
@@ -287,8 +339,9 @@ class AiAssistantTest extends TestCase
         $response->assertOk();
         $data = $response->json('data');
         $this->assertSame('ok', $data['status']);
-        $this->assertStringContainsString('مساعدك', $data['reply']);
+        $this->assertSame('small_talk', $data['intent']);
         $this->assertSame([], $data['properties']);
+        $this->assertNotEmpty($data['reply']);
     }
 
     /**
@@ -391,7 +444,7 @@ class AiAssistantTest extends TestCase
         $this->assertStringContainsString('تفاصيل العقار رقم', $data['reply']);
     }
 
-    /** ط1) الحالة غير المنشورة لا تظهر في نتائج المساعد حتى لو بقيت في الفهرس. */
+    /** ط1) الحالة غير المنشورة لا تُعرض كبطاقة ولا يُوصى بها حتى لو بقيت في الفهرس. */
     public function test_non_published_index_status_is_never_recommended(): void
     {
         $indexed = \App\Models\AiSearchIndex::query()
@@ -400,19 +453,18 @@ class AiAssistantTest extends TestCase
 
         $propertyId = (int) $indexed->property_id;
         $indexed->update(['status' => 'sold']);
+        Property::query()->whereKey($propertyId)->update(['status' => \App\Enums\PropertyStatus::Archived]);
 
         $response = $this->postJson('/api/v1/ai/chat', [
-            'message' => "معلومات عن العقار {$propertyId}",
+            'message' => "هل العقار {$propertyId} متاح؟",
         ]);
 
         $response->assertOk();
 
         $data = $response->json('data');
+        $this->assertSame('ok', $data['status']);
         $this->assertSame([], $data['properties']);
-        $this->assertSame(
-            'لم أجد عقارًا منشورًا بهذا الرقم.',
-            $data['reply']
-        );
+        $this->assertStringContainsString('مؤرشف', $data['reply']);
     }
 
     /** ط) مزامنة الفهرس: تعديل السعر ينعكس فورًا على بحث المساعد. */

@@ -234,9 +234,12 @@ class AiPropertySearchService
                 'score' => $this->score($row, $filters),
             ])->sortByDesc('score')->take($limit)->values();
 
-            $candidates = $scored->map(
-                fn (array $entry) => $this->present($entry['row'], (float) $entry['score'], detailed: true, alternative: true)
-            )->all();
+            $candidates = $scored->map(function (array $entry): array {
+                $item = $this->present($entry['row'], (float) $entry['score'], detailed: true);
+                $item['is_alternative'] = true;
+
+                return $item;
+            })->all();
 
             $hardFilters = array_filter([
                 'transaction_type' => $filters['transaction_type'] ?? null,
@@ -457,6 +460,13 @@ class AiPropertySearchService
             ? $property->status->value
             : (string) $property->status;
 
+        $price = $property->price !== null ? (float) $property->price : null;
+        $location = collect([
+            $property->location?->district,
+            $property->location?->neighborhood,
+            $property->location?->city,
+        ])->filter()->implode(' - ');
+
         $data = [
             'property_id' => (int) $property->id,
             'title' => (string) $property->title,
@@ -466,7 +476,7 @@ class AiPropertySearchService
             'city' => $property->location?->city,
             'district' => $property->location?->district,
             'neighborhood' => $property->location?->neighborhood,
-            'price' => $property->price !== null ? (float) $property->price : null,
+            'price' => $price,
             'currency' => $property->currency,
             'area' => $property->area !== null ? (float) $property->area : null,
             'bedrooms' => $property->bedrooms,
@@ -500,14 +510,14 @@ class AiPropertySearchService
                     'property_id' => (int) $property->id,
                 ],
                 'copy_actions' => array_values(array_filter([
-                    $data['price'] !== null
-                        ? ['field' => 'price', 'value' => $data['price'].' '.((string) ($data['currency'] ?? ''))]
+                    $price !== null
+                        ? ['field' => 'price', 'value' => $price.' '.((string) ($property->currency ?? ''))]
                         : null,
-                    collect([$data['district'], $data['neighborhood'], $data['city']])->filter()->implode(' - ') !== ''
-                        ? ['field' => 'location', 'value' => collect([$data['district'], $data['neighborhood'], $data['city']])->filter()->implode(' - ')]
+                    $location !== ''
+                        ? ['field' => 'location', 'value' => $location]
                         : null,
-                    $data['title'] !== ''
-                        ? ['field' => 'title', 'value' => $data['title']]
+                    (string) $property->title !== ''
+                        ? ['field' => 'title', 'value' => (string) $property->title]
                         : null,
                 ])),
             ],

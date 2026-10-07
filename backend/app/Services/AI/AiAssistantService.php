@@ -92,6 +92,7 @@ class AiAssistantService
             return [
                 'reply' => $reply,
                 'status' => $status,
+                'intent' => $intent,
                 'error' => $failedStage,
                 'conversation_id' => $conversation->exists ? $conversation->id : null,
                 'session_token' => $conversation->exists ? $conversation->session_token : null,
