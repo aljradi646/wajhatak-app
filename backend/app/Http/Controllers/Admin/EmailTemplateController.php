@@ -24,16 +24,46 @@ class EmailTemplateController extends Controller
     {
         return view('admin.email-templates.index', [
             'templates' => EmailTemplate::query()->orderByDesc('is_system')->orderBy('name')->paginate(24)->withQueryString(),
+            'templateTypes' => self::templateTypes(),
             'variableRegistry' => EmailTemplateVariableRegistry::definitions(),
         ]);
     }
 
     public function create()
     {
-        return view('admin.email-templates.create', [
-            'variables' => EmailTemplateVariableRegistry::definitions(),
-            'previewValues' => EmailTemplateVariableRegistry::previewValues(['app.logo_url' => EmailSetting::current()->getLogoUrlForEmail() ?? '']),
-        ]);
+        return redirect()->route('admin.email-templates.index', ['create' => 1]);
+    }
+
+    public function editorData(EmailTemplate $emailTemplate): JsonResponse
+    {
+        return response()->json(['data' => [
+            'id' => $emailTemplate->id,
+            'name' => $emailTemplate->name,
+            'key' => $emailTemplate->key,
+            'description' => $emailTemplate->description,
+            'template_type' => $emailTemplate->template_type ?: 'custom',
+            'subject' => $emailTemplate->subject,
+            'html_content' => $emailTemplate->html_content,
+            'css_styles' => $emailTemplate->css_styles,
+            'text_content' => $emailTemplate->text_content,
+            'variables' => $emailTemplate->variables ?: [],
+            'is_system' => (bool) $emailTemplate->is_system,
+            'version' => (int) $emailTemplate->version,
+            'status' => $emailTemplate->status,
+        ]]);
+    }
+
+    public static function templateTypes(): array
+    {
+        return [
+            'verification' => 'رموز التحقق',
+            'authentication' => 'تسجيل الدخول والحساب',
+            'account' => 'الحساب والمستخدم',
+            'agent' => 'الوكلاء والتوثيق',
+            'property' => 'العقارات',
+            'notification' => 'الإشعارات العامة',
+            'custom' => 'قالب مخصص',
+        ];
     }
 
     public function store(Request $request)
@@ -323,6 +353,7 @@ class EmailTemplateController extends Controller
         $rules = [
             'name' => [$require ? 'required' : 'sometimes', 'string', 'max:190'],
             'description' => ['nullable', 'string', 'max:5000'],
+            'template_type' => ['nullable', Rule::in(array_keys(self::templateTypes()))],
             'subject' => [$require ? 'required' : 'sometimes', 'string', 'max:190'],
             'html_content' => ['nullable', 'string', 'max:1000000'],
             'text_content' => ['nullable', 'string', 'max:500000'],
@@ -339,6 +370,7 @@ class EmailTemplateController extends Controller
         }
 
         $data = $request->validate($rules);
+        $data['template_type'] = $data['template_type'] ?? 'custom';
         $data['css_styles'] = $this->decodeArray($data['css_styles'] ?? null);
         $data['variables'] = $this->decodeArray($data['variables'] ?? null);
 
