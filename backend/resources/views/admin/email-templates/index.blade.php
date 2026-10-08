@@ -201,16 +201,6 @@ $statusLabels = ['draft' => 'مسودة', 'published' => 'منشور', 'archived
         </section>
     </div>
 
-    <div x-show="showPreview" x-cloak class="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-3" @click.stop>
-        <section class="flex h-[86vh] w-[92vw] max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-gray-900" @click.stop>
-            <header class="flex items-center gap-3 border-b p-4 dark:border-gray-700">
-                <div class="font-black">المعاينة الآمنة</div>
-                <button type="button" @click="showPreview=false" class="ms-auto rounded-xl border px-3 py-2 text-xs font-black">إغلاق</button>
-            </header>
-            <iframe id="emailPreviewFrame" title="معاينة البريد" sandbox referrerpolicy="no-referrer" class="min-h-0 flex-1 bg-gray-100"></iframe>
-        </section>
-    </div>
-
     <div x-show="showIcons" x-cloak class="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4" @click.stop>
         <section class="w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl dark:bg-gray-900" @click.stop>
             <div class="flex items-center"><h3 class="font-black">مكتبة الأيقونات</h3><button type="button" @click="showIcons=false" class="ms-auto rounded-xl border px-3 py-2 text-xs font-black">إغلاق</button></div>
