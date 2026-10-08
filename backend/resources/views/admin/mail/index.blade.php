@@ -182,74 +182,37 @@
             </x-admin.card>
         </div>
 
-        {{-- ==================== تبويب القوالب ==================== --}}
+        {{-- ==================== استوديو القوالب ==================== --}}
         <div x-show="tab === 'templates'" x-cloak class="space-y-6">
-            <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-sm text-gray-600 dark:text-gray-300">
-                المتغيرات المتاحة داخل أي قالب:
-                <code class="mx-1 rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5">{name}</code>
-                <code class="mx-1 rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5">{code}</code>
-                <code class="mx-1 rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5">{ttl}</code>
-                <code class="mx-1 rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5">{reason}</code>
-                <code class="mx-1 rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5">{property}</code>
-            </div>
-
-            <form method="POST" action="{{ route('admin.mail.templates') }}">
-                @csrf
-                @foreach($templates as $key => $meta)
-                    <x-admin.card :title="$meta['label']" class="mb-5">
-                        <div class="space-y-3">
-                            <x-admin.input label="عنوان الرسالة" name="templates[{{ $key }}][subject]" :value="$templateValues[$key]['subject']" />
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-1">نص الرسالة</label>
-                                <textarea name="templates[{{ $key }}][body]" rows="6" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm leading-relaxed dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">{{ $templateValues[$key]['body'] }}</textarea>
-                            </div>
-                            <button type="button" @click="previewTemplate('{{ $key }}')" class="text-sm text-wajhatak-600 hover:text-wajhatak-700 font-bold mt-2">👁️ معاينة الرسالة</button>
-                        </div>
-                    </x-admin.card>
-                @endforeach
-                <x-admin.button type="submit">حفظ كل القوالب</x-admin.button>
-            </form>
-
-            {{-- نافذة معاينة الرسالة --}}
-            <div x-show="showPreview" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showPreview = false">
-                <div class="bg-white dark:bg-gray-800 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-auto m-4">
-                    <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center">
-                        <h3 class="font-bold text-gray-900 dark:text-gray-100">معاينة الرسالة</h3>
-                        <button @click="showPreview = false" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl">&times;</button>
+            <div class="rounded-2xl border border-wajhatak-200 bg-wajhatak-50 p-5 dark:border-wajhatak-900/40 dark:bg-wajhatak-900/10">
+                <div class="flex flex-col gap-4 md:flex-row md:items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-black text-gray-900 dark:text-gray-100">استوديو قوالب البريد</h3>
+                        <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                            أنشئ قوالب بريد حقيقية وقابلة للتخصيص بالكامل، أو عدّل القوالب النظامية، باستخدام محرر مرئي أو HTML/CSS،
+                            مع معاينة آمنة، متغيرات ديناميكية، حفظ تلقائي، إصدارات، نشر واستعادة.
+                        </p>
                     </div>
-                    <div class="p-4">
-                        <div x-html="previewHtml"></div>
-                    </div>
+                    <a href="{{ route('admin.email-templates.index') }}" class="shrink-0 rounded-xl bg-wajhatak-600 px-4 py-2.5 text-center text-sm font-black text-white">
+                        فتح استوديو القوالب
+                    </a>
                 </div>
             </div>
 
-            <script>
-                function previewTemplate(templateKey) {
-                    fetch('{{ route('admin.mail.preview') }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                        },
-                        body: JSON.stringify({ template_key: templateKey })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        Alpine.store('mailPreview').previewHtml = data.html;
-                        Alpine.store('mailPreview').showPreview = true;
-                    })
-                    .catch(error => {
-                        alert('فشل تحميل المعاينة: ' + error.message);
-                    });
-                }
-
-                document.addEventListener('alpine:init', () => {
-                    Alpine.store('mailPreview', {
-                        showPreview: false,
-                        previewHtml: ''
-                    });
-                });
-            </script>
+            <div class="grid gap-4 md:grid-cols-3">
+                <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                    <div class="font-black">محرر مرئي</div>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">بناء رسائل البريد بتخطيط متوافق مع البريد الإلكتروني وتنسيق العناصر بصريًا.</p>
+                </div>
+                <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                    <div class="font-black">HTML / CSS</div>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">تحكم كامل في الكود مع محرر متخصص، ثم معاينة النتيجة بعد التعقيم والرندر الفعلي.</p>
+                </div>
+                <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                    <div class="font-black">الإصدارات والنشر</div>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">المسودة لا تصبح حية حتى تنشرها، والإصدار المنشور يبقى ثابتًا ويمكن استعادته.</p>
+                </div>
+            </div>
         </div>
     </div>
 </x-admin.layouts.admin>
