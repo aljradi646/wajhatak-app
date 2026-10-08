@@ -39,13 +39,6 @@ final class ResendService
             ];
         }
 
-        if (! $settings->is_active) {
-            return [
-                'success' => false,
-                'message' => 'إرسال البريد معطل حاليًا من إعدادات المنصة.',
-            ];
-        }
-
         if (! $settings->isResend()) {
             return [
                 'success' => false,
