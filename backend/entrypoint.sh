@@ -335,7 +335,7 @@ if [ "$SERVICE_TYPE" = "app" ]; then
     echo "==> [Wajhatak] Synchronizing production email templates..."
     php artisan db:seed --class=EmailTemplateSeeder --force
 
-    EXPECTED_TEMPLATES="email_verification agent_approved agent_rejected property_published property_rejected"
+    export EXPECTED_TEMPLATES="email_verification agent_approved agent_rejected property_published property_rejected"
     MISSING_TEMPLATES=$(php artisan tinker --execute='
         $expected = explode(" ", trim(getenv("EXPECTED_TEMPLATES") ?: ""));
         $missing = array_values(array_filter($expected, fn ($key) => ! \App\Models\EmailTemplate::query()
