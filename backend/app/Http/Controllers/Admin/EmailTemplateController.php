@@ -13,6 +13,8 @@ use App\Services\Mail\UnifiedMailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -202,6 +204,49 @@ class EmailTemplateController extends Controller
             'text' => $rendered['text'],
             'unknown_variables' => $rendered['unknown_variables'],
         ]);
+    }
+
+    /** معاينة مسودة جديدة قبل وجود سجل في قاعدة البيانات. */
+    public function previewDraft(Request $request): JsonResponse
+    {
+        $data = $this->validated($request, null, false);
+        $variables = array_merge(
+            EmailTemplateVariableRegistry::previewValues(),
+            $this->decodeArray($request->input('preview_variables', [])) ?? [],
+        );
+        $variables['app.logo_url'] ??= EmailSetting::current()->getLogoUrlForEmail() ?? '';
+
+        $rendered = app(EmailTemplateRenderer::class)->renderPayload(
+            (string) ($data['subject'] ?? ''),
+            $data['html_content'] ?? '',
+            $data['text_content'] ?? '',
+            $data['css_styles'] ?? null,
+            $variables,
+        );
+
+        return response()->json($rendered);
+    }
+
+    /** رفع صورة حقيقية من جهاز المدير إلى مكتبة أصول البريد. */
+    public function uploadAsset(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'max:5120', 'mimetypes:image/jpeg,image/png,image/gif,image/webp'],
+        ]);
+
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'png');
+        $name = Str::uuid()->toString().'.'.$extension;
+        $path = $file->storeAs('email-assets', $name, 'public');
+
+        return response()->json([
+            'data' => [[
+                'src' => Storage::disk('public')->url($path),
+                'name' => $file->getClientOriginalName(),
+                'type' => 'image',
+                'size' => $file->getSize(),
+            ]],
+        ], 201);
     }
 
     public function sendTest(Request $request, EmailTemplate $emailTemplate): JsonResponse
