@@ -3,6 +3,14 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
+$defaultConnection = env('DB_CONNECTION', 'mysql');
+if (
+    env('APP_ENV', 'production') === 'production'
+    && env('WJ_ALLOW_SQLITE', 'false') !== 'true'
+) {
+    $defaultConnection = 'mysql';
+}
+
 return [
 
     /*
@@ -17,7 +25,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => $defaultConnection,
 
     /*
     |--------------------------------------------------------------------------
@@ -46,7 +54,7 @@ return [
 
         'mysql' => [
             'driver' => 'mysql',
-            'url' => env('DB_URL'),
+            'url' => env('DB_URL', env('MYSQL_URL')),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '3306'),
             'database' => env('DB_DATABASE', 'laravel'),
