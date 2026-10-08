@@ -184,6 +184,16 @@
 
         {{-- ==================== قوالب البريد ==================== --}}
         <div x-show="tab === 'templates'" x-cloak class="space-y-5">
+            {{-- Compatibility fields for the legacy settings fallback. Values come from
+                 the real email_templates table when the matching template exists. --}}
+            <div class="hidden" aria-hidden="true">
+                @php($dbEmailTemplates = collect($emailTemplates)->keyBy('key'))
+                @foreach($templates as $legacyKey => $legacyMeta)
+                    @php($dbTemplate = $dbEmailTemplates->get($legacyKey))
+                    <input type="text" name="templates[{{ $legacyKey }}][subject]" value="{{ old('templates.'.$legacyKey.'.subject', $dbTemplate?->subject ?? $templateValues[$legacyKey]['subject'] ?? '') }}">
+                    <textarea name="templates[{{ $legacyKey }}][body]">{{ old('templates.'.$legacyKey.'.body', $dbTemplate?->text_content ?? $templateValues[$legacyKey]['body'] ?? '') }}</textarea>
+                @endforeach
+            </div>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div class="flex-1">
                     <h3 class="text-lg font-black">قوالب البريد الجاهزة</h3>

@@ -148,12 +148,21 @@ class EmailTemplateStudioTest extends TestCase
     }
 
 
-    public function test_new_template_draft_preview_is_server_rendered(): void
+    public function test_email_template_index_and_create_entry_render_the_real_editor(): void
+    {
+        $response = $this->actingAs($this->admin())->get(route('admin.email-templates.index', ['create' => 1]));
+
+        $response->assertOk()
+            ->assertSee('grapesjs-preset-newsletter', false)
+            ->assertSee('id="emailGjs"', false)
+            ->assertSee('محرر بصري للنشرات البريدية', false);
+    }
+
+    public function test_new_template_draft_preview_does_not_require_a_database_key(): void
     {
         $response = $this->actingAs($this->admin())->postJson(
             route('admin.email-templates.preview-draft'),
             [
-                'name' => 'قالب جديد',
                 'subject' => 'مرحبًا {{user.name}}',
                 'html_content' => '<table><tr><td>{{user.name}}</td></tr></table>',
                 'text_content' => 'مرحبًا {{user.name}}',
@@ -233,6 +242,29 @@ class EmailTemplateStudioTest extends TestCase
 
         $update->assertOk()->assertJsonPath('data.version', 2);
         $this->assertSame('تسجيل دخول جديد', $template->fresh()->subject);
+    }
+
+    public function test_production_email_catalog_seeds_five_real_system_templates(): void
+    {
+        $this->seed(\Database\Seeders\EmailTemplateSeeder::class);
+
+        $this->assertSame(5, EmailTemplate::query()->where('is_system', true)->count());
+
+        foreach ([
+            'email_verification' => 'verification',
+            'agent_approved' => 'agent',
+            'agent_rejected' => 'agent',
+            'property_published' => 'property',
+            'property_rejected' => 'property',
+        ] as $key => $type) {
+            $this->assertDatabaseHas('email_templates', [
+                'key' => $key,
+                'template_type' => $type,
+                'status' => 'published',
+                'is_active' => 1,
+                'is_system' => 1,
+            ]);
+        }
     }
 
 }

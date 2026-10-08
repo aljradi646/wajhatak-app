@@ -375,9 +375,9 @@ class EmailTemplateController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ];
 
-        if (! $template) {
+        if (! $template && $require) {
             $rules['key'] = ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:email_templates,key'];
-        } elseif (! $template->is_system) {
+        } elseif ($template && ! $template->is_system) {
             $rules['key'] = ['sometimes', 'required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('email_templates', 'key')->ignore($template->id)];
         }
 

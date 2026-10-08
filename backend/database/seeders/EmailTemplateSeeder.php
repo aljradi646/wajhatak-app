@@ -15,115 +15,88 @@ class EmailTemplateSeeder extends Seeder
             [
                 'key' => 'email_verification',
                 'name' => 'رمز التحقق من البريد',
-                'description' => 'رسالة تحتوي على رمز التحقق المُرسل للمستخدم',
+                'description' => 'رسالة التحقق من البريد الإلكتروني برمز صالح لمدة محددة.',
                 'template_type' => 'verification',
-                'subject' => 'رمز التحقق من وجهتك',
+                'subject' => 'رمز التحقق من {{app.name}}',
                 'html_content' => $this->getEmailVerificationHtml(),
-                'text_content' => 'مرحبا {name}،
-
-رمز التحقق الخاص بك هو: {code}
-
-صلاحية الرمز: {ttl} دقيقة.
-
-إذا لم تطلب هذا الرمز، يرجى تجاهل هذه الرسالة.',
-                'variables' => ['name', 'code', 'ttl'],
-                'is_system' => true,
-                'is_active' => true,
+                'text_content' => "مرحبًا {{user.name}}\n\nرمز التحقق الخاص بك هو: {{code}}\nصلاحية الرمز: {{ttl}} دقيقة.\n\nإذا لم تطلب هذا الرمز، تجاهل الرسالة.",
+                'variables' => ['user.name', 'code', 'ttl', 'app.name', 'app.logo_url'],
             ],
             [
                 'key' => 'agent_approved',
-                'name' => 'موافقة توثيق الوكيل',
-                'description' => 'رسالة إشعار الوكيل بموافقة توثيقه',
+                'name' => 'قبول توثيق الوكيل',
+                'description' => 'إشعار الوكيل باعتماد حسابه واستعداده لإدارة العقارات.',
                 'template_type' => 'agent',
-                'subject' => 'تم توثيق حسابك في وجهتك ✓',
+                'subject' => 'تم توثيق حسابك كوكيل في {{app.name}}',
                 'html_content' => $this->getAgentApprovedHtml(),
-                'text_content' => 'أهلا {name}،
-
-نود إعلامك بأن حسابك كوكيل عقاري في منصة وجهتك قد تم توثيقه بنجاح.
-
-يمكنك الآن البدء بنشر العقارات والاستفادة من جميع مميزات المنصة.
-
-مع تحيات فريق وجهتك.',
-                'variables' => ['name'],
-                'is_system' => true,
-                'is_active' => true,
+                'text_content' => "مرحبًا {{user.name}}\n\nتم اعتماد حسابك كوكيل عقاري في {{app.name}}.\nيمكنك الآن البدء بإدارة العقارات وطلبات المشاهدة.",
+                'variables' => ['user.name', 'agent.name', 'app.url', 'app.name', 'app.logo_url'],
             ],
             [
                 'key' => 'agent_rejected',
                 'name' => 'رفض توثيق الوكيل',
-                'description' => 'رسالة إشعار الوكيل برفض توثيقه مع السبب',
+                'description' => 'إشعار الوكيل برفض طلب التوثيق مع سبب واضح وخطوة تالية.',
                 'template_type' => 'agent',
-                'subject' => 'تم رفض طلب توثيق حسابك',
+                'subject' => 'تحديث طلب توثيق حسابك — {{app.name}}',
                 'html_content' => $this->getAgentRejectedHtml(),
-                'text_content' => 'أهلا {name}،
-
-نأسف لإبلاغك بأن طلب توثيق حسابك كوكيل عقاري في منصة وجهتك قد تم رفضه.
-
-سبب الرفض: {reason}
-
-يمكنك تقديم طلب جديد بعد معالجة الملاحظات.
-
-مع تحيات فريق وجهتك.',
-                'variables' => ['name', 'reason'],
-                'is_system' => true,
-                'is_active' => true,
+                'text_content' => "مرحبًا {{user.name}}\n\nلم تتم الموافقة على طلب توثيق حسابك.\nالسبب: {{reason}}\n\nيمكنك معالجة الملاحظات ثم إعادة التقديم.",
+                'variables' => ['user.name', 'reason', 'app.url', 'app.name', 'app.logo_url'],
             ],
             [
                 'key' => 'property_published',
-                'name' => 'نشر العقار',
-                'description' => 'رسالة إشعار بنشر العقار بنجاح',
+                'name' => 'تم نشر العقار',
+                'description' => 'إشعار المالك بأن العقار أصبح منشورًا ومتاحًا داخل المنصة.',
                 'template_type' => 'property',
-                'subject' => 'تم نشر عقارك بنجاح ✓',
+                'subject' => 'تم نشر عقارك بنجاح — {{property.title}}',
                 'html_content' => $this->getPropertyPublishedHtml(),
-                'text_content' => 'أهلا {name}،
-
-تم نشر عقارك "{property}" بنجاح في منصة وجهتك.
-
-يمكنك الآن متابعة الاستفسارات والطلبات من خلال لوحة التحكم.
-
-مع تحيات فريق وجهتك.',
-                'variables' => ['name', 'property'],
-                'is_system' => true,
-                'is_active' => true,
+                'text_content' => "مرحبًا {{user.name}}\n\nتم نشر العقار {{property.title}} بنجاح.\nالمدينة: {{property.city}}\nالسعر: {{property.price}}\nالمرجع: {{property.reference_code}}",
+                'variables' => ['user.name', 'property.title', 'property.city', 'property.price', 'property.reference_code', 'app.url', 'app.name', 'app.logo_url'],
             ],
             [
                 'key' => 'property_rejected',
                 'name' => 'رفض نشر العقار',
-                'description' => 'رسالة إشعار برفض نشر العقار مع السبب',
+                'description' => 'إشعار المالك بسبب رفض نشر العقار مع توجيه واضح لإعادة التقديم.',
                 'template_type' => 'property',
-                'subject' => 'تم رفض نشر عقارك',
+                'subject' => 'مطلوب تعديل عقارك — {{property.title}}',
                 'html_content' => $this->getPropertyRejectedHtml(),
-                'text_content' => 'أهلا {name}،
-
-نأسف لإبلاغك بأن طلب نشر عقارك "{property}" قد تم رفضه.
-
-سبب الرفض: {reason}
-
-يمكنك تعديل البيانات وإعادة تقديم الطلب.
-
-مع تحيات فريق وجهتك.',
-                'variables' => ['name', 'property', 'reason'],
-                'is_system' => true,
-                'is_active' => true,
+                'text_content' => "مرحبًا {{user.name}}\n\nتعذر نشر العقار {{property.title}}.\nالسبب: {{reason}}\n\nعدّل البيانات وأعد التقديم.",
+                'variables' => ['user.name', 'property.title', 'reason', 'app.url', 'app.name', 'app.logo_url'],
             ],
         ];
 
         DB::transaction(function () use ($templates): void {
             foreach ($templates as $definition) {
-                $template = EmailTemplate::updateOrCreate(
-                    ['key' => $definition['key']],
-                    array_merge($definition, [
+                $template = EmailTemplate::query()->firstOrNew(['key' => $definition['key']]);
+                $isNew = ! $template->exists;
+
+                $needsLegacyUpgrade = $template->exists
+                    && $template->is_system
+                    && (int) $template->version === 1
+                    && (int) ($template->published_version ?? 1) === 1
+                    && (
+                        str_contains((string) $template->html_content, '{name}')
+                        || str_contains((string) $template->html_content, '{{logo}}')
+                    );
+
+                if ($isNew || $needsLegacyUpgrade) {
+                    $template->fill(array_merge($definition, [
+                        'is_system' => true,
+                        'is_active' => true,
+                        'version' => 1,
                         'status' => 'published',
                         'published_version' => 1,
-                        'version' => 1,
                         'published_at' => now(),
                         'archived_at' => null,
                         'autosaved_at' => null,
-                    ])
-                );
+                    ]));
+                    $template->save();
+                }
 
-                EmailTemplateVersion::updateOrCreate(
-                    ['email_template_id' => $template->id, 'version' => 1],
+                EmailTemplateVersion::query()->firstOrCreate(
+                    [
+                        'email_template_id' => $template->id,
+                        'version' => (int) $template->version,
+                    ],
                     [
                         'subject' => (string) $template->subject,
                         'html_content' => $template->html_content,
@@ -131,7 +104,9 @@ class EmailTemplateSeeder extends Seeder
                         'css_styles' => $template->css_styles,
                         'variables' => $template->variables,
                         'created_by' => null,
-                        'change_note' => 'قالب إنتاجي أساسي — تمت تهيئته بواسطة Seeder',
+                        'change_note' => $needsLegacyUpgrade
+                            ? 'تحديث القوالب النظامية القديمة إلى قوالب الإنتاج الحديثة'
+                            : ($isNew ? 'قالب إنتاجي أساسي' : 'تهيئة نسخة القالب الحالية'),
                     ],
                 );
             }
@@ -140,227 +115,130 @@ class EmailTemplateSeeder extends Seeder
 
     private function getEmailVerificationHtml(): string
     {
-        return <<<HTML
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>رمز التحقق</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5;">
-    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-        <div style="background: linear-gradient(135deg, #075E4A, #0E8A6D); padding: 30px; text-align: center;">
-            {{logo}}
-            <h1 style="color: white; margin: 0; font-size: 24px;">وجهتك</h1>
-        </div>
-        
-        <div style="padding: 30px;">
-            <h2 style="color: #075E4A; margin-top: 0;">رمز التحقق</h2>
-            <p>أهلا {name}،</p>
-            <p>رمز التحقق الخاص بك هو:</p>
-            
-            <div style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; border-radius: 8px; margin: 20px 0; color: #075E4A;">
-                {code}
-            </div>
-            
-            <p>صلاحية الرمز: <strong>{ttl} دقيقة</strong></p>
-            <p>إذا لم تطلب هذا الرمز، يرجى تجاهل هذه الرسالة.</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eee;">
-            <p style="margin: 0; color: #666; font-size: 12px;">
-                تم إرسال هذه الرسالة من منصة وجهتك العقارية
-            </p>
-        </div>
-    </div>
-</body>
-</html>
+        return <<<'HTML'
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background:#f4f7f6;">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;border-collapse:collapse;background:#ffffff;border-radius:20px;overflow:hidden;">
+<tr><td style="padding:34px 30px;text-align:center;background:#075e4a;">
+<img src="{{app.logo_url}}" alt="{{app.name}}" width="120" style="display:block;width:120px;max-width:120px;height:auto;margin:0 auto 14px;">
+<h1 style="margin:0;color:#ffffff;font:700 25px/1.35 Arial,sans-serif;">{{app.name}}</h1>
+<p style="margin:8px 0 0;color:#dceee9;font:400 14px/1.7 Arial,sans-serif;">تأكيد بريدك الإلكتروني</p>
+</td></tr>
+<tr><td style="padding:34px 30px;text-align:right;font:400 16px/1.8 Arial,sans-serif;color:#263631;">
+<h2 style="margin:0 0 10px;color:#075e4a;font:700 22px/1.5 Arial,sans-serif;">مرحبًا {{user.name}}</h2>
+<p style="margin:0 0 18px;">أدخل الرمز التالي في التطبيق لإكمال التحقق من بريدك الإلكتروني.</p>
+<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:18px auto 22px;">
+<tr><td style="padding:18px 28px;border:1px solid #dce8e3;border-radius:14px;background:#f5faf8;color:#075e4a;font:700 30px/1 Arial,sans-serif;letter-spacing:7px;text-align:center;">{{code}}</td></tr>
+</table>
+<p style="margin:0;color:#63736d;">صلاحية الرمز: <strong>{{ttl}} دقيقة</strong>.</p>
+<p style="margin:14px 0 0;font-size:13px;color:#7b8783;">إذا لم تطلب هذا الرمز، تجاهل هذه الرسالة حفاظًا على أمان حسابك.</p>
+</td></tr>
+<tr><td style="padding:18px 30px;text-align:center;background:#f7faf9;color:#7b8783;font:400 12px/1.6 Arial,sans-serif;">رسالة آلية من {{app.name}}</td></tr>
+</table></td></tr></table>
 HTML;
     }
 
     private function getAgentApprovedHtml(): string
     {
-        return <<<HTML
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>موافقة التوثيق</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5;">
-    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-        <div style="background: linear-gradient(135deg, #075E4A, #0E8A6D); padding: 30px; text-align: center;">
-            {{logo}}
-            <h1 style="color: white; margin: 0; font-size: 24px;">وجهتك</h1>
-        </div>
-        
-        <div style="padding: 30px;">
-            <div style="text-align: center; margin-bottom: 20px;">
-                <span style="font-size: 48px;">✓</span>
-            </div>
-            <h2 style="color: #075E4A; margin-top: 0; text-align: center;">تم توثيق حسابك بنجاح!</h2>
-            <p>أهلا {name}،</p>
-            <p>نود إعلامك بأن حسابك كوكيل عقاري في منصة وجهتك قد تم توثيقه بنجاح.</p>
-            
-            <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; border-right: 4px solid #075E4A;">
-                <h3 style="margin-top: 0; color: #075E4A;">ما يمكنك فعله الآن:</h3>
-                <ul style="margin: 10px 0; padding-right: 20px;">
-                    <li>نشر العقارات</li>
-                    <li>إدارة الاستفسارات</li>
-                    <li>متابعة طلبات المشاهدة</li>
-                    <li>الاستفادة من جميع مميزات المنصة</li>
-                </ul>
-            </div>
-            
-            <p>يمكنك البدء فوراً من خلال لوحة التحكم.</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eee;">
-            <p style="margin: 0; color: #666; font-size: 12px;">
-                تم إرسال هذه الرسالة من منصة وجهتك العقارية
-            </p>
-        </div>
-    </div>
-</body>
-</html>
+        return <<<'HTML'
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background:#f4f7f6;">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;border-collapse:collapse;background:#ffffff;border-radius:20px;overflow:hidden;">
+<tr><td style="padding:34px 30px;text-align:center;background:#075e4a;">
+<img src="{{app.logo_url}}" alt="{{app.name}}" width="120" style="display:block;width:120px;max-width:120px;height:auto;margin:0 auto 14px;">
+<h1 style="margin:0;color:#ffffff;font:700 25px/1.35 Arial,sans-serif;">تم توثيق حساب الوكيل</h1>
+</td></tr>
+<tr><td style="padding:34px 30px;text-align:right;font:400 16px/1.8 Arial,sans-serif;color:#263631;">
+<div style="display:inline-block;padding:7px 12px;border-radius:999px;background:#eaf7f1;color:#087253;font:700 12px Arial,sans-serif;">تم الاعتماد</div>
+<h2 style="margin:14px 0 10px;color:#075e4a;font:700 22px/1.5 Arial,sans-serif;">مرحبًا {{user.name}}</h2>
+<p style="margin:0 0 14px;">تم اعتماد حسابك كوكيل عقاري في {{app.name}}، وأصبح بإمكانك إدارة العقارات وطلبات المشاهدة.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:20px 0;background:#f7faf9;">
+<tr><td style="padding:16px;border-right:4px solid #0e8a6d;">
+<strong style="color:#075e4a;">الخطوات التالية</strong>
+<ul style="margin:8px 0 0;padding:0 20px 0 0;"><li>إكمال بيانات الوكيل</li><li>إضافة العقارات الحقيقية</li><li>متابعة طلبات المشاهدة</li></ul>
+</td></tr></table>
+<a href="{{app.url}}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#075e4a;color:#ffffff;text-decoration:none;font-weight:700;">فتح منصة {{app.name}}</a>
+</td></tr>
+<tr><td style="padding:18px 30px;text-align:center;background:#f7faf9;color:#7b8783;font:400 12px/1.6 Arial,sans-serif;">{{app.name}} — إشعار اعتماد آلي</td></tr>
+</table></td></tr></table>
 HTML;
     }
 
     private function getAgentRejectedHtml(): string
     {
-        return <<<HTML
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>رفض التوثيق</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5;">
-    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-        <div style="background: linear-gradient(135deg, #dc2626, #ef4444); padding: 30px; text-align: center;">
-            {{logo}}
-            <h1 style="color: white; margin: 0; font-size: 24px;">وجهتك</h1>
-        </div>
-        
-        <div style="padding: 30px;">
-            <div style="text-align: center; margin-bottom: 20px;">
-                <span style="font-size: 48px;">✕</span>
-            </div>
-            <h2 style="color: #dc2626; margin-top: 0; text-align: center;">تم رفض طلب التوثيق</h2>
-            <p>أهلا {name}،</p>
-            <p>نأسف لإبلاغك بأن طلب توثيق حسابك كوكيل عقاري في منصة وجهتك قد تم رفضه.</p>
-            
-            <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border-right: 4px solid #dc2626;">
-                <h3 style="margin-top: 0; color: #dc2626;">سبب الرفض:</h3>
-                <p style="margin: 10px 0;">{reason}</p>
-            </div>
-            
-            <p>يمكنك تقديم طلب جديد بعد معالجة الملاحظات المذكورة أعلاه.</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eee;">
-            <p style="margin: 0; color: #666; font-size: 12px;">
-                تم إرسال هذه الرسالة من منصة وجهتك العقارية
-            </p>
-        </div>
-    </div>
-</body>
-</html>
+        return <<<'HTML'
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background:#f6f7f7;">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;border-collapse:collapse;background:#ffffff;border-radius:20px;overflow:hidden;">
+<tr><td style="padding:34px 30px;text-align:center;background:#8b1e1e;">
+<img src="{{app.logo_url}}" alt="{{app.name}}" width="120" style="display:block;width:120px;max-width:120px;height:auto;margin:0 auto 14px;">
+<h1 style="margin:0;color:#ffffff;font:700 25px/1.35 Arial,sans-serif;">تحديث طلب التوثيق</h1>
+</td></tr>
+<tr><td style="padding:34px 30px;text-align:right;font:400 16px/1.8 Arial,sans-serif;color:#263631;">
+<h2 style="margin:0 0 10px;color:#8b1e1e;font:700 22px/1.5 Arial,sans-serif;">مرحبًا {{user.name}}</h2>
+<p style="margin:0 0 16px;">تعذر اعتماد طلب توثيق حسابك كوكيل في {{app.name}}.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background:#fff5f5;">
+<tr><td style="padding:18px;border-right:4px solid #dc2626;">
+<strong style="color:#991b1b;">سبب الرفض</strong>
+<p style="margin:8px 0 0;">{{reason}}</p>
+</td></tr></table>
+<p style="margin:18px 0 0;">عالج الملاحظات ثم أعد تقديم الطلب من حسابك.</p>
+<a href="{{app.url}}" style="display:inline-block;margin-top:12px;padding:12px 20px;border-radius:10px;background:#8b1e1e;color:#ffffff;text-decoration:none;font-weight:700;">العودة إلى المنصة</a>
+</td></tr>
+<tr><td style="padding:18px 30px;text-align:center;background:#fafafa;color:#7b8783;font:400 12px/1.6 Arial,sans-serif;">إشعار آلي من {{app.name}}</td></tr>
+</table></td></tr></table>
 HTML;
     }
 
     private function getPropertyPublishedHtml(): string
     {
-        return <<<HTML
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نشر العقار</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5;">
-    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-        <div style="background: linear-gradient(135deg, #075E4A, #0E8A6D); padding: 30px; text-align: center;">
-            {{logo}}
-            <h1 style="color: white; margin: 0; font-size: 24px;">وجهتك</h1>
-        </div>
-        
-        <div style="padding: 30px;">
-            <div style="text-align: center; margin-bottom: 20px;">
-                <span style="font-size: 48px;">🏠</span>
-            </div>
-            <h2 style="color: #075E4A; margin-top: 0; text-align: center;">تم نشر عقارك بنجاح!</h2>
-            <p>أهلا {name}،</p>
-            <p>تم نشر عقارك "<strong>{property}</strong>" بنجاح في منصة وجهتك.</p>
-            
-            <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; border-right: 4px solid #075E4A;">
-                <h3 style="margin-top: 0; color: #075E4A;">الخطوات التالية:</h3>
-                <ul style="margin: 10px 0; padding-right: 20px;">
-                    <li>راقب الاستفسارات الواردة</li>
-                    <li>رد على طلبات المشاهدة</li>
-                    <li>حدّث معلومات العقار عند الحاجة</li>
-                </ul>
-            </div>
-            
-            <p>يمكنك إدارة عقارك من خلال لوحة التحكم.</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eee;">
-            <p style="margin: 0; color: #666; font-size: 12px;">
-                تم إرسال هذه الرسالة من منصة وجهتك العقارية
-            </p>
-        </div>
-    </div>
-</body>
-</html>
+        return <<<'HTML'
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background:#f4f7f6;">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;border-collapse:collapse;background:#ffffff;border-radius:20px;overflow:hidden;">
+<tr><td style="padding:30px;text-align:right;background:#075e4a;">
+<h1 style="margin:0;color:#ffffff;font:700 24px/1.4 Arial,sans-serif;">تم نشر عقارك</h1>
+<p style="margin:6px 0 0;color:#dceee9;font:400 14px/1.7 Arial,sans-serif;">{{app.name}}</p>
+</td></tr>
+<tr><td style="padding:32px 30px;text-align:right;font:400 16px/1.8 Arial,sans-serif;color:#263631;">
+<h2 style="margin:0 0 10px;color:#075e4a;font:700 22px/1.5 Arial,sans-serif;">مرحبًا {{user.name}}</h2>
+<p style="margin:0 0 20px;">تم نشر العقار التالي وأصبح جاهزًا للعرض داخل المنصة.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #dce8e3;border-radius:14px;">
+<tr><td style="padding:16px;"><strong style="color:#075e4a;">العقار</strong><br>{{property.title}}</td></tr>
+<tr><td style="padding:16px;border-top:1px solid #edf2f0;"><strong style="color:#55645f;">المدينة</strong><br>{{property.city}}</td></tr>
+<tr><td style="padding:16px;border-top:1px solid #edf2f0;"><strong style="color:#55645f;">السعر</strong><br>{{property.price}}</td></tr>
+<tr><td style="padding:16px;border-top:1px solid #edf2f0;"><strong style="color:#55645f;">المرجع</strong><br>{{property.reference_code}}</td></tr>
+</table>
+<a href="{{app.url}}" style="display:inline-block;margin-top:20px;padding:12px 20px;border-radius:10px;background:#075e4a;color:#ffffff;text-decoration:none;font-weight:700;">إدارة العقار</a>
+</td></tr>
+<tr><td style="padding:18px 30px;text-align:center;background:#f7faf9;color:#7b8783;font:400 12px/1.6 Arial,sans-serif;">إشعار نشر من {{app.name}}</td></tr>
+</table></td></tr></table>
 HTML;
     }
 
     private function getPropertyRejectedHtml(): string
     {
-        return <<<HTML
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>رفض نشر العقار</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5;">
-    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-        <div style="background: linear-gradient(135deg, #dc2626, #ef4444); padding: 30px; text-align: center;">
-            {{logo}}
-            <h1 style="color: white; margin: 0; font-size: 24px;">وجهتك</h1>
-        </div>
-        
-        <div style="padding: 30px;">
-            <div style="text-align: center; margin-bottom: 20px;">
-                <span style="font-size: 48px;">🏠</span>
-            </div>
-            <h2 style="color: #dc2626; margin-top: 0; text-align: center;">تم رفض نشر العقار</h2>
-            <p>أهلا {name}،</p>
-            <p>نأسف لإبلاغك بأن طلب نشر عقارك "<strong>{property}</strong>" قد تم رفضه.</p>
-            
-            <div style="background: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border-right: 4px solid #dc2626;">
-                <h3 style="margin-top: 0; color: #dc2626;">سبب الرفض:</h3>
-                <p style="margin: 10px 0;">{reason}</p>
-            </div>
-            
-            <p>يمكنك تعديل البيانات وإعادة تقديم الطلب من خلال لوحة التحكم.</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eee;">
-            <p style="margin: 0; color: #666; font-size: 12px;">
-                تم إرسال هذه الرسالة من منصة وجهتك العقارية
-            </p>
-        </div>
-    </div>
-</body>
-</html>
+        return <<<'HTML'
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background:#f6f7f7;">
+<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;border-collapse:collapse;background:#ffffff;border-radius:20px;overflow:hidden;">
+<tr><td style="padding:30px;text-align:right;background:#8b1e1e;">
+<h1 style="margin:0;color:#ffffff;font:700 24px/1.4 Arial,sans-serif;">تعذر نشر العقار</h1>
+<p style="margin:6px 0 0;color:#ffe2e2;font:400 14px/1.7 Arial,sans-serif;">مطلوب تعديل قبل إعادة التقديم</p>
+</td></tr>
+<tr><td style="padding:32px 30px;text-align:right;font:400 16px/1.8 Arial,sans-serif;color:#263631;">
+<h2 style="margin:0 0 10px;color:#8b1e1e;font:700 22px/1.5 Arial,sans-serif;">مرحبًا {{user.name}}</h2>
+<p style="margin:0 0 18px;">تعذر نشر العقار <strong>{{property.title}}</strong> في {{app.name}}.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background:#fff5f5;">
+<tr><td style="padding:18px;border-right:4px solid #dc2626;">
+<strong style="color:#991b1b;">السبب</strong>
+<p style="margin:8px 0 0;">{{reason}}</p>
+</td></tr></table>
+<p style="margin:18px 0 0;">عدّل البيانات المطلوبة ثم أعد إرسال العقار للمراجعة.</p>
+<a href="{{app.url}}" style="display:inline-block;margin-top:12px;padding:12px 20px;border-radius:10px;background:#8b1e1e;color:#ffffff;text-decoration:none;font-weight:700;">فتح لوحة المنصة</a>
+</td></tr>
+<tr><td style="padding:18px 30px;text-align:center;background:#fafafa;color:#7b8783;font:400 12px/1.6 Arial,sans-serif;">إشعار آلي من {{app.name}}</td></tr>
+</table></td></tr></table>
 HTML;
     }
 }

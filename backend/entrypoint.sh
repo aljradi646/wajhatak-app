@@ -307,6 +307,12 @@ if [ "$SERVICE_TYPE" = "app" ]; then
     echo "==> [Wajhatak] Running migrations (idempotent — syncs new tables/columns with the live database)..."
     php artisan migrate --force
 
+    # EmailTemplateSeeder is idempotent and intentionally runs on every boot.
+    # This backfills/updates the five built-in production templates even when
+    # system_initialized=1 from an older deployment.
+    echo "==> [Wajhatak] Synchronizing production email templates..."
+    php artisan db:seed --class=EmailTemplateSeeder --force
+
     SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
     case "$SEEDED_FLAG" in
