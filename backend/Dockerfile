@@ -12,6 +12,9 @@ FROM composer:2 AS composer_stage
 
 WORKDIR /app
 
+# ar-php requires PHP's calendar extension during Composer dependency resolution.
+RUN docker-php-ext-install calendar
+
 # Only composer.json / lockfile are copied here so dependency resolution is
 # cached independently from the source code. Vendored deps for PHP 8.2 are
 # installed with --no-scripts because the full application (needed for Laravel
@@ -73,6 +76,7 @@ RUN apk add --no-cache \
         intl \
         bcmath \
         exif \
+        calendar \
         pcntl \
         opcache \
         gd \
