@@ -26,13 +26,18 @@ class UnifiedMailService
         }
 
         if ($settings->isResend()) {
-            $this->resendService->send(
+            $result = $this->resendService->send(
                 $to,
                 $subject,
                 $options['html'] ?? null,
                 $options['text'] ?? $body,
                 $options['attachments'] ?? [],
             );
+
+            if (! ($result['success'] ?? false)) {
+                throw new \RuntimeException((string) ($result['message'] ?? 'فشل إرسال البريد عبر Resend.'));
+            }
+
             return;
         }
 
