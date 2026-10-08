@@ -18,6 +18,9 @@ FROM composer:2 AS composer_stage
 
 WORKDIR /app
 
+# ar-php requires PHP's calendar extension during Composer dependency resolution.
+RUN docker-php-ext-install calendar
+
 # Only composer.json / lockfile here so dependency resolution is cached
 # independently from source. --no-scripts because Laravel needs the full app
 # (package:discover) which runs later in the runtime stage.
@@ -72,6 +75,7 @@ RUN apk add --no-cache \
         intl \
         bcmath \
         exif \
+        calendar \
         pcntl \
         opcache \
         gd \
