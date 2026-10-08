@@ -95,12 +95,7 @@ class EmailTemplateController extends Controller
 
     public function edit(EmailTemplate $emailTemplate)
     {
-        return view('admin.email-templates.edit', [
-            'template' => $emailTemplate,
-            'logoUrl' => EmailSetting::current()->getLogoUrlForEmail(),
-            'variables' => EmailTemplateVariableRegistry::definitions(),
-            'previewValues' => EmailTemplateVariableRegistry::previewValues(['app.logo_url' => EmailSetting::current()->getLogoUrlForEmail() ?? '']),
-        ]);
+        return redirect()->route('admin.email-templates.index', ['edit' => $emailTemplate->id]);
     }
 
     public function update(Request $request, EmailTemplate $emailTemplate)
