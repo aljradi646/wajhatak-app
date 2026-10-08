@@ -96,60 +96,88 @@ if [ -f scripts/ai_selftest/run.php ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 2. MySQL must be configured - never silently use SQLite in production.
+# 2. Resolve the production MySQL connection.
+#
+# Railway exposes MySQL connection values on the MySQL service itself:
+# MYSQL_URL / MYSQLHOST / MYSQLPORT / MYSQLDATABASE / MYSQLUSER / MYSQLPASSWORD.
+# A consuming app service must reference those variables explicitly. We always
+# prefer these canonical MySQL variables over a generic DB_URL/DB_HOST because
+# a generic value can accidentally point back to the application service.
 # ---------------------------------------------------------------------------
-# Production is MySQL-only. Never inherit an accidental SQLite value from
-# an old .env or hosting variable. A SQLite runtime is allowed only when the
-# operator explicitly sets WJ_ALLOW_SQLITE=true for local development.
+
 if [ "${WJ_ALLOW_SQLITE:-false}" = "true" ]; then
     export DB_CONNECTION="${DB_CONNECTION:-sqlite}"
 else
     export DB_CONNECTION=mysql
 fi
+
 case "$DB_CONNECTION" in
     mysql) ;;
     sqlite)
         echo "==> [Wajhatak] SQLite explicitly enabled (WJ_ALLOW_SQLITE=true)." >&2
         ;;
     *)
-        echo "!! [Wajhatak] DB_CONNECTION='$DB_CONNECTION' is not supported. Production requires mysql." >&2
+        echo "!! [Wajhatak] DB_CONNECTION='$DB_CONNECTION' is unsupported. Production requires mysql." >&2
         exit 1
         ;;
 esac
 
-# Railway injects several MySQL env vars. Prefer the explicit Laravel vars and
-# fall back to Railway's MYSQL_* names so the application does not rely on a
-# stale .env file.
-if [ -n "${DB_URL:-}" ] || [ -n "${DATABASE_URL:-}" ] || [ -n "${MYSQL_URL:-}" ]; then
-    _db_url="${DB_URL:-${DATABASE_URL:-${MYSQL_URL:-}}}"
-    case "$_db_url" in
+parse_mysql_url() {
+    _u="$1"
+    _creds="${_u#*://}"
+    _auth="${_creds%%@*}"
+    _rest="${_creds#*@}"
+    _hostport="${_rest%%/*}"
+    _db="${_rest#*/}"
+    _db="${_db%%\?*}"
+    _db="${_db%%#*}"
+    _user="${_auth%%:*}"
+    _pass="${_auth#*:}"
+
+    case "$_hostport" in
+        *:*)
+            _host="${_hostport%%:*}"
+            _port="${_hostport##*:}"
+            ;;
+        *)
+            _host="$_hostport"
+            _port=3306
+            ;;
+    esac
+
+    export DB_HOST="$_host"
+    export DB_PORT="${DB_PORT:-$_port}"
+    export DB_DATABASE="$_db"
+    export DB_USERNAME="$_user"
+    export DB_PASSWORD="$_pass"
+
+    unset _u _creds _auth _rest _hostport _db _user _pass _host _port
+}
+
+# 1) Canonical Railway MySQL URL.
+if [ -n "${MYSQL_URL:-}" ]; then
+    echo "==> [Wajhatak] Using Railway MYSQL_URL as the canonical database source."
+    parse_mysql_url "${MYSQL_URL}"
+# 2) Canonical Railway MySQL split variables.
+elif [ -n "${MYSQLHOST:-}" ] && [ -n "${MYSQLDATABASE:-}" ] && [ -n "${MYSQLUSER:-}" ]; then
+    echo "==> [Wajhatak] Using Railway MYSQLHOST/MYSQLDATABASE/MYSQLUSER variables."
+    export DB_HOST="${MYSQLHOST}"
+    export DB_PORT="${MYSQLPORT:-3306}"
+    export DB_DATABASE="${MYSQLDATABASE}"
+    export DB_USERNAME="${MYSQLUSER}"
+    export DB_PASSWORD="${MYSQLPASSWORD:-}"
+# 3) Explicit Laravel DB_URL fallback.
+elif [ -n "${DB_URL:-}" ]; then
+    case "${DB_URL}" in
         mysql://*|mariadb://*)
-            echo "==> [Wajhatak] Parsing DB_URL / DATABASE_URL / MYSQL_URL into Laravel DB_* variables."
-            _u="$_db_url"
-            _creds="${_u#*://}"
-            _auth="${_creds%%@*}"
-            _rest="${_creds#*@}"
-            _hostport="${_rest%%/*}"
-            _db="${_rest#*/}"
-            _db="${_db%%\?*}"
-            _db="${_db%%#*}"
-            _user="${_auth%%:*}"
-            _pass="${_auth#*:}"
-            case "$_hostport" in
-                *:*) _host="${_hostport%%:*}"; _port="${_hostport##*:}" ;;
-                *) _host="$_hostport"; _port="${DB_PORT:-3306}" ;;
-            esac
-            export DB_HOST="${DB_HOST:-$_host}"
-            export DB_PORT="${DB_PORT:-$_port}"
-            export DB_DATABASE="${DB_DATABASE:-$_db}"
-            export DB_USERNAME="${DB_USERNAME:-$_user}"
-            export DB_PASSWORD="${DB_PASSWORD:-$_pass}"
-            unset _u _creds _auth _rest _hostport _db _user _pass _host _port
+            echo "==> [Wajhatak] Using explicit DB_URL."
+            parse_mysql_url "${DB_URL}"
             ;;
     esac
 fi
 
-# Fallbacks for Railway MySQL service naming.
+# Fallback to split DB_* values only when no canonical MYSQL* source was
+# supplied. Never replace a valid explicit DB_* value with empty values.
 if [ -z "${DB_HOST:-}" ] && [ -n "${MYSQLHOST:-}" ]; then
     export DB_HOST="${MYSQLHOST}"
 fi
@@ -166,56 +194,42 @@ if [ -z "${DB_PASSWORD:-}" ] && [ -n "${MYSQLPASSWORD:-}" ]; then
     export DB_PASSWORD="${MYSQLPASSWORD}"
 fi
 
-case "${DB_HOST:-}" in
-    mysql://*|mariadb://*)
-        echo "==> [Wajhatak] DB_HOST contains a full URL - splitting it into DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD."
-        _u="${DB_HOST}"
-        _creds="${_u#*://}"
-        _auth="${_creds%%@*}"
-        _rest="${_creds#*@}"
-        _hostport="${_rest%%/*}"
-        _db="${_rest#*/}"
-        _db="${_db%%\?*}"
-        _db="${_db%%#*}"
-        _user="${_auth%%:*}"
-        _pass="${_auth#*:}"
-        case "$_hostport" in
-            *:*) _host="${_hostport%%:*}"; _port="${_hostport##*:}" ;;
-            *) _host="$_hostport"; _port="${DB_PORT:-3306}" ;;
-        esac
-        export DB_HOST="$_host" DB_PORT="${DB_PORT:-$_port}" DB_DATABASE="${DB_DATABASE:-$_db}" DB_USERNAME="${DB_USERNAME:-$_user}" DB_PASSWORD="${DB_PASSWORD:-$_pass}"
-        unset _u _creds _auth _rest _hostport _db _user _pass _host _port
-        ;;
-esac
-
-if [ -n "${DB_HOST:-}" ] && [ -n "${DB_DATABASE:-}" ] && [ -n "${DB_USERNAME:-}" ]; then
-    export DB_URL="mysql://${DB_USERNAME}@${DB_HOST}:${DB_PORT:-3306}/${DB_DATABASE}"
-    if [ -n "${DB_PASSWORD:-}" ]; then
-        export DB_URL="mysql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-3306}/${DB_DATABASE}"
-    fi
+# Never allow an accidental self-reference such as
+# wajhatak-app.railway.internal:3306. That hostname belongs to this app
+# service, not the MySQL service, and produces connection-refused errors.
+SELF_HOST="${RAILWAY_PRIVATE_DOMAIN:-}"
+if [ -z "$SELF_HOST" ] && [ -n "${RAILWAY_SERVICE_NAME:-}" ]; then
+    SELF_HOST="${RAILWAY_SERVICE_NAME}.railway.internal"
 fi
 
-DB_HOST_VALUE="${DB_HOST:-${MYSQLHOST:-}}"
+if [ -n "$SELF_HOST" ] && [ "${DB_HOST:-}" = "$SELF_HOST" ]; then
+    echo "!! [Wajhatak] DB_HOST resolves to this application service ('$DB_HOST')." >&2
+    echo "   Set the app service variables to references from the MySQL service:" >&2
+    echo '   DB_URL='"$"'{{MySQL.MYSQL_URL}}' >&2
+    echo '   or DB_HOST='"$"'{{MySQL.MYSQLHOST}}, DB_PORT='"$"'{{MySQL.MYSQLPORT}}, DB_DATABASE='"$"'{{MySQL.MYSQLDATABASE}},' >&2
+    echo '      DB_USERNAME='"$"'{{MySQL.MYSQLUSER}}, DB_PASSWORD='"$"'{{MySQL.MYSQLPASSWORD}}' >&2
+    exit 1
+fi
+
+DB_HOST_VALUE="${DB_HOST:-}"
 case "$DB_HOST_VALUE" in
     ''|*\$\{\{*|*\$\{*)
-        echo '!! [Wajhatak] MySQL connection is NOT configured (DB_HOST is empty or an unresolved ${{...}} reference).' >&2
-        echo '   To fix on Railway:' >&2
-        echo '     1. Add a MySQL service to this project (default name is "MySQL"), then wait for it to provision.' >&2
-        echo '     2. Redeploy this service - Railway injects DB_* / MYSQL* variables automatically.' >&2
-        echo '   Or set DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD (or MYSQL*) manually.' >&2
+        echo '!! [Wajhatak] MySQL connection is NOT configured (DB_HOST is empty or unresolved).' >&2
+        echo '   Reference the MySQL service variables explicitly from the Laravel service.' >&2
         echo "   Current values: DB_CONNECTION=$DB_CONNECTION, DB_HOST='${DB_HOST:-}', DB_PORT='${DB_PORT:-}'," >&2
         echo "                    DB_DATABASE='${DB_DATABASE:-}', DB_USERNAME='${DB_USERNAME:-}'." >&2
         exit 1
         ;;
 esac
+
+if [ -z "${DB_DATABASE:-}" ] || [ -z "${DB_USERNAME:-}" ]; then
+    echo "!! [Wajhatak] MySQL credentials are incomplete. DB_DATABASE and DB_USERNAME are required." >&2
+    exit 1
+fi
+
 echo "==> [Wajhatak] Using MySQL at ${DB_HOST_VALUE}."
-
-# Drop any stale cached config so the fresh environment variables win.
 php artisan config:clear >/dev/null 2>&1 || true
-
-# Print the exact target we are connecting to (password hidden).
-echo "==> [Wajhatak] DB target: host=${DB_HOST_VALUE}, port=${DB_PORT:-3306}, database=${DB_DATABASE:-<unset>}, user=${DB_USERNAME:-<unset>}."
-
+echo "==> [Wajhatak] DB target: host=${DB_HOST_VALUE}, port=${DB_PORT:-3306}, database=${DB_DATABASE}, user=${DB_USERNAME}."
 # ---------------------------------------------------------------------------
 # 3. Wait for the database (with real diagnostics)
 #
@@ -320,6 +334,25 @@ if [ "$SERVICE_TYPE" = "app" ]; then
     # system_initialized=1 from an older deployment.
     echo "==> [Wajhatak] Synchronizing production email templates..."
     php artisan db:seed --class=EmailTemplateSeeder --force
+
+    EXPECTED_TEMPLATES="email_verification agent_approved agent_rejected property_published property_rejected"
+    MISSING_TEMPLATES=$(php artisan tinker --execute='
+        $expected = explode(" ", trim(getenv("EXPECTED_TEMPLATES") ?: ""));
+        $missing = array_values(array_filter($expected, fn ($key) => ! \App\Models\EmailTemplate::query()
+            ->where("key", $key)
+            ->where("is_system", true)
+            ->where("is_active", true)
+            ->where("status", "published")
+            ->exists()));
+        echo implode(" ", $missing);
+    ' 2>/dev/null || true)
+
+    if [ -n "$MISSING_TEMPLATES" ]; then
+        echo "!! [Wajhatak] Required production email templates are still missing: $MISSING_TEMPLATES" >&2
+        echo "   The deployment is stopped so the admin UI can never serve an incomplete email catalog." >&2
+        exit 1
+    fi
+    echo "==> [Wajhatak] Production email template catalog: 5/5 synchronized."
 
     SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
