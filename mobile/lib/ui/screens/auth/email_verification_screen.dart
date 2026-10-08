@@ -23,42 +23,94 @@ class EmailVerificationScreen extends ConsumerStatefulWidget {
 }
 
 class _EmailVerificationScreenState
-    extends ConsumerState<EmailVerificationScreen> {
+    extends ConsumerState<EmailVerificationScreen>
+    with WidgetsBindingObserver {
   final _codeController = TextEditingController();
   final _form = GlobalKey<FormState>();
   bool _busy = false;
   int _resendIn = 0;
+  DateTime? _resendUntil;
+  Duration _serverClockOffset = Duration.zero;
   Timer? _ticker;
   String? _email;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _email = ref.read(sessionProvider).asData?.value?.user.email;
-    if (widget.autoSend) {
-      // إرسال تلقائي بعد فتح الشاشة بقليل (بعد بناء الواجهة).
-      WidgetsBinding.instance.addPostFrameCallback((_) => _sendCode());
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.autoSend) {
+        _sendCode();
+      } else {
+        _refreshServerStatus();
+      }
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     _codeController.dispose();
     super.dispose();
   }
 
-  void _startResendTimer(int seconds) {
-    setState(() => _resendIn = seconds);
+  void _syncServerClock(DateTime? serverTime) {
+    if (serverTime == null) return;
+    _serverClockOffset = serverTime.difference(DateTime.now().toUtc());
+  }
+
+  DateTime _serverNow() => DateTime.now().toUtc().add(_serverClockOffset);
+
+  void _startResendTimer(int seconds, {DateTime? serverTime, DateTime? availableAt}) {
+    _syncServerClock(serverTime);
+    final target = availableAt ??
+        _serverNow().add(Duration(seconds: seconds));
+    _resendUntil = target.toUtc();
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted || _resendIn <= 1) {
-        timer.cancel();
-        if (mounted) setState(() => _resendIn = 0);
+    void tick() {
+      if (!mounted || _resendUntil == null) return;
+      final remaining = _resendUntil!.difference(_serverNow());
+      final secondsLeft = remaining.inSeconds + (remaining.inMilliseconds % 1000 == 0 ? 0 : 1);
+      if (secondsLeft <= 0) {
+        _ticker?.cancel();
+        _resendUntil = null;
+        setState(() => _resendIn = 0);
         return;
       }
-      setState(() => _resendIn -= 1);
-    });
+      setState(() => _resendIn = secondsLeft);
+    }
+    tick();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => tick());
+  }
+
+  Future<void> _refreshServerStatus() async {
+    try {
+      final result = await ref.read(accountRepositoryProvider).emailStatus();
+      if (!mounted) return;
+      _syncServerClock(result.serverTime);
+      if (result.resendAvailableAt != null) {
+        _startResendTimer(
+          result.resendIn,
+          serverTime: result.serverTime,
+          availableAt: result.resendAvailableAt,
+        );
+      } else {
+        _ticker?.cancel();
+        _resendUntil = null;
+        setState(() => _resendIn = 0);
+      }
+    } on ApiFailure {
+      // لا نعتمد على ساعة الجهاز عند فشل مزامنة الخادم.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshServerStatus();
+    }
   }
 
   Future<void> _sendCode() async {
@@ -69,7 +121,9 @@ class _EmailVerificationScreenState
           await ref.read(accountRepositoryProvider).sendVerificationCode();
       if (!mounted) return;
       util.notice(context, result.message);
-      if (result.resendIn > 0) _startResendTimer(result.resendIn);
+      if (result.resendAvailableAt != null || result.resendIn > 0) {
+        _startResendTimer(result.resendIn, serverTime: result.serverTime, availableAt: result.resendAvailableAt);
+      }
     } on ApiFailure catch (error) {
       if (mounted) util.notice(context, error.message);
     } finally {
