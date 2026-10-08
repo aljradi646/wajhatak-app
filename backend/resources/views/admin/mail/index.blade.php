@@ -182,36 +182,53 @@
             </x-admin.card>
         </div>
 
-        {{-- ==================== استوديو القوالب ==================== --}}
-        <div x-show="tab === 'templates'" x-cloak class="space-y-6">
-            <div class="rounded-2xl border border-wajhatak-200 bg-wajhatak-50 p-5 dark:border-wajhatak-900/40 dark:bg-wajhatak-900/10">
-                <div class="flex flex-col gap-4 md:flex-row md:items-center">
-                    <div class="flex-1">
-                        <h3 class="text-lg font-black text-gray-900 dark:text-gray-100">استوديو قوالب البريد</h3>
-                        <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
-                            أنشئ قوالب بريد حقيقية وقابلة للتخصيص بالكامل، أو عدّل القوالب النظامية، باستخدام محرر مرئي أو HTML/CSS،
-                            مع معاينة آمنة، متغيرات ديناميكية، حفظ تلقائي، إصدارات، نشر واستعادة.
-                        </p>
-                    </div>
-                    <a href="{{ route('admin.email-templates.index') }}" class="shrink-0 rounded-xl bg-wajhatak-600 px-4 py-2.5 text-center text-sm font-black text-white">
-                        فتح استوديو القوالب
-                    </a>
+        {{-- ==================== قوالب البريد ==================== --}}
+        <div x-show="tab === 'templates'" x-cloak class="space-y-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div class="flex-1">
+                    <h3 class="text-lg font-black">قوالب البريد الجاهزة</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">القوالب التي تستخدمها المنصة فعليًا لرموز التحقق والإشعارات وغيرها.</p>
                 </div>
+                <a href="{{ route('admin.email-templates.index', ['create' => 1]) }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-wajhatak-600 px-4 py-2.5 text-sm font-black text-white">
+                    <x-admin.icon name="plus" class="h-4 w-4" /> إنشاء قالب
+                </a>
             </div>
 
-            <div class="grid gap-4 md:grid-cols-3">
-                <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-                    <div class="font-black">محرر مرئي</div>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">بناء رسائل البريد بتخطيط متوافق مع البريد الإلكتروني وتنسيق العناصر بصريًا.</p>
-                </div>
-                <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-                    <div class="font-black">HTML / CSS</div>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">تحكم كامل في الكود مع محرر متخصص، ثم معاينة النتيجة بعد التعقيم والرندر الفعلي.</p>
-                </div>
-                <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-                    <div class="font-black">الإصدارات والنشر</div>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">المسودة لا تصبح حية حتى تنشرها، والإصدار المنشور يبقى ثابتًا ويمكن استعادته.</p>
-                </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                @forelse($emailTemplates as $template)
+                    @php
+                        $type = $template->template_type ?: 'custom';
+                        $typeLabel = $emailTemplateTypes[$type] ?? $type;
+                        $status = $template->status ?: ($template->is_active ? 'published' : 'archived');
+                    @endphp
+                    <article class="group relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                        <div class="absolute inset-x-0 top-0 h-1 bg-wajhatak-600"></div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800"><x-admin.icon name="mail" class="h-5 w-5 text-gray-500" /></div>
+                            <div class="min-w-0 flex-1">
+                                <h4 class="truncate font-black">{{ $template->name }}</h4>
+                                <div class="mt-1 truncate font-mono text-[10px] text-gray-500">{{ $template->key }}</div>
+                            </div>
+                            <div class="flex translate-y-1 gap-1 opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
+                                <a href="{{ route('admin.email-templates.index', ['edit' => $template->id]) }}" title="تعديل" class="flex h-8 w-8 items-center justify-center rounded-lg border bg-white text-gray-700 shadow-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"><x-admin.icon name="edit" class="h-4 w-4" /></a>
+                                <a href="{{ route('admin.email-templates.history', $template) }}" title="السجل" class="flex h-8 w-8 items-center justify-center rounded-lg border bg-white text-gray-700 shadow-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"><x-admin.icon name="activity" class="h-4 w-4" /></a>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <span class="rounded-full bg-wajhatak-50 px-2.5 py-1 text-[10px] font-black text-wajhatak-700 dark:bg-wajhatak-900/30 dark:text-wajhatak-300">{{ $typeLabel }}</span>
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-black dark:bg-gray-800">{{ $status === 'published' ? 'منشور' : ($status === 'draft' ? 'مسودة' : 'مؤرشف') }}</span>
+                            @if($template->is_system)<span class="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">نظامي</span>@endif
+                        </div>
+                        <p class="mt-3 line-clamp-2 text-sm leading-6 text-gray-600 dark:text-gray-300">{{ $template->description ?: 'قالب بريد قابل للتحرير.' }}</p>
+                        <a href="{{ route('admin.email-templates.index', ['edit' => $template->id]) }}" class="mt-4 block rounded-xl border px-3 py-2 text-center text-xs font-black hover:border-wajhatak-500 hover:text-wajhatak-700 dark:border-gray-700">تعديل القالب</a>
+                    </article>
+                @empty
+                    <div class="col-span-full rounded-3xl border border-dashed p-10 text-center text-sm text-gray-500">لا توجد قوالب بريد.</div>
+                @endforelse
+            </div>
+
+            <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs leading-6 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <strong>ملاحظة تشغيلية:</strong> المفتاح البرمجي يحدد القالب الذي تستدعيه خدمات المنصة، بينما نوع القالب ينظم القوالب داخل لوحة الإدارة ولا يغيّر مسار الإرسال تلقائيًا.
             </div>
         </div>
     </div>
