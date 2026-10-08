@@ -82,7 +82,15 @@ class EmailTemplateController extends Controller
         });
 
         ActivityLog::record('email_template', "تم إنشاء قالب بريد: {$template->name}", $template);
-        return redirect()->route('admin.email-templates.edit', $template)->with('status', 'تم إنشاء القالب كمسودة.');
+        if ($request->expectsJson()) {
+            return response()->json(['data' => [
+                'id' => $template->id,
+                'key' => $template->key,
+                'version' => $template->version,
+                'status' => $template->status,
+            ]], 201);
+        }
+        return redirect()->route('admin.email-templates.index', ['edit' => $template->id])->with('status', 'تم إنشاء القالب كمسودة.');
     }
 
     public function edit(EmailTemplate $emailTemplate)
@@ -114,6 +122,15 @@ class EmailTemplateController extends Controller
         });
 
         ActivityLog::record('email_template', "تم حفظ إصدار جديد من قالب: {$emailTemplate->name}", $emailTemplate, properties: ['version' => $emailTemplate->version]);
+        if ($request->expectsJson()) {
+            $fresh = $emailTemplate->fresh();
+            return response()->json(['data' => [
+                'id' => $fresh->id,
+                'key' => $fresh->key,
+                'version' => $fresh->version,
+                'status' => $fresh->status,
+            ]]);
+        }
         return back()->with('status', 'تم حفظ المسودة وإنشاء إصدار جديد.');
     }
 
