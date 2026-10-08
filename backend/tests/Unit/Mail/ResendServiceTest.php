@@ -15,16 +15,17 @@ class ResendServiceTest extends TestCase
     private function settings(bool $sandbox = false): EmailSetting
     {
         $settings = EmailSetting::current();
-        $settings->update([
+
+        $settings->forceFill([
             'provider' => 'resend',
             'resend_api_key' => 're_test_key',
             'resend_sandbox' => $sandbox,
             'from_name' => 'وجهتك',
             'from_address' => 'no-reply@example.com',
             'is_active' => true,
-        ]);
+        ])->saveOrFail();
 
-        return $settings->fresh();
+        return EmailSetting::query()->whereKey($settings->getKey())->firstOrFail();
     }
 
     public function test_successful_send_posts_the_real_resend_payload(): void
