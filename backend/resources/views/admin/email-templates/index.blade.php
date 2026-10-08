@@ -1,7 +1,12 @@
 @php
 $statusLabels = ['draft' => 'مسودة', 'published' => 'منشور', 'archived' => 'مؤرشف'];
 @endphp
-<x-admin.layouts.admin heading="قوالب البريد الإلكتروني" title="قوالب البريد">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<style>
+.CodeMirror{height:100%;width:100%;font-family:"JetBrains Mono","Fira Code",Consolas,monospace;font-size:13px;line-height:1.7;background:#0b1110;color:#d7e4df}
+.CodeMirror-gutters{background:#0b1110;border-left:1px solid rgba(255,255,255,.06);border-right:0}.CodeMirror-linenumber{color:#60716c}.CodeMirror-cursor{border-left:2px solid #55c9a7}
+.CodeMirror-selected{background:rgba(65,180,145,.20)!important}.cm-s-wajhatak .cm-tag{color:#65d6b1}.cm-s-wajhatak .cm-attribute{color:#d9c47a}.cm-s-wajhatak .cm-string{color:#a9d6ff}.cm-s-wajhatak .cm-comment{color:#6f817a}.cm-s-wajhatak .cm-property{color:#8fd7ff}.cm-s-wajhatak .cm-keyword{color:#d9a8ff}
+</style><x-admin.layouts.admin heading="قوالب البريد الإلكتروني" title="قوالب البريد">
 <div
     x-data="emailTemplateManager()"
     x-init="init()"
@@ -123,7 +128,7 @@ $statusLabels = ['draft' => 'مسودة', 'published' => 'منشور', 'archived
                         <span class="ms-auto text-[10px] text-white/40">Ctrl/Cmd + S للحفظ</span>
                     </div>
                     <div class="min-h-0 flex-1 relative">
-                        <div id="emailMonaco" class="absolute inset-0"></div>
+                        <textarea id="emailCodeEditor" class="absolute inset-0 h-full w-full resize-none border-0 outline-none"></textarea>
                         <div x-show="!editorReady" class="absolute inset-0 flex items-center justify-center bg-[#111817] text-sm text-white/50">جارٍ تحميل محرر الكود…</div>
                     </div>
                 </main>
@@ -222,147 +227,107 @@ $statusLabels = ['draft' => 'مسودة', 'published' => 'منشور', 'archived
 <script>
 function emailTemplateManager() {
     return {
-        open: false, editing: false, editorReady: false, busy: false, pane: 'html',
-        showIcons: false, showPreview: false, showTest: false, testRecipient: '',
-        saveState: 'جاهز', errorMessage: '', previewTimer: null, monacoLoaded: false, editor: null,
-        form: { id:null, name:'', key:'', template_type:'custom', subject:'', description:'', html_content:'', css_styles:[], text_content:'', variables:@json(array_keys($variableRegistry)), is_system:false, version:1, status:'draft' },
-
+        open:false, editing:false, editorReady:false, busy:false, pane:'html',
+        showIcons:false, showPreview:false, showTest:false, testRecipient:'',
+        saveState:'جاهز', errorMessage:'', previewTimer:null, editor:null, form:{},
         init() {
             window.addEventListener('keydown', e => {
-                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && this.open) { e.preventDefault(); this.save(); }
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='s' && this.open) {
+                    e.preventDefault(); this.save();
+                }
             });
-            const qs=new URLSearchParams(location.search); if(qs.get('create')==='1') this.openCreate(); else if(qs.get('edit')) this.openEdit(Number(qs.get('edit')));
+            const qs=new URLSearchParams(location.search);
+            if(qs.get('create')==='1') this.openCreate();
+            else if(qs.get('edit')) this.openEdit(Number(qs.get('edit')));
         },
-
         blank() {
             return {
-                id:null, name:'', key:'', template_type:'custom', subject:'', description:'',
-                html_content:'<!doctype html>\n<html dir="rtl" lang="ar">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>وجهتك</title>\n</head>\n<body style="margin:0;padding:0;background:#f4f7f6;font-family:Arial,sans-serif;direction:rtl;">\n  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f6;">\n    <tr><td align="center" style="padding:32px 16px;">\n      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;">\n        <tr><td style="padding:32px;">\n          <h1 style="margin:0 0 16px;color:#075E4A;">عنوان الرسالة</h1>\n          <p style="margin:0;color:#374151;">اكتب محتوى الرسالة هنا.</p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>', css_styles:[], text_content:'', variables:@json(array_keys($variableRegistry)), is_system:false, version:1, status:'draft'
+                id:null,name:'',key:'',template_type:'custom',subject:'',description:'',
+                html_content:'<!doctype html>\n<html dir="rtl" lang="ar">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0">\n<title>وجهتك</title>\n</head>\n<body style="margin:0;padding:0;background:#f4f7f6;font-family:Arial,sans-serif;direction:rtl;">\n<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f6;">\n<tr><td align="center" style="padding:32px 16px;">\n<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;">\n<tr><td style="padding:32px;">\n<h1 style="margin:0 0 16px;color:#075E4A;">مرحبًا {{user.name}}</h1>\n<p style="margin:0;color:#374151;">اكتب محتوى الرسالة هنا.</p>\n</td></tr></table></td></tr></table>\n</body></html>',
+                css_styles:[],text_content:'',variables:@json(array_keys($variableRegistry)),is_system:false,version:1,status:'draft'
             };
         },
-
-        async openCreate() {
-            this.editing=false; this.form=this.blank(); this.errorMessage=''; this.saveState='مسودة جديدة'; this.open=true;
-            await this.ensureMonaco(); this.loadEditorValue(); this.refreshPreviewDebounced();
+        async openCreate(){this.editing=false;this.form=this.blank();this.errorMessage='';this.saveState='مسودة جديدة';this.open=true;await this.ensureEditor();this.loadEditor();this.refreshPreviewDebounced();},
+        async openEdit(id){
+            this.busy=true;this.open=true;this.errorMessage='';this.saveState='جارٍ تحميل القالب…';
+            try{
+                const r=await fetch(@json(url('/admin/email-templates'))+'/'+id+'/editor-data',{headers:{Accept:'application/json'},credentials:'same-origin'});
+                const d=await r.json();if(!r.ok)throw new Error(d.message||'تعذر تحميل القالب');
+                this.form=d.data;this.editing=true;await this.ensureEditor();this.loadEditor();this.saveState='تم التحميل';this.refreshPreviewDebounced();
+            }catch(e){this.errorMessage=e.message;this.saveState='فشل التحميل';}finally{this.busy=false;}
         },
-
-        async openEdit(id) {
-            this.busy=true; this.errorMessage=''; this.saveState='جارٍ تحميل القالب…'; this.open=true;
-            try {
-                const r=await fetch(@json(url('/admin/email-templates')).+'/'+id+'/editor-data',{headers:{Accept:'application/json'},credentials:'same-origin'});
-                const d=await r.json(); if(!r.ok) throw new Error(d.message||'تعذر تحميل القالب');
-                this.form=d.data; this.editing=true;
-                await this.ensureMonaco(); this.loadEditorValue(); this.saveState='تم التحميل'; this.refreshPreviewDebounced();
-            } catch(e) { this.errorMessage=e.message; } finally { this.busy=false; }
-        },
-
-        close() {
-            if(this.busy) return;
-            this.open=false; this.showPreview=false; this.showIcons=false; this.showTest=false;
-            this.editorReady=false; this.disposeEditor(); this.monacoLoaded=false;
-            history.replaceState({},'',location.pathname);
-        },
-
-        async ensureMonaco() {
-            if(this.monacoLoaded && window.monaco) { this.editorReady=true; return; }
+        close(){if(this.busy)return;this.open=false;this.showPreview=false;this.showIcons=false;this.showTest=false;this.editorReady=false;this.disposeEditor();history.replaceState({},'',location.pathname);},
+        async ensureEditor(){
+            if(window.CodeMirror){this.editorReady=true;return;}
             await new Promise((resolve,reject)=>{
-                const existing=document.querySelector('script[data-wajhatak-monaco]');
-                if(existing) { const t=setInterval(()=>{ if(window.monaco){clearInterval(t);resolve();}},50); setTimeout(()=>{clearInterval(t);reject(new Error('تعذر تحميل محرر الكود'));},15000); return; }
-                const script=document.createElement('script'); script.dataset.wajhatakMonaco='1'; script.src='https://cdn.jsdelivr.net/npm/monaco-editor@0.57.0/min/vs/loader.js'; script.onload=()=>{
-                    require.config({paths:{vs:'https://cdn.jsdelivr.net/npm/monaco-editor@0.57.0/min/vs'}});
-                    require(['vs/editor/editor.main'],()=>resolve(),reject);
-                }; script.onerror=()=>reject(new Error('تعذر تحميل محرر الكود.')); document.head.appendChild(script);
+                const existing=document.querySelector('script[data-wajhatak-codemirror]');
+                if(existing){const t=setInterval(()=>{if(window.CodeMirror){clearInterval(t);resolve();}},30);setTimeout(()=>{clearInterval(t);reject(new Error('تعذر تحميل محرر الكود'));},12000);return;}
+                const script=document.createElement('script');script.dataset.wajhatakCodemirror='1';script.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js';
+                script.onload=()=>{
+                    const mode=document.createElement('script');mode.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js';
+                    mode.onload=()=>{const css=document.createElement('script');css.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js';css.onload=resolve;css.onerror=()=>reject(new Error('تعذر تحميل وضع CSS'));document.head.appendChild(css);};
+                    mode.onerror=()=>reject(new Error('تعذر تحميل وضع HTML'));document.head.appendChild(mode);
+                };
+                script.onerror=()=>reject(new Error('تعذر تحميل CodeMirror'));document.head.appendChild(script);
             });
-            this.monacoLoaded=true; this.editorReady=true;
+            this.editorReady=true;
         },
-
-        loadEditorValue() {
-            if(!window.monaco) return;
+        loadEditor(){
+            if(!window.CodeMirror)return;
             this.disposeEditor();
-            const css=Array.isArray(this.form.css_styles)?this.form.css_styles.join('\n'):String(this.form.css_styles||'');
-            this.editor=monaco.editor.create(document.getElementById('emailMonaco'),{
-                value:this.form.html_content||'', language:'html', theme:document.documentElement.classList.contains('dark')?'vs-dark':'vs',
-                automaticLayout:true, minimap:{enabled:true}, fontSize:13, lineNumbers:'on', wordWrap:'on',
-                padding:{top:14,bottom:14}, tabSize:2, formatOnPaste:true, smoothScrolling:true,
-                bracketPairColorization:{enabled:true}, guides:{bracketPairs:true}
+            const ta=document.getElementById('emailCodeEditor');
+            ta.value=this.pane==='html'?(this.form.html_content||''):(Array.isArray(this.form.css_styles)?this.form.css_styles.join('\n'):String(this.form.css_styles||''));
+            this.editor=CodeMirror.fromTextArea(ta,{
+                mode:this.pane==='html'?'htmlmixed':'css',theme:'wajhatak',lineNumbers:true,lineWrapping:true,
+                tabSize:2,indentUnit:2,indentWithTabs:false,matchBrackets:true,autoCloseBrackets:true,
+                styleActiveLine:true,viewportMargin:50,extraKeys:{'Ctrl-S':()=>this.save(),'Cmd-S':()=>this.save()}
             });
-            this._cssValue=css;
-            this.editor.onDidChangeModelContent(()=>{if(this.pane==='html') {this.form.html_content=this.editor.getValue();this.refreshPreviewDebounced();}});
+            this.editor.setSize('100%','100%');
+            this.editor.on('change',()=>{if(this.pane==='html')this.form.html_content=this.editor.getValue();else this.form.css_styles=[this.editor.getValue()];this.saveState='تغييرات غير محفوظة';this.refreshPreviewDebounced();});
         },
-
-        disposeEditor(){ if(this.editor){this.editor.dispose();this.editor=null;} },
-
-        setPane(pane) {
-            if(this.pane===pane) return;
-            if(this.editor) { if(this.pane==='html') this.form.html_content=this.editor.getValue(); else { this._cssValue=this.editor.getValue(); this.form.css_styles=[this._cssValue]; } }
-            this.pane=pane;
-            const value=pane==='html'?this.form.html_content:(this._cssValue||'');
-            const oldModel=this.editor?.getModel();
-            const model=monaco.editor.createModel(value,pane==='html'?'html':'css');
-            this.editor?.setModel(model);
-            oldModel?.dispose();
-            this.editor?.layout();
-            this.refreshPreviewDebounced();
+        disposeEditor(){if(this.editor){this.editor.save();this.editor.toTextArea();this.editor=null;}},
+        setPane(pane){if(this.pane===pane)return;if(this.editor){if(this.pane==='html')this.form.html_content=this.editor.getValue();else this.form.css_styles=[this.editor.getValue()];}this.pane=pane;this.loadEditor();this.refreshPreviewDebounced();},
+        currentHtml(){return this.pane==='html'&&this.editor?this.editor.getValue():String(this.form.html_content||'');},
+        currentCss(){return this.pane==='css'&&this.editor?[this.editor.getValue()]:(Array.isArray(this.form.css_styles)?this.form.css_styles:[]);},
+        formPayload(){
+            if(this.editor){if(this.pane==='html')this.form.html_content=this.editor.getValue();else this.form.css_styles=[this.editor.getValue()];}
+            return {...this.form,css_styles:this.currentCss(),preview_variables:@json($variableRegistry?[]:[])}
         },
-
-        currentCss(){ return this.pane==='css' && this.editor ? [this.editor.getValue()] : (Array.isArray(this.form.css_styles)?this.form.css_styles:[this._cssValue||'']); },
-        currentHtml(){ return this.pane==='html' && this.editor ? this.editor.getValue() : this.form.html_content; },
-
-        formPayload() {
-            if(this.editor){ if(this.pane==='html') this.form.html_content=this.editor.getValue(); else this._cssValue=this.editor.getValue(); }
-            this.form.css_styles=this.currentCss();
-            return {...this.form, preview_variables:{}};
+        refreshPreviewDebounced(){clearTimeout(this.previewTimer);this.previewTimer=setTimeout(()=>this.preview(),300);},
+        async preview(){
+            if(!this.open||!this.editorReady)return;
+            try{
+                const r=await fetch(@json(route('admin.email-templates.preview-draft')),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''},body:JSON.stringify(this.formPayload())});
+                const d=await r.json();if(!r.ok)throw new Error(d.message||'تعذر إنشاء المعاينة');
+                const f=document.getElementById('emailPreviewFrame');if(f)f.srcdoc=d.html||'<p style="padding:24px">لا يوجد HTML للمعاينة.</p>';
+            }catch(e){this.errorMessage=e.message;}
         },
-
-        refreshPreviewDebounced(){ clearTimeout(this.previewTimer); this.previewTimer=setTimeout(()=>this.preview(),350); },
-
-        async preview() {
-            if(!this.open || !this.editorReady) return;
-            const payload=this.formPayload();
-            try {
-                const r=await fetch(@json(route('admin.email-templates.preview-draft')),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''},body:JSON.stringify(payload)});
-                const d=await r.json(); if(!r.ok) return;
-                const f=document.getElementById('emailPreviewFrame'); f.srcdoc=d.html||'';
-            } catch(e) {}
-        },
-
-        async save() {
-            if(this.busy || !this.editorReady) return;
-            this.busy=true; this.errorMessage=''; this.saveState='جارٍ الحفظ…';
-            const payload=this.formPayload();
-            const url=this.editing ? @json(url('/admin/email-templates')).+'/'+this.form.id : @json(route('admin.email-templates.store'));
-            try {
+        async save(){
+            if(this.busy||!this.editorReady)return;this.busy=true;this.errorMessage='';this.saveState='جارٍ الحفظ…';
+            try{
+                const payload=this.formPayload();const url=this.editing?@json(url('/admin/email-templates'))+'/'+this.form.id:@json(route('admin.email-templates.store'));
                 const r=await fetch(url,{method:this.editing?'PATCH':'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''},body:JSON.stringify(payload)});
-                const d=await r.json();
-                if(!r.ok) throw new Error(Object.values(d.errors||{}).flat()[0]||d.message||'تعذر حفظ القالب');
-                this.editing=true; this.form.id=d.data?.id||this.form.id; this.form.version=d.data?.version||this.form.version; this.form.status=d.data?.status||'draft';
-                this.saveState='تم الحفظ'; this.form.key=d.data?.key||this.form.key;
-                if(!this.form.id) location.reload();
-            } catch(e){this.errorMessage=e.message;this.saveState='فشل الحفظ';} finally{this.busy=false;}
+                const d=await r.json();if(!r.ok)throw new Error(Object.values(d.errors||{}).flat()[0]||d.message||'تعذر حفظ القالب');
+                this.editing=true;this.form.id=d.data?.id||this.form.id;this.form.version=d.data?.version||this.form.version;this.form.status=d.data?.status||'draft';this.form.key=d.data?.key||this.form.key;this.saveState='تم الحفظ';
+                if(!this.form.id)location.reload();
+            }catch(e){this.errorMessage=e.message;this.saveState='فشل الحفظ';}finally{this.busy=false;}
         },
-
-        async publish() {
-            if(!this.editing) return;
-            this.busy=true; this.saveState='جارٍ النشر…';
-            try {
-                const r=await fetch(@json(url('/admin/email-templates'))+'/'+this.form.id+'/publish',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''}});
-                const d=await r.json(); if(!r.ok) throw new Error(d.message||'تعذر النشر');
-                this.form.status='published'; this.form.version=d.version||this.form.version; this.saveState='تم النشر';
-            } catch(e){this.errorMessage=e.message;this.saveState='فشل النشر';} finally{this.busy=false;}
+        async publish(){
+            if(!this.editing)return;this.busy=true;this.saveState='جارٍ النشر…';
+            try{const r=await fetch(@json(url('/admin/email-templates'))+'/'+this.form.id+'/publish',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''}});const d=await r.json();if(!r.ok)throw new Error(d.message||'تعذر النشر');this.form.status='published';this.form.version=d.version||this.form.version;this.saveState='تم النشر';}catch(e){this.errorMessage=e.message;this.saveState='فشل النشر';}finally{this.busy=false;}
         },
-
-        insertVariable(name) {
-            const token='{{'+name+'}}';
-            if(this.editor){const s=this.editor.getSelection();this.editor.executeEdits('insert-variable',[{range:s,text:token,forceMoveMarkers:true}]);this.editor.focus();}
-        },
-        insertVariablePrompt(){const key=prompt('اسم المتغير، مثل user.name أو property.price');if(key&&@json(array_keys($variableRegistry)).includes(key))this.insertVariable(key);},
+        insertVariable(name){if(!this.editor)return;const token='{{'+name+'}}';this.editor.replaceSelection(token);this.editor.focus();},
+        insertVariablePrompt(){const key=prompt('اسم المتغير مثل user.name أو property.title');if(key&&@json(array_keys($variableRegistry)).includes(key))this.insertVariable(key);},
         insertIcon(icon){this.insertRaw('<span style="font-size:24px;line-height:1;display:inline-block">'+icon+'</span>');},
-        insertRaw(text){if(!this.editor)return;const s=this.editor.getSelection();this.editor.executeEdits('insert',[{range:s,text,forceMoveMarkers:true}]);this.editor.focus();},
+        insertRaw(text){if(!this.editor)return;this.editor.replaceSelection(text);this.editor.focus();},
         async uploadAsset(event){const file=event.target.files?.[0];event.target.value='';if(!file)return;const fd=new FormData();fd.append('file',file);try{const r=await fetch(@json(route('admin.email-templates.assets')),{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''},body:fd});const d=await r.json();if(!r.ok)throw new Error(d.message||'تعذر رفع الصورة');this.insertRaw('<img src="'+d.data[0].src+'" alt="'+file.name.replace(/"/g,'&quot;')+'" style="max-width:100%;height:auto;display:block;">');}catch(e){this.errorMessage=e.message;}},
         openTest(){this.testRecipient='';this.showTest=true;},
-        async sendTest(){if(!this.form.id)return;this.busy=true;try{const r=await fetch(@json(url('/admin/email-templates'))+'/'+this.form.id+'/test-email',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''},body:JSON.stringify({recipient:this.testRecipient,...this.formPayload()})});const d=await r.json();if(!r.ok)throw new Error(d.message||'تعذر الإرسال');this.showTest=false;this.saveState='تم إرسال النسخة التجريبية';}catch(e){this.errorMessage=e.message;}finally{this.busy=false;}}
+        async sendTest(){
+            if(!this.form.id)return;this.busy=true;
+            try{const r=await fetch(@json(url('/admin/email-templates'))+'/'+this.form.id+'/test-email',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''},body:JSON.stringify({recipient:this.testRecipient,...this.formPayload()})});const d=await r.json();if(!r.ok)throw new Error(d.message||'تعذر إرسال البريد التجريبي');this.showTest=false;this.saveState='تم إرسال البريد فعليًا عبر مزود البريد';}catch(e){this.errorMessage=e.message;}finally{this.busy=false;}
+        }
     };
 }
-</script>
+</script>>
 @endpush
 </x-admin.layouts.admin>
