@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\EmailTemplate;
+use App\Models\EmailTemplateVersion;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Seeder;
 
 class EmailTemplateSeeder extends Seeder
@@ -106,12 +108,34 @@ class EmailTemplateSeeder extends Seeder
             ],
         ];
 
-        foreach ($templates as $template) {
-            EmailTemplate::updateOrCreate(
-                ['key' => $template['key']],
-                $template
-            );
-        }
+        DB::transaction(function () use ($templates): void {
+            foreach ($templates as $definition) {
+                $template = EmailTemplate::updateOrCreate(
+                    ['key' => $definition['key']],
+                    array_merge($definition, [
+                        'status' => 'published',
+                        'published_version' => 1,
+                        'version' => 1,
+                        'published_at' => now(),
+                        'archived_at' => null,
+                        'autosaved_at' => null,
+                    ])
+                );
+
+                EmailTemplateVersion::updateOrCreate(
+                    ['email_template_id' => $template->id, 'version' => 1],
+                    [
+                        'subject' => (string) $template->subject,
+                        'html_content' => $template->html_content,
+                        'text_content' => $template->text_content,
+                        'css_styles' => $template->css_styles,
+                        'variables' => $template->variables,
+                        'created_by' => null,
+                        'change_note' => 'قالب إنتاجي أساسي — تمت تهيئته بواسطة Seeder',
+                    ],
+                );
+            }
+        });
     }
 
     private function getEmailVerificationHtml(): string
