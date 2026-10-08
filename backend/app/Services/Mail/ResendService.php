@@ -219,7 +219,8 @@ class ResendService
         return Http::baseUrl(self::RESEND_API_URL)
             ->withToken($this->settings->resend_api_key)
             ->acceptJson()
-            ->timeout(30);
+            ->timeout(30)
+            ->retry(2, 250);
     }
 
     /**
