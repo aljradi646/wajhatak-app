@@ -7,11 +7,13 @@ import '../../core/utils/image_compressor.dart';
 
 /// نتيجة عمليات التحقق من البريد.
 class VerificationResult {
-  const VerificationResult({required this.ok, required this.message, this.resendIn = 0});
+  const VerificationResult({required this.ok, required this.message, this.resendIn = 0, this.resendAvailableAt, this.serverTime});
 
   final bool ok;
   final String message;
   final int resendIn;
+  final DateTime? resendAvailableAt;
+  final DateTime? serverTime;
 }
 
 /// حالة توثيق حساب الوكيل كما يراها التطبيق.
@@ -93,12 +95,14 @@ class AccountRepository {
   final ImageCompressor _compressor = ImageCompressor();
 
   /// حالة التحقق: هل البريد موثق؟ وكم تبقى لإعادة الإرسال؟
-  Future<({bool verified, int resendIn})> emailStatus() async {
+  Future<({bool verified, int resendIn, DateTime? resendAvailableAt, DateTime? serverTime})> emailStatus() async {
     final json = await _api.get('/me/email/status');
     final data = json['data'] as Map<String, dynamic>? ?? const {};
     return (
       verified: data['verified'] as bool? ?? false,
       resendIn: (data['resend_in'] as num?)?.toInt() ?? 0,
+      resendAvailableAt: _parseDate(data['resend_available_at']),
+      serverTime: _parseDate(data['server_time']),
     );
   }
 
@@ -110,7 +114,14 @@ class AccountRepository {
       ok: data['ok'] as bool? ?? false,
       message: data['message'] as String? ?? '',
       resendIn: (data['resend_in'] as num?)?.toInt() ?? 0,
+      resendAvailableAt: _parseDate(data['resend_available_at']),
+      serverTime: _parseDate(data['server_time']),
     );
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value is! String || value.isEmpty) return null;
+    return DateTime.tryParse(value)?.toUtc();
   }
 
   /// تأكيد الرمز المُدخل.
