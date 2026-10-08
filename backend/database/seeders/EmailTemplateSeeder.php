@@ -14,6 +14,7 @@ class EmailTemplateSeeder extends Seeder
                 'key' => 'email_verification',
                 'name' => 'رمز التحقق من البريد',
                 'description' => 'رسالة تحتوي على رمز التحقق المُرسل للمستخدم',
+                'template_type' => 'verification',
                 'subject' => 'رمز التحقق من وجهتك',
                 'html_content' => $this->getEmailVerificationHtml(),
                 'text_content' => 'مرحبا {name}،
@@ -31,6 +32,7 @@ class EmailTemplateSeeder extends Seeder
                 'key' => 'agent_approved',
                 'name' => 'موافقة توثيق الوكيل',
                 'description' => 'رسالة إشعار الوكيل بموافقة توثيقه',
+                'template_type' => 'agent',
                 'subject' => 'تم توثيق حسابك في وجهتك ✓',
                 'html_content' => $this->getAgentApprovedHtml(),
                 'text_content' => 'أهلا {name}،
@@ -48,6 +50,7 @@ class EmailTemplateSeeder extends Seeder
                 'key' => 'agent_rejected',
                 'name' => 'رفض توثيق الوكيل',
                 'description' => 'رسالة إشعار الوكيل برفض توثيقه مع السبب',
+                'template_type' => 'agent',
                 'subject' => 'تم رفض طلب توثيق حسابك',
                 'html_content' => $this->getAgentRejectedHtml(),
                 'text_content' => 'أهلا {name}،
@@ -67,6 +70,7 @@ class EmailTemplateSeeder extends Seeder
                 'key' => 'property_published',
                 'name' => 'نشر العقار',
                 'description' => 'رسالة إشعار بنشر العقار بنجاح',
+                'template_type' => 'property',
                 'subject' => 'تم نشر عقارك بنجاح ✓',
                 'html_content' => $this->getPropertyPublishedHtml(),
                 'text_content' => 'أهلا {name}،
@@ -84,6 +88,7 @@ class EmailTemplateSeeder extends Seeder
                 'key' => 'property_rejected',
                 'name' => 'رفض نشر العقار',
                 'description' => 'رسالة إشعار برفض نشر العقار مع السبب',
+                'template_type' => 'property',
                 'subject' => 'تم رفض نشر عقارك',
                 'html_content' => $this->getPropertyRejectedHtml(),
                 'text_content' => 'أهلا {name}،
