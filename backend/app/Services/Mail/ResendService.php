@@ -28,9 +28,10 @@ final class ResendService
         string $subject,
         ?string $html = null,
         ?string $text = null,
-        array $attachments = []
+        array $attachments = [],
+        ?EmailSetting $settings = null,
     ): array {
-        $settings = EmailSetting::current();
+        $settings ??= EmailSetting::current();
 
         if (EmailSetting::isTestEmail($to)) {
             return [

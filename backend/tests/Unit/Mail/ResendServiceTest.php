@@ -60,7 +60,7 @@ class ResendServiceTest extends TestCase
 
     public function test_sandbox_403_is_reported_as_a_configuration_problem(): void
     {
-        $this->settings(true);
+        $settings = $this->settings(true);
 
         Http::fake([
             'https://api.resend.com/emails' => Http::response([
@@ -75,6 +75,8 @@ class ResendServiceTest extends TestCase
             'اختبار',
             '<p>اختبار</p>',
             'اختبار',
+            [],
+            $settings,
         );
 
         $this->assertFalse($result['success']);
@@ -102,6 +104,8 @@ class ResendServiceTest extends TestCase
             'شعار',
             '<p><img src="https://example.test/storage/email-logos/logo.png"></p>',
             null,
+            [],
+            $settings,
         );
 
         $this->assertTrue($result['success']);
