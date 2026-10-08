@@ -294,7 +294,7 @@ function emailTemplateManager() {
 
         setPane(pane) {
             if(this.pane===pane) return;
-            if(this.editor) { if(this.pane==='html') this.form.html_content=this.editor.getValue(); else this._cssValue=this.editor.getValue(); }
+            if(this.editor) { if(this.pane==='html') this.form.html_content=this.editor.getValue(); else { this._cssValue=this.editor.getValue(); this.form.css_styles=[this._cssValue]; } }
             this.pane=pane;
             const value=pane==='html'?this.form.html_content:(this._cssValue||'');
             const oldModel=this.editor?.getModel();
