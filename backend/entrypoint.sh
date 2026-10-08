@@ -98,13 +98,21 @@ fi
 # ---------------------------------------------------------------------------
 # 2. MySQL must be configured - never silently use SQLite in production.
 # ---------------------------------------------------------------------------
-if [ -z "${DB_CONNECTION:-}" ]; then
+# Production is MySQL-only. Never inherit an accidental SQLite value from
+# an old .env or hosting variable. A SQLite runtime is allowed only when the
+# operator explicitly sets WJ_ALLOW_SQLITE=true for local development.
+if [ "${WJ_ALLOW_SQLITE:-false}" = "true" ]; then
+    export DB_CONNECTION="${DB_CONNECTION:-sqlite}"
+else
     export DB_CONNECTION=mysql
 fi
 case "$DB_CONNECTION" in
-    mysql|pgsql) ;;
+    mysql) ;;
+    sqlite)
+        echo "==> [Wajhatak] SQLite explicitly enabled (WJ_ALLOW_SQLITE=true)." >&2
+        ;;
     *)
-        echo "!! [Wajhatak] DB_CONNECTION='$DB_CONNECTION' is not supported. Set it to mysql (Railway MySQL service)." >&2
+        echo "!! [Wajhatak] DB_CONNECTION='$DB_CONNECTION' is not supported. Production requires mysql." >&2
         exit 1
         ;;
 esac
