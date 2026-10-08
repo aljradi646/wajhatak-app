@@ -210,7 +210,7 @@ function emailTemplateManager() {
         blank(){
             return {
                 id:null,name:'قالب بريد جديد',key:'',template_type:'custom',subject:'',description:'',
-                html_content:'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background:#f4f7f6;"><tr><td align="center" style="padding:28px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;border-collapse:collapse;background:#ffffff;"><tr><td style="padding:32px;font-family:Arial,sans-serif;text-align:right;direction:rtl;"><h1 style="margin:0 0 14px;color:#075e4a;">مرحبًا {{user.name}}</h1><p style="margin:0;color:#36443f;">ابدأ بتصميم رسالتك من الكتل الجاهزة.</p></td></tr></table></td></tr></table>',
+                html_content:'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background:#f4f7f6;"><tr><td align="center" style="padding:28px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;border-collapse:collapse;background:#ffffff;"><tr><td style="padding:32px;font-family:Arial,sans-serif;text-align:right;direction:rtl;"><h1 style="margin:0 0 14px;color:#075e4a;">مرحبًا \u007B\u007Buser.name\u007D\u007D</h1><p style="margin:0;color:#36443f;">ابدأ بتصميم رسالتك من الكتل الجاهزة.</p></td></tr></table></td></tr></table>',
                 css_styles:[],text_content:'',variables:@json(array_keys($variableRegistry)),is_system:false,version:1,status:'draft'
             };
         },

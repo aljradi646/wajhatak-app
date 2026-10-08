@@ -39,10 +39,10 @@ final class ResendService
             ];
         }
 
-        if (! $settings->canSend()) {
+        if (! $settings->is_active) {
             return [
                 'success' => false,
-                'message' => 'إعدادات البريد غير مفعلة أو غير مكتملة. تحقق من المزود، مفتاح API، وعنوان From.',
+                'message' => 'إرسال البريد معطل حاليًا من إعدادات المنصة.',
             ];
         }
 

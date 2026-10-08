@@ -186,12 +186,22 @@
         <div x-show="tab === 'templates'" x-cloak class="space-y-5">
             {{-- Compatibility fields for the legacy settings fallback. Values come from
                  the real email_templates table when the matching template exists. --}}
+            @php
+                $dbEmailTemplates = collect($emailTemplates)->keyBy('key');
+                $legacyTemplateFields = [];
+                foreach ($templates as $legacyKey => $legacyMeta) {
+                    $dbTemplate = $dbEmailTemplates->get($legacyKey);
+                    $legacyTemplateFields[] = [
+                        'key' => $legacyKey,
+                        'subject' => old('templates.'.$legacyKey.'.subject', $dbTemplate?->subject ?? $templateValues[$legacyKey]['subject'] ?? ''),
+                        'body' => old('templates.'.$legacyKey.'.body', $dbTemplate?->text_content ?? $templateValues[$legacyKey]['body'] ?? ''),
+                    ];
+                }
+            @endphp
             <div class="hidden" aria-hidden="true">
-                @php($dbEmailTemplates = collect($emailTemplates)->keyBy('key'))
-                @foreach($templates as $legacyKey => $legacyMeta)
-                    @php($dbTemplate = $dbEmailTemplates->get($legacyKey))
-                    <input type="text" name="templates[{{ $legacyKey }}][subject]" value="{{ old('templates.'.$legacyKey.'.subject', $dbTemplate?->subject ?? $templateValues[$legacyKey]['subject'] ?? '') }}">
-                    <textarea name="templates[{{ $legacyKey }}][body]">{{ old('templates.'.$legacyKey.'.body', $dbTemplate?->text_content ?? $templateValues[$legacyKey]['body'] ?? '') }}</textarea>
+                @foreach($legacyTemplateFields as $field)
+                    <input type="text" name="templates[{{ $field['key'] }}][subject]" value="{{ $field['subject'] }}">
+                    <textarea name="templates[{{ $field['key'] }}][body]">{{ $field['body'] }}</textarea>
                 @endforeach
             </div>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
