@@ -30,7 +30,10 @@ class EmailTemplateController extends Controller
 
     public function create()
     {
-        return view('admin.email-templates.create', ['variables' => EmailTemplateVariableRegistry::definitions()]);
+        return view('admin.email-templates.create', [
+            'variables' => EmailTemplateVariableRegistry::definitions(),
+            'previewValues' => EmailTemplateVariableRegistry::previewValues(['app.logo_url' => EmailSetting::current()->getLogoUrlForEmail() ?? '']),
+        ]);
     }
 
     public function store(Request $request)
