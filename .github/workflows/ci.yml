@@ -2,7 +2,7 @@ name: Wajhatak CI
 
 on:
   push:
-    branches: ["main", "jules-*", "ai-agent-*", "feature/**"]
+    branches: ["main", "jules-*", "ai-agent-*", "feature/**", "fix/**"]
   pull_request:
     branches: ["main"]
 
@@ -34,10 +34,11 @@ jobs:
           php-version: "8.4"
           extensions: mbstring,bcmath,intl,pdo_mysql,gd,zip
           coverage: none
+      - name: Validate Composer metadata
+        run: composer validate --strict --no-check-publish
       - uses: ramsey/composer-install@v3
         with:
           working-directory: backend
-          dependency-versions: highest
       - run: cp .env.example .env && php artisan key:generate
       - name: Tests
         env:
