@@ -45,7 +45,7 @@ restartPolicyMaxRetries = 5
 #   APP_URL             = https://${{RAILWAY_PUBLIC_DOMAIN}}
 #
 # MySQL connection - attach a Railway MySQL service (name "MySQL"); its
-# variables are exported into this service automatically. For example:
+# variables must be referenced from the app service explicitly. For example:
 #   DB_CONNECTION = mysql
 #   DB_URL        = ${{MySQL.MYSQL_URL}}     <- preferred, Laravel parses it
 #   DB_HOST = ${{MySQL.MYSQLHOST}}  DB_PORT = ${{MySQL.MYSQLPORT}}
