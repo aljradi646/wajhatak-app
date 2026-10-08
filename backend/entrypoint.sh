@@ -78,9 +78,9 @@ fi
 # ---------------------------------------------------------------------------
 if [ ! -f vendor/autoload.php ] || [ -d vendor/laravel/pail ]; then
     echo "==> [Wajhatak] Installing Laravel dependencies for a clean runtime bootstrap..."
-    composer install --no-interaction --no-progress --prefer-dist --no-dev --no-scripts --no-ansi || true
+    composer install --no-interaction --no-progress --prefer-dist --no-dev --no-scripts --no-ansi
     rm -rf vendor/laravel/pail 2>/dev/null || true
-    composer dump-autoload --optimize --no-dev --no-interaction --no-ansi >/dev/null 2>&1 || true
+    composer dump-autoload --optimize --no-dev --no-interaction --no-ansi
 fi
 
 # اختبار ذاتي لمحرك المساعد الحتمي (بلا قاعدة بيانات ولا vendor) — يكشف أي
@@ -91,6 +91,7 @@ if [ -f scripts/ai_selftest/run.php ]; then
     else
         echo "!! [Wajhatak] AI engine self-test FAILED — راجع: php scripts/ai_selftest/run.php" >&2
         php scripts/ai_selftest/run.php 2>&1 | tail -n 25 | sed 's/^/      | /' >&2 || true
+        exit 1
     fi
 fi
 
@@ -283,7 +284,7 @@ php artisan storage:link >/dev/null 2>&1 || echo "    storage:link unavailable (
 if [ -d image-bundle/properties ]; then
     echo "==> [Wajhatak] Restoring property photos from image-bundle..."
     mkdir -p storage/app/public/properties
-    cp -rf image-bundle/properties/. storage/app/public/properties/ 2>/dev/null || true
+    cp -rf image-bundle/properties/. storage/app/public/properties/
     echo "==> [Wajhatak] Property photos restored."
 fi
 
@@ -330,10 +331,10 @@ if [ "$SERVICE_TYPE" = "app" ]; then
 
     # 7. Cache config/routes/views (recomputed from current env each boot)
     echo "==> [Wajhatak] Caching config, routes and views..."
-    php artisan optimize:clear >/dev/null 2>&1 || true
-    php artisan config:cache || true
-    php artisan route:cache || true
-    php artisan view:cache || true
+    php artisan optimize:clear
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
 
     # 7b. Property-image self-healing. Railway's disk is ephemeral, so seeder
     #     images can be wiped on redeploy while DB rows survive. Running the
