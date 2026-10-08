@@ -260,7 +260,7 @@ function emailTemplateManager() {
             if(this.busy) return;
             this.open=false; this.showPreview=false; this.showIcons=false; this.showTest=false;
             this.editorReady=false; this.disposeEditor(); this.monacoLoaded=false;
-            history.replaceState({},'',location.pathname+location.search.replace(/([?&])create=1(&?)/,'$1').replace(/[?&]$/,''));
+            history.replaceState({},'',location.pathname);
         },
 
         async ensureMonaco() {
@@ -297,9 +297,10 @@ function emailTemplateManager() {
             if(this.editor) { if(this.pane==='html') this.form.html_content=this.editor.getValue(); else this._cssValue=this.editor.getValue(); }
             this.pane=pane;
             const value=pane==='html'?this.form.html_content:(this._cssValue||'');
-            this.editor?.setValue(value);
-            this.editor?.setModel(monaco.editor.createModel(value,pane==='html'?'html':'css'));
-            this.editor?.updateOptions({language:pane});
+            const oldModel=this.editor?.getModel();
+            const model=monaco.editor.createModel(value,pane==='html'?'html':'css');
+            this.editor?.setModel(model);
+            oldModel?.dispose();
             this.editor?.layout();
             this.refreshPreviewDebounced();
         },
@@ -322,7 +323,6 @@ function emailTemplateManager() {
                 const r=await fetch(@json(route('admin.email-templates.preview-draft')),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''},body:JSON.stringify(payload)});
                 const d=await r.json(); if(!r.ok) return;
                 const f=document.getElementById('emailPreviewFrame'); f.srcdoc=d.html||'';
-                this.showPreview=true;
             } catch(e) {}
         },
 
