@@ -27,7 +27,7 @@ class EmailVerificationService
     /**
      * إرسال رمز جديد إلى البريد (بعد فحص التسليم والحد الزمني).
      *
-     * @return array{ok: bool, message: string, resend_in: int}
+     * @return array{ok: bool, message: string, resend_in: int, resend_available_at: ?string, server_time: string}
      */
     public function sendCode(User $user): array
     {
@@ -38,7 +38,7 @@ class EmailVerificationService
         // 1) البريد يجب أن يكون صالحًا وقابلًا للتسليم فعليًا.
         $check = $this->deliverability->verify($email);
         if (! $check['deliverable']) {
-            return ['ok' => false, 'message' => $check['reason'] ?? 'البريد غير قابل للتسليم.', 'resend_in' => 0];
+            return ['ok' => false, 'message' => $check['reason'] ?? 'البريد غير قابل للتسليم.', 'resend_in' => 0, 'resend_available_at' => null, 'server_time' => now()->toIso8601String()];
         }
 
         // 2) حد الإرسالات الزمني.
@@ -50,6 +50,8 @@ class EmailVerificationService
                 'ok' => false,
                 'message' => 'انتظر '.max(1, $remaining).' ثانية قبل إعادة إرسال الرمز.',
                 'resend_in' => max(1, $remaining),
+                'resend_available_at' => $last->copy()->addSeconds($resendSeconds)->toIso8601String(),
+                'server_time' => now()->toIso8601String(),
             ];
         }
 
@@ -75,12 +77,20 @@ class EmailVerificationService
                 'ok' => false,
                 'message' => 'تعذر إرسال البريد الآن: '.$e->getMessage(),
                 'resend_in' => 0,
+                'resend_available_at' => null,
+                'server_time' => now()->toIso8601String(),
             ];
         }
 
         $user->forceFill(['email_code_sent_at' => now()])->save();
 
-        return ['ok' => true, 'message' => 'تم إرسال رمز التحقق إلى بريدك — افحص صندوق الوارد.', 'resend_in' => $resendSeconds];
+        return [
+            'ok' => true,
+            'message' => 'تم إرسال رمز التحقق إلى بريدك — افحص صندوق الوارد.',
+            'resend_in' => $resendSeconds,
+            'resend_available_at' => now()->addSeconds($resendSeconds)->toIso8601String(),
+            'server_time' => now()->toIso8601String(),
+        ];
     }
 
     /**
@@ -132,5 +142,11 @@ class EmailVerificationService
         }
 
         return max(0, $resendSeconds - (int) $last->diffInSeconds(now()));
+    }
+
+    public function resendAvailableAt(User $user): ?string
+    {
+        $remaining = $this->resendIn($user);
+        return $remaining > 0 ? now()->addSeconds($remaining)->toIso8601String() : null;
     }
 }
