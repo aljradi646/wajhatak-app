@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EmailTemplate extends Model
 {
     protected $fillable = [
-        'key', 'name', 'description', 'subject', 'html_content', 'text_content',
+        'key', 'name', 'description', 'template_type', 'subject', 'html_content', 'text_content',
         'css_styles', 'variables', 'is_active', 'is_system', 'thumbnail', 'version',
         'status', 'published_version', 'last_edited_by', 'published_at', 'archived_at', 'autosaved_at',
     ];
