@@ -76,7 +76,7 @@
                                 
                                 <label class="flex items-center gap-2 text-sm font-bold cursor-pointer">
                                     <input type="checkbox" name="resend_sandbox" value="1" @checked($settings->resend_sandbox) class="h-4 w-4 accent-wajhatak-600">
-                                    وضع الاختبار (Sandbox) — يستخدم onboarding@resend.dev
+                                    وضع الاختبار (Sandbox) — يسمح Resend بالإرسال للاختبار فقط إلى بريد حساب Resend المرتبط
                                 </label>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mr-6">فعّل هذا للتجربة قبل توثيق النطاق الخاص بك.</p>
                             </div>
