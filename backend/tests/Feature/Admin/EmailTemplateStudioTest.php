@@ -28,6 +28,7 @@ class EmailTemplateStudioTest extends TestCase
             'key' => 'tests.template',
             'name' => 'قالب اختبار',
             'description' => 'اختبار',
+            'template_type' => 'custom',
             'subject' => 'مرحبًا {{user.name}}',
             'html_content' => '<p>{{user.name}}</p>',
             'text_content' => 'مرحبًا {{user.name}}',
@@ -179,6 +180,59 @@ class EmailTemplateStudioTest extends TestCase
         $response->assertCreated();
         $path = basename(parse_url($response->json('data.0.src'), PHP_URL_PATH));
         Storage::disk('public')->assertExists('email-assets/'.$path);
+    }
+
+
+    public function test_modal_editor_data_exposes_template_type_and_editor_payload(): void
+    {
+        $template = $this->template();
+
+        $response = $this->actingAs($this->admin())->getJson(
+            route('admin.email-templates.editor-data', $template)
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('data.id', $template->id)
+            ->assertJsonPath('data.template_type', 'custom')
+            ->assertJsonPath('data.html_content', '<p>{{user.name}}</p>');
+    }
+
+    public function test_modal_can_create_and_update_template_as_json(): void
+    {
+        $create = $this->actingAs($this->admin())->postJson(
+            route('admin.email-templates.store'),
+            [
+                'name' => 'قالب تسجيل الدخول',
+                'key' => 'auth.login.notice',
+                'template_type' => 'authentication',
+                'description' => 'إشعار تسجيل الدخول',
+                'subject' => 'تم تسجيل الدخول',
+                'html_content' => '<p>تم تسجيل الدخول إلى حسابك.</p>',
+                'text_content' => 'تم تسجيل الدخول إلى حسابك.',
+                'css_styles' => [],
+                'variables' => [],
+            ],
+        );
+
+        $create->assertCreated()->assertJsonPath('data.status', 'draft');
+        $template = EmailTemplate::where('key', 'auth.login.notice')->firstOrFail();
+        $this->assertSame('authentication', $template->template_type);
+
+        $update = $this->actingAs($this->admin())->patchJson(
+            route('admin.email-templates.update', $template),
+            [
+                'name' => 'إشعار تسجيل الدخول المحدث',
+                'template_type' => 'authentication',
+                'subject' => 'تسجيل دخول جديد',
+                'html_content' => '<p>تسجيل دخول جديد.</p>',
+                'text_content' => 'تسجيل دخول جديد.',
+                'css_styles' => [],
+                'variables' => [],
+            ],
+        );
+
+        $update->assertOk()->assertJsonPath('data.version', 2);
+        $this->assertSame('تسجيل دخول جديد', $template->fresh()->subject);
     }
 
 }
