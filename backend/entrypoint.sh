@@ -299,12 +299,12 @@ fi
 #     'system_initialized' = 1, and every later boot skips seeds so the
 #     existing data is never touched or duplicated.
 # ---------------------------------------------------------------------------
-if [ "$SERVICE_TYPE" != "static" ]; then
+if [ "$SERVICE_TYPE" = "app" ]; then
     # -------------------------------------------------------------------------
     # المساعد الذكي محرك حتمي داخل Laravel — لا خدمة استدلال خلفية ولا مجلد نماذج.
     # -------------------------------------------------------------------------
     echo "==> [Wajhatak] Running migrations (idempotent — syncs new tables/columns with the live database)..."
-    php artisan migrate --force || echo "    migrate reported an issue (non-fatal, continuing)."
+    php artisan migrate --force
 
     SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
@@ -326,7 +326,7 @@ if [ "$SERVICE_TYPE" != "static" ]; then
     #     لأي جدول/عمود ناقص أو فهرس فارغ. السبب صار ظاهرًا في سجل النشر
     #     بلا تخمين. غير قاتل: نُكمل التشغيل حتى لو أبلغ عن مشكلة.
     echo "==> [Wajhatak] AI assistant health check (ai:doctor --fix)..."
-    php artisan ai:doctor --fix || echo "    ai:doctor reported issues (non-fatal, continuing)."
+    php artisan ai:doctor --fix
 
     # 7. Cache config/routes/views (recomputed from current env each boot)
     echo "==> [Wajhatak] Caching config, routes and views..."
@@ -346,7 +346,7 @@ if [ "$SERVICE_TYPE" != "static" ]; then
             ;;
         *)
             echo "==> [Wajhatak] Self-healing property images..."
-            php scripts/fix_property_images.php --quiet || echo "    image fixer exited non-zero (non-fatal)."
+            php scripts/fix_property_images.php --quiet
             ;;
     esac
 fi
@@ -371,18 +371,13 @@ case "$SERVICE_TYPE" in
         exec tail -f /dev/null
         ;;
     *)
-        # App service: queue worker (background, self-healing) + artisan serve.
-        echo "==> [Wajhatak] Starting queue worker (background) for deferred notifications..."
-        (
-            while :; do
-                php artisan queue:work --sleep=3 --tries=3 --timeout=60 --max-time=3500 || true
-                sleep 2
-            done
-        ) &
+        # App service: HTTP only. Queue work is handled by the dedicated worker
+        # service so deploys cannot accidentally create duplicate consumers.
+        if [ "${START_EMBEDDED_QUEUE_WORKER:-false}" = "true" ]; then
+            echo "==> [Wajhatak] Starting explicitly enabled embedded queue worker..."
+            php artisan queue:work --sleep=3 --tries=3 --timeout=60 --max-time=3500 &
+        fi
 
-        # -------------------------------------------------------------------
-        # المساعد الذكي محرك حتمي داخل Laravel نفسه — لا عملية خلفية إضافية.
-        # -------------------------------------------------------------------
         echo "==> [Wajhatak] AI assistant: deterministic in-process engine (no model download, no external provider)."
 
         export PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}"
