@@ -1,7 +1,7 @@
 @php
 $statusLabels = ['draft' => 'مسودة', 'published' => 'منشور', 'archived' => 'مؤرشف'];
 @endphp
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/codemirror.min.css">
 <style>
 .CodeMirror{height:100%;width:100%;font-family:"JetBrains Mono","Fira Code",Consolas,monospace;font-size:13px;line-height:1.7;background:#0b1110;color:#d7e4df}
 .CodeMirror-gutters{background:#0b1110;border-left:1px solid rgba(255,255,255,.06);border-right:0}.CodeMirror-linenumber{color:#60716c}.CodeMirror-cursor{border-left:2px solid #55c9a7}
@@ -116,7 +116,7 @@ $statusLabels = ['draft' => 'مسودة', 'published' => 'منشور', 'archived
             </header>
 
             <div class="min-h-0 flex-1 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">
-                <main class="min-h-0 flex flex-col bg-[#111817]">
+                <main class="min-h-0 grid grid-cols-1 lg:grid-cols-2 bg-[#111817]">
                     <div class="flex shrink-0 items-center gap-1 border-b border-white/10 bg-[#0d1312] px-3 py-2">
                         <button type="button" @click="setPane('html')" :class="pane==='html' ? 'bg-white/10 text-white' : 'text-white/55'" class="rounded-lg px-3 py-2 text-xs font-black">HTML</button>
                         <button type="button" @click="setPane('css')" :class="pane==='css' ? 'bg-white/10 text-white' : 'text-white/55'" class="rounded-lg px-3 py-2 text-xs font-black">CSS</button>
@@ -127,10 +127,19 @@ $statusLabels = ['draft' => 'مسودة', 'published' => 'منشور', 'archived
                         <input x-ref="asset" type="file" accept="image/png,image/jpeg,image/gif,image/webp" class="hidden" @change="uploadAsset($event)">
                         <span class="ms-auto text-[10px] text-white/40">Ctrl/Cmd + S للحفظ</span>
                     </div>
-                    <div class="min-h-0 flex-1 relative">
+                    <div class="min-h-0 relative border-e border-white/10">
                         <textarea id="emailCodeEditor" class="absolute inset-0 h-full w-full resize-none border-0 outline-none"></textarea>
                         <div x-show="!editorReady" class="absolute inset-0 flex items-center justify-center bg-[#111817] text-sm text-white/50">جارٍ تحميل محرر الكود…</div>
                     </div>
+                    <section class="min-h-0 flex flex-col bg-gray-100 dark:bg-gray-950">
+                        <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-3 py-2 text-xs font-black dark:border-gray-800">
+                            <span>معاينة حية</span>
+                            <button type="button" @click="preview()" class="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-[10px] font-black dark:border-gray-700 dark:bg-gray-900">تحديث</button>
+                        </div>
+                        <div class="min-h-0 flex-1 p-3">
+                            <iframe id="emailPreviewFrame" title="معاينة البريد" sandbox referrerpolicy="no-referrer" class="h-full w-full rounded-2xl border-0 bg-white shadow-sm"></iframe>
+                        </div>
+                    </section>
                 </main>
 
                 <aside class="min-h-0 overflow-y-auto border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 xl:border-t-0 xl:border-s">
@@ -262,10 +271,10 @@ function emailTemplateManager() {
             await new Promise((resolve,reject)=>{
                 const existing=document.querySelector('script[data-wajhatak-codemirror]');
                 if(existing){const t=setInterval(()=>{if(window.CodeMirror){clearInterval(t);resolve();}},30);setTimeout(()=>{clearInterval(t);reject(new Error('تعذر تحميل محرر الكود'));},12000);return;}
-                const script=document.createElement('script');script.dataset.wajhatakCodemirror='1';script.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js';
+                const script=document.createElement('script');script.dataset.wajhatakCodemirror='1';script.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/codemirror.min.js';
                 script.onload=()=>{
-                    const mode=document.createElement('script');mode.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js';
-                    mode.onload=()=>{const css=document.createElement('script');css.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js';css.onload=resolve;css.onerror=()=>reject(new Error('تعذر تحميل وضع CSS'));document.head.appendChild(css);};
+                    const mode=document.createElement('script');mode.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/mode/htmlmixed/htmlmixed.min.js';
+                    mode.onload=()=>{const css=document.createElement('script');css.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.20/mode/css/css.min.js';css.onload=resolve;css.onerror=()=>reject(new Error('تعذر تحميل وضع CSS'));document.head.appendChild(css);};
                     mode.onerror=()=>reject(new Error('تعذر تحميل وضع HTML'));document.head.appendChild(mode);
                 };
                 script.onerror=()=>reject(new Error('تعذر تحميل CodeMirror'));document.head.appendChild(script);
