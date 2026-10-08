@@ -231,7 +231,7 @@ function emailTemplateManager() {
             window.addEventListener('keydown', e => {
                 if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && this.open) { e.preventDefault(); this.save(); }
             });
-            if (new URLSearchParams(location.search).get('create') === '1') this.openCreate();
+            const qs=new URLSearchParams(location.search); if(qs.get('create')==='1') this.openCreate(); else if(qs.get('edit')) this.openEdit(Number(qs.get('edit')));
         },
 
         blank() {
