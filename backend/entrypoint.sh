@@ -30,15 +30,14 @@ set -e
 SERVICE_TYPE="${RAILWAY_SERVICE_TYPE:-app}"
 echo "==> [Wajhatak] Container starting (type: ${SERVICE_TYPE})"
 
-# The Laravel image is the application runtime. The separate Railway "ai"
-# service must use deploy/llm (llama.cpp), not this image. Never let an AI
-# inference service accidentally boot Laravel and attempt to connect to MySQL.
+# Compatibility guard: older Railway projects may still expose the Laravel
+# image through a service carrying RAILWAY_SERVICE_TYPE=ai. Do NOT take the
+# application offline in that case; the Laravel image remains a valid web app.
+# A real LLM service uses deploy/llm/Dockerfile and never executes this script.
 if [ "${SERVICE_TYPE}" = "ai" ]; then
-    echo "!! [Wajhatak] SERVICE_TYPE=ai received by the Laravel image." >&2
-    echo "   This service must be deployed from deploy/llm/Dockerfile (LLM inference)." >&2
-    echo "   Railway: AI service -> Settings -> Root Directory = deploy/llm." >&2
-    echo "   Keep RAILWAY_SERVICE_TYPE=app only on the Laravel application service." >&2
-    exit 78
+    echo "!! [Wajhatak] Laravel image received RAILWAY_SERVICE_TYPE=ai; treating it as app for availability."
+    echo "   The dedicated AI inference service should use deploy/llm/Dockerfile."
+    SERVICE_TYPE=app
 fi
 
 # ---------------------------------------------------------------------------
