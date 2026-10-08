@@ -100,6 +100,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // قوالب البريد الإلكتروني — المسارات الثابتة يجب أن تسبق resource حتى لا يلتقطها show. 
     Route::get('email-templates/{emailTemplate}/history', [EmailTemplateController::class, 'history'])->name('email-templates.history');
+    Route::post('email-templates/preview-draft', [EmailTemplateController::class, 'previewDraft'])->name('email-templates.preview-draft');
+    Route::post('email-templates/assets', [EmailTemplateController::class, 'uploadAsset'])->name('email-templates.assets');
     Route::post('email-templates/{emailTemplate}/preview', [EmailTemplateController::class, 'preview'])->name('email-templates.preview');
     Route::post('email-templates/{emailTemplate}/autosave', [EmailTemplateController::class, 'autosave'])->name('email-templates.autosave');
     Route::post('email-templates/{emailTemplate}/publish', [EmailTemplateController::class, 'publish'])->name('email-templates.publish');
