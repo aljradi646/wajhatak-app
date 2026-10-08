@@ -1,5 +1,9 @@
 <x-admin.layouts.admin heading="إنشاء قالب بريد جديد" title="إنشاء قالب">
     <div class="max-w-3xl mx-auto space-y-6">
+        <div class="rounded-2xl border border-wajhatak-200 bg-wajhatak-50 p-4 text-sm leading-6 text-gray-700 dark:border-wajhatak-900/40 dark:bg-wajhatak-900/10 dark:text-gray-200">
+            أنشئ بيانات القالب أولًا، وبعد الحفظ يفتح <strong>استوديو القوالب</strong> مباشرة لتحريره بصريًا أو بالكود
+            <strong>HTML / CSS</strong>، مع المعاينة والمتغيرات والحفظ التلقائي والإصدارات والنشر.
+        </div>
         <form method="POST" action="{{ route('admin.email-templates.store') }}">
             @csrf
             
