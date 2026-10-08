@@ -53,6 +53,9 @@ RUN npm run build
 # =============================================================================
 FROM php:8.4-fpm-alpine AS runtime
 
+# Production Laravel deployments use Railway MySQL; the entrypoint keeps this invariant.
+ENV DB_CONNECTION=mysql
+
 # Install runtime PHP extensions and the Caddy web server.
 # - Caddy serves as a reverse proxy to php-fpm and provides automatic HTTPS.
 RUN apk add --no-cache \
