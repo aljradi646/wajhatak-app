@@ -140,7 +140,7 @@ class EmailSetting extends Model
         }
 
         // Email clients require a publicly reachable absolute URL.
-        if (Str::startsWith($url, ['http://', 'https://'])) {
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
             return $url;
         }
 
