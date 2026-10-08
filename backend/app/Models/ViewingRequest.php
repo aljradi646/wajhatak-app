@@ -18,6 +18,15 @@ class ViewingRequest extends Model
         return ['scheduled_date' => 'date', 'status' => ViewingRequestStatus::class];
     }
 
+    /**
+     * MySQL TIME values are returned as HH:MM:SS, while the API contract
+     * accepts and returns HH:MM. Keep the DB representation out of clients.
+     */
+    public function getScheduledTimeAttribute($value): ?string
+    {
+        return $value === null ? null : substr((string) $value, 0, 5);
+    }
+
     public function property(): BelongsTo
     {
         return $this->belongsTo(Property::class);
@@ -33,4 +42,3 @@ class ViewingRequest extends Model
         return $this->belongsTo(Agent::class);
     }
 }
-
