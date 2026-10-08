@@ -30,14 +30,14 @@ set -e
 SERVICE_TYPE="${RAILWAY_SERVICE_TYPE:-app}"
 echo "==> [Wajhatak] Container starting (type: ${SERVICE_TYPE})"
 
-# Compatibility guard: older Railway projects may still expose the Laravel
-# image through a service carrying RAILWAY_SERVICE_TYPE=ai. Do NOT take the
-# application offline in that case; the Laravel image remains a valid web app.
-# A real LLM service uses deploy/llm/Dockerfile and never executes this script.
+# Some Railway projects use RAILWAY_SERVICE_TYPE=ai on the Laravel web service.
+# That value is only metadata; it must never make the public Laravel service exit.
+# The actual dedicated LLM image is deploy/llm/Dockerfile and does not execute
+# this entrypoint at all.
 if [ "${SERVICE_TYPE}" = "ai" ]; then
-    echo "!! [Wajhatak] Laravel image received RAILWAY_SERVICE_TYPE=ai; treating it as app for availability."
-    echo "   The dedicated AI inference service should use deploy/llm/Dockerfile."
-    SERVICE_TYPE=app
+    echo "==> [Wajhatak] Service type 'ai' detected on Laravel image; starting web app without DB bootstrap."
+    echo "    Use deploy/llm/Dockerfile only for a dedicated LLM inference service."
+    exec php artisan serve --host=0.0.0.0 --port="${PORT:-8080}" --no-reload
 fi
 
 # ---------------------------------------------------------------------------
@@ -108,26 +108,17 @@ fi
 # ---------------------------------------------------------------------------
 # 2. Resolve the production MySQL connection.
 #
-# Railway exposes MySQL connection values on the MySQL service itself:
-# MYSQL_URL / MYSQLHOST / MYSQLPORT / MYSQLDATABASE / MYSQLUSER / MYSQLPASSWORD.
-# A consuming app service must reference those variables explicitly. We always
-# prefer these canonical MySQL variables over a generic DB_URL/DB_HOST because
-# a generic value can accidentally point back to the application service.
+# Explicit Laravel DB_* variables are authoritative. Only fall back to a
+# Railway MYSQL_URL / MYSQL* set when the explicit Laravel values are absent.
+# This avoids overwriting a valid DB_HOST/DB_DATABASE with a generic URL
+# belonging to another service.
 # ---------------------------------------------------------------------------
 
-if [ "${WJ_ALLOW_SQLITE:-false}" = "true" ]; then
-    export DB_CONNECTION="${DB_CONNECTION:-sqlite}"
-else
-    export DB_CONNECTION=mysql
-fi
-
+export DB_CONNECTION="${DB_CONNECTION:-mysql}"
 case "$DB_CONNECTION" in
-    mysql) ;;
-    sqlite)
-        echo "==> [Wajhatak] SQLite explicitly enabled (WJ_ALLOW_SQLITE=true)." >&2
-        ;;
+    mysql|sqlite) ;;
     *)
-        echo "!! [Wajhatak] DB_CONNECTION='$DB_CONNECTION' is unsupported. Production requires mysql." >&2
+        echo "!! [Wajhatak] Unsupported DB_CONNECTION='$DB_CONNECTION'." >&2
         exit 1
         ;;
 esac
@@ -143,100 +134,52 @@ parse_mysql_url() {
     _db="${_db%%#*}"
     _user="${_auth%%:*}"
     _pass="${_auth#*:}"
-
     case "$_hostport" in
-        *:*)
-            _host="${_hostport%%:*}"
-            _port="${_hostport##*:}"
-            ;;
-        *)
-            _host="$_hostport"
-            _port=3306
-            ;;
+        *:*) _host="${_hostport%%:*}"; _port="${_hostport##*:}" ;;
+        *) _host="$_hostport"; _port=3306 ;;
     esac
-
-    export DB_HOST="$_host"
-    export DB_PORT="${DB_PORT:-$_port}"
-    export DB_DATABASE="$_db"
-    export DB_USERNAME="$_user"
-    export DB_PASSWORD="$_pass"
-
+    [ -z "${DB_HOST:-}" ] && export DB_HOST="$_host"
+    [ -z "${DB_PORT:-}" ] && export DB_PORT="$_port"
+    [ -z "${DB_DATABASE:-}" ] && export DB_DATABASE="$_db"
+    [ -z "${DB_USERNAME:-}" ] && export DB_USERNAME="$_user"
+    [ -z "${DB_PASSWORD:-}" ] && export DB_PASSWORD="$_pass"
     unset _u _creds _auth _rest _hostport _db _user _pass _host _port
 }
 
-# 1) Canonical Railway MySQL URL.
-if [ -n "${MYSQL_URL:-}" ]; then
-    echo "==> [Wajhatak] Using Railway MYSQL_URL as the canonical database source."
+# Prefer explicit DB_* values already configured on the Laravel service.
+if [ -n "${DB_HOST:-}" ] && [ -n "${DB_DATABASE:-}" ] && [ -n "${DB_USERNAME:-}" ]; then
+    echo "==> [Wajhatak] Using explicit Laravel DB_* variables."
+elif [ -n "${MYSQL_URL:-}" ]; then
+    echo "==> [Wajhatak] Resolving database from MYSQL_URL because explicit DB_* values are incomplete."
     parse_mysql_url "${MYSQL_URL}"
-# 2) Canonical Railway MySQL split variables.
-elif [ -n "${MYSQLHOST:-}" ] && [ -n "${MYSQLDATABASE:-}" ] && [ -n "${MYSQLUSER:-}" ]; then
-    echo "==> [Wajhatak] Using Railway MYSQLHOST/MYSQLDATABASE/MYSQLUSER variables."
-    export DB_HOST="${MYSQLHOST}"
-    export DB_PORT="${MYSQLPORT:-3306}"
-    export DB_DATABASE="${MYSQLDATABASE}"
-    export DB_USERNAME="${MYSQLUSER}"
-    export DB_PASSWORD="${MYSQLPASSWORD:-}"
-# 3) Explicit Laravel DB_URL fallback.
 elif [ -n "${DB_URL:-}" ]; then
     case "${DB_URL}" in
         mysql://*|mariadb://*)
-            echo "==> [Wajhatak] Using explicit DB_URL."
+            echo "==> [Wajhatak] Resolving database from explicit DB_URL."
             parse_mysql_url "${DB_URL}"
             ;;
     esac
 fi
 
-# Fallback to split DB_* values only when no canonical MYSQL* source was
-# supplied. Never replace a valid explicit DB_* value with empty values.
-if [ -z "${DB_HOST:-}" ] && [ -n "${MYSQLHOST:-}" ]; then
-    export DB_HOST="${MYSQLHOST}"
-fi
-if [ -z "${DB_PORT:-}" ] && [ -n "${MYSQLPORT:-}" ]; then
-    export DB_PORT="${MYSQLPORT}"
-fi
-if [ -z "${DB_DATABASE:-}" ] && [ -n "${MYSQLDATABASE:-}" ]; then
-    export DB_DATABASE="${MYSQLDATABASE}"
-fi
-if [ -z "${DB_USERNAME:-}" ] && [ -n "${MYSQLUSER:-}" ]; then
-    export DB_USERNAME="${MYSQLUSER}"
-fi
-if [ -z "${DB_PASSWORD:-}" ] && [ -n "${MYSQLPASSWORD:-}" ]; then
-    export DB_PASSWORD="${MYSQLPASSWORD}"
-fi
-
-# Never allow an accidental self-reference such as
-# wajhatak-app.railway.internal:3306. That hostname belongs to this app
-# service, not the MySQL service, and produces connection-refused errors.
-SELF_HOST="${RAILWAY_PRIVATE_DOMAIN:-}"
-if [ -z "$SELF_HOST" ] && [ -n "${RAILWAY_SERVICE_NAME:-}" ]; then
-    SELF_HOST="${RAILWAY_SERVICE_NAME}.railway.internal"
-fi
-
-if [ -n "$SELF_HOST" ] && [ "${DB_HOST:-}" = "$SELF_HOST" ]; then
-    echo "!! [Wajhatak] DB_HOST resolves to this application service ('$DB_HOST')." >&2
-    echo "   Set the app service variables to references from the MySQL service:" >&2
-    echo '   DB_URL='"$"'{{MySQL.MYSQL_URL}}' >&2
-    echo '   or DB_HOST='"$"'{{MySQL.MYSQLHOST}}, DB_PORT='"$"'{{MySQL.MYSQLPORT}}, DB_DATABASE='"$"'{{MySQL.MYSQLDATABASE}},' >&2
-    echo '      DB_USERNAME='"$"'{{MySQL.MYSQLUSER}}, DB_PASSWORD='"$"'{{MySQL.MYSQLPASSWORD}}' >&2
-    exit 1
-fi
+# Railway split variables are the final fallback.
+[ -z "${DB_HOST:-}" ] && [ -n "${MYSQLHOST:-}" ] && export DB_HOST="${MYSQLHOST}"
+[ -z "${DB_PORT:-}" ] && [ -n "${MYSQLPORT:-}" ] && export DB_PORT="${MYSQLPORT}"
+[ -z "${DB_DATABASE:-}" ] && [ -n "${MYSQLDATABASE:-}" ] && export DB_DATABASE="${MYSQLDATABASE}"
+[ -z "${DB_USERNAME:-}" ] && [ -n "${MYSQLUSER:-}" ] && export DB_USERNAME="${MYSQLUSER}"
+[ -z "${DB_PASSWORD:-}" ] && [ -n "${MYSQLPASSWORD:-}" ] && export DB_PASSWORD="${MYSQLPASSWORD}"
 
 DB_HOST_VALUE="${DB_HOST:-}"
 case "$DB_HOST_VALUE" in
     ''|*\$\{\{*|*\$\{*)
-        echo '!! [Wajhatak] MySQL connection is NOT configured (DB_HOST is empty or unresolved).' >&2
-        echo '   Reference the MySQL service variables explicitly from the Laravel service.' >&2
-        echo "   Current values: DB_CONNECTION=$DB_CONNECTION, DB_HOST='${DB_HOST:-}', DB_PORT='${DB_PORT:-}'," >&2
-        echo "                    DB_DATABASE='${DB_DATABASE:-}', DB_USERNAME='${DB_USERNAME:-}'." >&2
+        echo '!! [Wajhatak] MySQL connection is not configured.' >&2
+        echo "   DB_HOST='${DB_HOST:-}', DB_DATABASE='${DB_DATABASE:-}', DB_USERNAME='${DB_USERNAME:-}'. Please reference the MySQL service variables." >&2
         exit 1
         ;;
 esac
-
 if [ -z "${DB_DATABASE:-}" ] || [ -z "${DB_USERNAME:-}" ]; then
-    echo "!! [Wajhatak] MySQL credentials are incomplete. DB_DATABASE and DB_USERNAME are required." >&2
+    echo "!! [Wajhatak] MySQL connection is incomplete." >&2
     exit 1
 fi
-
 echo "==> [Wajhatak] Using MySQL at ${DB_HOST_VALUE}."
 php artisan config:clear >/dev/null 2>&1 || true
 echo "==> [Wajhatak] DB target: host=${DB_HOST_VALUE}, port=${DB_PORT:-3306}, database=${DB_DATABASE}, user=${DB_USERNAME}."
