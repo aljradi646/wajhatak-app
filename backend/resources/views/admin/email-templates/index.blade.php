@@ -290,7 +290,7 @@ function emailTemplateManager() {
         currentCss(){return this.pane==='css'&&this.editor?[this.editor.getValue()]:(Array.isArray(this.form.css_styles)?this.form.css_styles:[]);},
         formPayload(){
             if(this.editor){if(this.pane==='html')this.form.html_content=this.editor.getValue();else this.form.css_styles=[this.editor.getValue()];}
-            return {...this.form,css_styles:this.currentCss(),preview_variables:@json($variableRegistry?[]:[])}
+            return {...this.form,css_styles:this.currentCss(),preview_variables:{}}
         },
         refreshPreviewDebounced(){clearTimeout(this.previewTimer);this.previewTimer=setTimeout(()=>this.preview(),300);},
         async preview(){
