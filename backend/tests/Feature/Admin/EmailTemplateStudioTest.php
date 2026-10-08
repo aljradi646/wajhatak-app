@@ -6,6 +6,8 @@ use App\Models\EmailTemplate;
 use App\Models\EmailTemplateVersion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -144,5 +146,39 @@ class EmailTemplateStudioTest extends TestCase
         $response->assertViewIs('admin.email-templates.history');
     }
 
+
+    public function test_new_template_draft_preview_is_server_rendered(): void
+    {
+        $response = $this->actingAs($this->admin())->postJson(
+            route('admin.email-templates.preview-draft'),
+            [
+                'name' => 'قالب جديد',
+                'subject' => 'مرحبًا {{user.name}}',
+                'html_content' => '<table><tr><td>{{user.name}}</td></tr></table>',
+                'text_content' => 'مرحبًا {{user.name}}',
+                'css_styles' => ['td{padding:20px}'],
+                'variables' => ['user.name'],
+                'preview_variables' => ['user.name' => 'عبدالرحمن'],
+            ],
+        );
+
+        $response->assertOk()->assertJsonPath('unknown_variables', []);
+        $this->assertStringContainsString('عبدالرحمن', $response->json('html'));
+    }
+
+    public function test_editor_can_upload_an_image_to_the_email_asset_library(): void
+    {
+        Storage::fake('public');
+
+        $response = $this->actingAs($this->admin())->post(
+            route('admin.email-templates.assets'),
+            ['file' => UploadedFile::fake()->image('property-cover.jpg', 800, 600)],
+            ['Accept' => 'application/json'],
+        );
+
+        $response->assertCreated();
+        $path = basename(parse_url($response->json('data.0.src'), PHP_URL_PATH));
+        Storage::disk('public')->assertExists('email-assets/'.$path);
+    }
 
 }
