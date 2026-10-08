@@ -20,11 +20,6 @@ final class ResendService
     private const RESEND_API_URL = 'https://api.resend.com';
     private const SANDBOX_SENDER = 'onboarding@resend.dev';
 
-    public function __construct(
-        private readonly ?EmailSetting $settings = null,
-    ) {
-    }
-
     /**
      * @return array{success:bool,message:string,data?:array<string,mixed>}
      */
@@ -35,7 +30,7 @@ final class ResendService
         ?string $text = null,
         array $attachments = []
     ): array {
-        $settings = $this->settings ?? EmailSetting::current();
+        $settings = EmailSetting::current();
 
         if (EmailSetting::isTestEmail($to)) {
             return [
@@ -82,8 +77,10 @@ final class ResendService
             'subject' => $subject,
         ];
 
+        $logoAttachment = $this->prepareLogoAttachment($settings);
+
         if ($html !== null && trim($html) !== '') {
-            $payload['html'] = $this->injectLogo($html, $this->prepareLogoAttachment($settings)['cid'] ?? null, $settings);
+            $payload['html'] = $this->injectLogo($html, $logoAttachment['cid'] ?? null, $settings);
         }
 
         if ($text !== null && trim($text) !== '') {
@@ -91,10 +88,8 @@ final class ResendService
         }
 
         if ($settings->reply_to) {
-            $payload['reply_to'] = [$settings->reply_to];
+            $payload['reply_to'] = $settings->reply_to;
         }
-
-        $logoAttachment = $this->prepareLogoAttachment($settings);
         if ($logoAttachment) {
             $payload['attachments'] = array_merge([$logoAttachment['attachment']], $attachments);
         } elseif ($attachments !== []) {
@@ -139,7 +134,7 @@ final class ResendService
      */
     public function testConnection(string $to): array
     {
-        $settings = $this->settings ?? EmailSetting::current();
+        $settings = EmailSetting::current();
 
         if (! $settings->isResend()) {
             return [
@@ -288,7 +283,7 @@ final class ResendService
 
     private function getTestEmailTemplate(): string
     {
-        $settings = $this->settings ?? EmailSetting::current();
+        $settings = EmailSetting::current();
         $logoUrl = $settings->getLogoUrlForEmail();
         $logo = $logoUrl
             ? '<img src="'.e($logoUrl).'" alt="وجهتك" width="150" style="display:block;width:150px;max-width:150px;height:auto;margin:0 auto 18px;">'
