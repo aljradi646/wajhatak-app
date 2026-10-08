@@ -242,9 +242,7 @@ function emailTemplateManager() {
                     fromElement:false,clearOnRender:true,
                     plugins:['grapesjs-preset-newsletter'],
                     pluginsOpts:{'grapesjs-preset-newsletter':{inlineCss:true,showBlocksOnLoad:true,updateStyleManager:true,useCustomTheme:true}},
-                    blockManager:{appendTo:'#emailGjs',openBlocksOnLoad:true},
                     assetManager:{upload:@json(route('admin.email-templates.assets')),uploadName:'file',headers:{'X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||''},params:{'_token':document.querySelector('meta[name="csrf-token"]')?.content||''},credentials:'same-origin',autoAdd:true},
-                    panels:{defaults:[]},
                     selectorManager:{componentFirst:true},
                 });
                 this.gjs.on('update',()=>{if(this.mode==='visual'){this.syncVisual();this.saveState='تغييرات غير محفوظة';this.previewDebounced();this.queueAutosave();}});
