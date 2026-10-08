@@ -180,14 +180,15 @@ $filters = ['transaction_type' => 'rent', 'property_type' => 'apartment', 'prope
 
 $reply = $replies->summaryReply('شقة للإيجار في صنعاء', $search->items, $filters);
 check('الرد يذكر عدد النتائج', str_contains($reply, 'وجدت لك 4'), $reply);
-check('الرد يعرض بطاقات فعلية', substr_count($reply, '• ') === 3, $reply);
-check('الرد يذكر معرف عقار حقيقي', str_contains($reply, 'المعرف 5'), $reply);
-check('الرد يذكر باقي النتائج', str_contains($reply, 'وهناك 1 عقارًا آخر'), $reply);
+// Property cards are returned separately by the API/UI; the text reply must not duplicate them.
+check('الرد لا يكرر بطاقات العقارات كنص', ! str_contains($reply, '• ') && ! str_contains($reply, 'المعرف '), $reply);
+check('الرد يشرح وجود البطاقات التفاعلية', str_contains($reply, 'بطاقات تفاعلية'), $reply);
+check('الرد يذكر إمكانية ترتيب/مقارنة النتائج', str_contains($reply, 'ترتيبها') && str_contains($reply, 'مقارنة'), $reply);
 check('الرد يذكر المدينة', str_contains($reply, 'في صنعاء'), $reply);
 check('الرد بلا معرف فارغ', ! preg_match('/المعرف\s*\)/u', $reply), $reply);
 
 $single = $replies->summaryReply('شقة', [$row(42, 'شقة واحدة', 60000.0)], ['transaction_type' => 'rent', 'city' => 'صنعاء']);
-check('عقار واحد: الرد يذكر معرفه الصحيح', str_contains($single, 'المعرف 42'), $single);
+check('عقار واحد: الرد لا يختلق معرفًا داخل النص', ! str_contains($single, 'المعرف 42'), $single);
 check('عقار واحد: لا نص «معلومات عن العقار » بلا رقم', ! str_contains($single, 'معلومات عن العقار »'), $single);
 
 $search->detailsRow = $row(5, 'شقة في حدة', 75000.0);
@@ -209,7 +210,7 @@ check('رد عدم التوفر واضح', str_contains($empty, 'لا توجد �
 check('رد عدم التوفر يذكر المعيار', str_contains($empty, 'المدينة (عدن)'), $empty);
 
 check('حوار عام: تحية', str_contains($replies->smallTalkReply('مرحبا', 'greeting'), 'مساعد وجهتك'));
-check('حوار عام: قدرات', str_contains($replies->smallTalkReply('مين انت', 'capabilities'), 'البحث عن عقارات'));
+check('حوار عام: قدرات', str_contains($replies->smallTalkReply('مين انت', 'capabilities'), 'أبحث في العقارات المنشورة فعليًا'));
 
 // nextStepLine: لا معرف فارغ أبدًا
 $reflect = new ReflectionMethod(AiReplyEngine::class, 'nextStepLine');
