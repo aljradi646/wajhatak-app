@@ -87,7 +87,10 @@ class ResendServiceTest extends TestCase
         \Illuminate\Support\Facades\Storage::fake('public');
         \Illuminate\Support\Facades\Storage::disk('public')->put('email-logos/logo.png', 'PNG');
 
-        $settings->update(['logo_path' => 'email-logos/logo.png']);
+        $settings->update([
+            'logo_path' => 'email-logos/logo.png',
+            'logo_url' => 'https://example.test/storage/email-logos/logo.png',
+        ]);
 
         Http::fake([
             'https://api.resend.com/emails' => Http::response(['id' => 'email-test-logo'], 200),
@@ -96,7 +99,7 @@ class ResendServiceTest extends TestCase
         $result = app(ResendService::class)->send(
             'customer@gmail.com',
             'شعار',
-            '<p><img src="https://example.com/logo.png"></p>',
+            '<p><img src="https://example.test/storage/email-logos/logo.png"></p>',
             null,
         );
 

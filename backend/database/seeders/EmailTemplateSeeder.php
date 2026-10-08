@@ -92,23 +92,35 @@ class EmailTemplateSeeder extends Seeder
                     $template->save();
                 }
 
-                EmailTemplateVersion::query()->firstOrCreate(
-                    [
-                        'email_template_id' => $template->id,
-                        'version' => (int) $template->version,
-                    ],
-                    [
-                        'subject' => (string) $template->subject,
-                        'html_content' => $template->html_content,
-                        'text_content' => $template->text_content,
-                        'css_styles' => $template->css_styles,
-                        'variables' => $template->variables,
-                        'created_by' => null,
-                        'change_note' => $needsLegacyUpgrade
-                            ? 'تحديث القوالب النظامية القديمة إلى قوالب الإنتاج الحديثة'
-                            : ($isNew ? 'قالب إنتاجي أساسي' : 'تهيئة نسخة القالب الحالية'),
-                    ],
-                );
+                $snapshotData = [
+                    'subject' => (string) $template->subject,
+                    'html_content' => $template->html_content,
+                    'text_content' => $template->text_content,
+                    'css_styles' => $template->css_styles,
+                    'variables' => $template->variables,
+                    'created_by' => null,
+                    'change_note' => $needsLegacyUpgrade
+                        ? 'تحديث القوالب النظامية القديمة إلى قوالب الإنتاج الحديثة'
+                        : ($isNew ? 'قالب إنتاجي أساسي' : 'تهيئة نسخة القالب الحالية'),
+                ];
+
+                if ($needsLegacyUpgrade) {
+                    EmailTemplateVersion::query()->updateOrCreate(
+                        [
+                            'email_template_id' => $template->id,
+                            'version' => (int) $template->version,
+                        ],
+                        $snapshotData,
+                    );
+                } else {
+                    EmailTemplateVersion::query()->firstOrCreate(
+                        [
+                            'email_template_id' => $template->id,
+                            'version' => (int) $template->version,
+                        ],
+                        $snapshotData,
+                    );
+                }
             }
         });
     }
