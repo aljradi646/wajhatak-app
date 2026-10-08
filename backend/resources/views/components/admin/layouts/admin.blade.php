@@ -10,7 +10,7 @@
     $serverTheme = in_array($uiPreferences['theme'] ?? null, ['light', 'dark', 'system'], true) ? $uiPreferences['theme'] : null;
     $cookieTheme = request()->cookie('lux_theme');
     $cookieTheme = in_array($cookieTheme, ['light', 'dark', 'system'], true) ? $cookieTheme : null;
-    $initialTheme = $serverTheme ?? $cookieTheme ?? 'system';
+    $initialTheme = $cookieTheme ?? $serverTheme ?? 'system';
 @endphp
 
 <!DOCTYPE html>
@@ -28,7 +28,7 @@
             (() => {
                 const serverTheme = @json($serverTheme);
                 const cookieTheme = @json($cookieTheme);
-                let theme = serverTheme || cookieTheme || 'system';
+                let theme = cookieTheme || serverTheme || 'system';
                 try {
                     if (!serverTheme && !cookieTheme) {
                         const local = localStorage.getItem('lux_theme');
