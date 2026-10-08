@@ -132,4 +132,17 @@ class EmailTemplateStudioTest extends TestCase
         $this->assertSame('published', $fresh->status);
         $this->assertSame(2, $fresh->published_version);
     }
+    public function test_history_route_is_not_captured_by_resource_show_route(): void
+    {
+        $template = $this->template();
+
+        $response = $this->actingAs($this->admin())->get(
+            route('admin.email-templates.history', $template)
+        );
+
+        $response->assertOk();
+        $response->assertViewIs('admin.email-templates.history');
+    }
+
+
 }
