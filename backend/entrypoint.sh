@@ -148,6 +148,17 @@ parse_mysql_url() {
     unset _u _creds _auth _rest _hostport _db _user _pass _host _port
 }
 
+# Detect an explicit DB_HOST that accidentally points back to this web service.
+SELF_HOST="${RAILWAY_PRIVATE_DOMAIN:-}"
+if [ -z "$SELF_HOST" ] && [ -n "${RAILWAY_SERVICE_NAME:-}" ]; then
+    SELF_HOST="${RAILWAY_SERVICE_NAME}.railway.internal"
+fi
+
+if [ -n "$SELF_HOST" ] && [ "${DB_HOST:-}" = "$SELF_HOST" ]; then
+    echo "!! [Wajhatak] Ignoring DB_HOST=${DB_HOST} because it points to the current web service."
+    unset DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD DB_URL
+fi
+
 # Prefer an explicit, complete Laravel DB_* connection.
 if [ -n "${DB_HOST:-}" ] && [ -n "${DB_DATABASE:-}" ] && [ -n "${DB_USERNAME:-}" ]; then
     echo "==> [Wajhatak] Using explicit Laravel DB_* variables."
