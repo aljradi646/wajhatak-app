@@ -129,6 +129,16 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     });
   }
 
+  void _resetExplore() {
+    _searchDebounce?.cancel();
+    _controller.clear();
+    ref.read(appSettingsProvider.notifier).setLastTransactionType(null);
+    setState(() {
+      _term = '';
+      _filters = const PropertyQuery();
+    });
+  }
+
   void _onSortSelected(String value) {
     setState(() => _filters = _filters.copyWith(
       sort: value == 'recommended' ? null : value,
@@ -323,10 +333,12 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               loading: const ExploreSkeleton(),
               errorRetry: () => ref.invalidate(explorePropertySearchProvider(query)),
               data: (page) => page.items.isEmpty
-                  ? const EmptyState(
+                  ? EmptyState(
                       title: 'لا توجد نتائج مطابقة',
-                      body: 'جرّب تغيير الفرز أو تعديل الفلاتر للوصول إلى نتائج أكثر.',
+                      body: 'لم نجد عقارات تطابق البحث والفلاتر الحالية. امسحها للعودة إلى جميع العقارات.',
                       icon: Icons.search_off_rounded,
+                      actionLabel: 'عرض جميع العقارات',
+                      onAction: _resetExplore,
                     )
                   : LayoutBuilder(
                       builder: (_, constraints) => GridView.builder(
