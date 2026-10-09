@@ -87,55 +87,130 @@ class AiKnowledgeService
         ],
     ];
 
+    private ?string $resolvedVersion = null;
+
     public function version(): string
     {
-        return self::VERSION;
+        if ($this->resolvedVersion !== null) {
+            return $this->resolvedVersion;
+        }
+
+        $version = self::VERSION;
+        try {
+            if (Schema::hasTable('ai_knowledge_articles')) {
+                $latest = AiKnowledgeArticle::query()->max('updated_at');
+                if (is_string($latest) && $latest !== '') {
+                    $version .= '+'.substr(hash('sha256', $latest), 0, 8);
+                }
+            }
+        } catch (Throwable) {
+            // Use the built-in version if the database table is not ready.
+        }
+
+        return $this->resolvedVersion = $version;
     }
 
+    /**
+     * المعرفة الثابتة تبقى مرجعًا افتراضيًا؛ المقالات النشطة المضافة من لوحة التحكم
+     * تُحمّل من قاعدة البيانات وتُفلتر حسب الدور الحالي.
+     *
+     * @return list<array<string, mixed>>
+     */
     public function overview(string $role = 'client'): array
     {
-        $role = strtolower($role ?: 'client');
-
+        $items = $this->entriesForRole($role);
         return array_values(array_map(
             fn (array $item) => [
                 'id' => $item['id'],
                 'topic' => $item['topic'],
                 'content' => $item['content'],
-                'target_screen' => $item['target_screen'],
-                'version' => self::VERSION,
+                'target_screen' => $item['target_screen'] ?? null,
+                'version' => $item['version'] ?? $this->version(),
             ],
-            array_filter(self::KNOWLEDGE_BASE, fn (array $item) => in_array($role, $item['roles'], true)),
+            $items,
         ));
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function searchKnowledge(string $query, string $role = 'client'): array
     {
         $normalized = $this->normalize($query);
-        $role = strtolower($role ?: 'client');
+        if ($normalized === '') {
+            return [];
+        }
+
         $results = [];
-
-        foreach (self::KNOWLEDGE_BASE as $item) {
-            if (! in_array($role, $item['roles'], true)) {
-                continue;
-            }
-
+        foreach ($this->entriesForRole($role) as $item) {
             $score = 0;
-            foreach ($item['keywords'] as $keyword) {
-                if (str_contains($normalized, $this->normalize($keyword))) {
+            foreach ((array) ($item['keywords'] ?? []) as $keyword) {
+                $needle = $this->normalize((string) $keyword);
+                if ($needle !== '' && str_contains($normalized, $needle)) {
                     $score++;
                 }
             }
 
             if ($score > 0) {
-                $item['version'] = self::VERSION;
+                $item['version'] = $item['version'] ?? $this->version();
                 $item['score'] = $score;
                 $results[] = $item;
             }
         }
 
-        usort($results, fn (array $a, array $b) => $b['score'] <=> $a['score']);
+        usort($results, static fn (array $a, array $b) =>
+            ($b['score'] <=> $a['score']) ?: ((int) ($a['priority'] ?? 100) <=> (int) ($b['priority'] ?? 100))
+        );
 
         return array_slice($results, 0, 5);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function entriesForRole(string $role): array
+    {
+        $role = strtolower(trim($role)) ?: 'client';
+        $builtIn = array_values(array_map(
+            fn (array $item) => $item + ['version' => $this->version(), 'priority' => 100],
+            array_filter(self::KNOWLEDGE_BASE, fn (array $item) => in_array($role, $item['roles'], true)),
+        ));
+
+        return array_values(array_merge($builtIn, $this->databaseEntries($role)));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function databaseEntries(string $role): array
+    {
+        try {
+            if (! Schema::hasTable('ai_knowledge_articles')) {
+                return [];
+            }
+
+            return AiKnowledgeArticle::query()
+                ->where('is_active', true)
+                ->orderBy('priority')
+                ->orderByDesc('updated_at')
+                ->limit(200)
+                ->get()
+                ->filter(fn (AiKnowledgeArticle $article) => in_array($role, (array) $article->roles, true))
+                ->map(fn (AiKnowledgeArticle $article) => [
+                    'id' => 'article-'.$article->id,
+                    'topic' => $article->topic,
+                    'content' => $article->content,
+                    'keywords' => (array) $article->keywords,
+                    'target_screen' => $article->target_screen,
+                    'roles' => (array) $article->roles,
+                    'priority' => (int) $article->priority,
+                    'version' => 'article-'.$article->id.'-v'.$article->version,
+                ])
+                ->values()
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     private function normalize(string $text): string
