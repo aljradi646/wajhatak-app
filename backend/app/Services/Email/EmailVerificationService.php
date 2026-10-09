@@ -57,7 +57,7 @@ class EmailVerificationService
 
         // 3) توليد الرمز وتخزينه مجزّأً.
         $code = (string) random_int(100000, 999999);
-        EmailVerificationCode::query()->create([
+        $verification = EmailVerificationCode::query()->create([
             'email' => $email,
             'code_hash' => Hash::make($code),
             'expires_at' => now()->addMinutes($ttl),
@@ -71,11 +71,13 @@ class EmailVerificationService
                 'ttl' => (string) $ttl,
             ]);
         } catch (Throwable $e) {
+            // لا نترك رمزًا صالحًا إذا فشل مزود البريد قبل التسليم.
+            $verification->delete();
             report($e);
 
             return [
                 'ok' => false,
-                'message' => 'تعذر إرسال البريد الآن: '.$e->getMessage(),
+                'message' => 'تعذر إرسال رمز التحقق الآن. تحقق من إعدادات البريد أو أعد المحاولة لاحقًا.',
                 'resend_in' => 0,
                 'resend_available_at' => null,
                 'server_time' => now()->toIso8601String(),

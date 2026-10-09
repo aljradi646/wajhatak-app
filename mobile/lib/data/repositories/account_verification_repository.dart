@@ -7,7 +7,13 @@ import '../../core/utils/image_compressor.dart';
 
 /// نتيجة عمليات التحقق من البريد.
 class VerificationResult {
-  const VerificationResult({required this.ok, required this.message, this.resendIn = 0, this.resendAvailableAt, this.serverTime});
+  const VerificationResult({
+    required this.ok,
+    required this.message,
+    this.resendIn = 0,
+    this.resendAvailableAt,
+    this.serverTime,
+  });
 
   final bool ok;
   final String message;
@@ -64,7 +70,8 @@ class AgentProfileData {
   bool get isPending => verificationStatus == 'pending';
   bool get isRejected => verificationStatus == 'rejected';
 
-  static AgentProfileData fromJson(Map<String, dynamic> json) => AgentProfileData(
+  static AgentProfileData fromJson(Map<String, dynamic> json) =>
+      AgentProfileData(
         verificationStatus: json['verification_status'] as String? ?? 'pending',
         rejectionReason: json['rejection_reason'] as String?,
         agencyName: json['agency_name'] as String?,
@@ -95,7 +102,15 @@ class AccountRepository {
   final ImageCompressor _compressor = ImageCompressor();
 
   /// حالة التحقق: هل البريد موثق؟ وكم تبقى لإعادة الإرسال؟
-  Future<({bool verified, int resendIn, DateTime? resendAvailableAt, DateTime? serverTime})> emailStatus() async {
+  Future<
+    ({
+      bool verified,
+      int resendIn,
+      DateTime? resendAvailableAt,
+      DateTime? serverTime,
+    })
+  >
+  emailStatus() async {
     final json = await _api.get('/me/email/status');
     final data = json['data'] as Map<String, dynamic>? ?? const {};
     return (
@@ -108,7 +123,31 @@ class AccountRepository {
 
   /// طلب رمز جديد إلى البريد الحقيقي.
   Future<VerificationResult> sendVerificationCode() async {
-    final json = await _api.post('/me/email/verification-code');
+    try {
+      final json = await _api.post('/me/email/verification-code');
+      return _verificationResult(json);
+    } on ApiFailure catch (failure) {
+      // طلب الإرسال المحدود يرجع 422، لذلك نقرأ الحالة من الخادم كي لا
+      // تفقد الواجهة موعد السماح الحقيقي بإعادة الإرسال.
+      if (failure.statusCode == 422) {
+        try {
+          final status = await emailStatus();
+          return VerificationResult(
+            ok: false,
+            message: failure.message,
+            resendIn: status.resendIn,
+            resendAvailableAt: status.resendAvailableAt,
+            serverTime: status.serverTime,
+          );
+        } on ApiFailure {
+          // نعيد خطأ الإرسال الأصلي إذا تعذر طلب الحالة أيضًا.
+        }
+      }
+      rethrow;
+    }
+  }
+
+  VerificationResult _verificationResult(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? const {};
     return VerificationResult(
       ok: data['ok'] as bool? ?? false,
@@ -141,7 +180,9 @@ class AccountRepository {
   /// ملف توثيق الوكيل.
   Future<AgentProfileData> agentProfile() async {
     final json = await _api.get('/me/agent-profile');
-    return AgentProfileData.fromJson(json['data'] as Map<String, dynamic>? ?? {});
+    return AgentProfileData.fromJson(
+      json['data'] as Map<String, dynamic>? ?? {},
+    );
   }
 
   /// حفظ ملف توثيق الوكيل (بيانات + مستندات اختيارية).
@@ -171,6 +212,8 @@ class AccountRepository {
     }
 
     final json = await _api.post('/me/agent-profile', data: payload);
-    return AgentProfileData.fromJson(json['data'] as Map<String, dynamic>? ?? {});
+    return AgentProfileData.fromJson(
+      json['data'] as Map<String, dynamic>? ?? {},
+    );
   }
 }

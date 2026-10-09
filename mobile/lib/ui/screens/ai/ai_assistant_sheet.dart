@@ -99,6 +99,7 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
         automaticallyImplyLeading: false,
         backgroundColor: WajhatakColors.emeraldDeep,
         foregroundColor: Colors.white,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(WajhatakRadius.sheet),
@@ -159,56 +160,63 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-              itemCount: state.messages.length + (state.loading ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (state.loading && index == state.messages.length) {
-                  return const _TypingIndicator();
-                }
-                final message = state.messages[index];
-                return _MessageBubble(
-                  message: message,
-                  onPropertyTap: (propertyId) => _openProperty(propertyId),
-                  onFavoriteTap: _canFavorite
-                      ? (property) => _favorite(property)
-                      : null,
-                );
-              },
-            ),
-          ),
-          if (state.isEmpty && bootstrap?.suggestions.isNotEmpty == true)
-            _SuggestionsBar(
-              suggestions: bootstrap!.suggestions,
-              onSelected: (value) {
-                ref.read(aiConversationProvider.notifier).send(value);
-              },
-            ),
-          if (lastFailed)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: TextButton.icon(
-                onPressed: state.loading
-                    ? null
-                    : () => ref
-                          .read(aiConversationProvider.notifier)
-                          .resendLast(),
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('إعادة إرسال'),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 14,
+                ),
+                itemCount: state.messages.length + (state.loading ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (state.loading && index == state.messages.length) {
+                    return const _TypingIndicator();
+                  }
+                  final message = state.messages[index];
+                  return _MessageBubble(
+                    message: message,
+                    onPropertyTap: (propertyId) => _openProperty(propertyId),
+                    onFavoriteTap: _canFavorite
+                        ? (property) => _favorite(property)
+                        : null,
+                  );
+                },
               ),
             ),
-          _InputBar(
-            controller: _inputController,
-            enabled: state.canSend,
-            sending: state.loading,
-            onSubmit: _send,
-            onCancel: () => ref.read(aiConversationProvider.notifier).cancel(),
-          ),
-        ],
+            if (state.isEmpty && bootstrap?.suggestions.isNotEmpty == true)
+              _SuggestionsBar(
+                suggestions: bootstrap!.suggestions,
+                onSelected: (value) {
+                  ref.read(aiConversationProvider.notifier).send(value);
+                },
+              ),
+            if (lastFailed)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: TextButton.icon(
+                  onPressed: state.loading
+                      ? null
+                      : () => ref
+                            .read(aiConversationProvider.notifier)
+                            .resendLast(),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('إعادة إرسال'),
+                ),
+              ),
+            _InputBar(
+              controller: _inputController,
+              enabled: state.canSend,
+              sending: state.loading,
+              onSubmit: _send,
+              onCancel: () =>
+                  ref.read(aiConversationProvider.notifier).cancel(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -331,7 +339,7 @@ class _MessageBubble extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: SizedBox(
-                  height: 224,
+                  height: 350,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: message.properties.length,
@@ -339,7 +347,7 @@ class _MessageBubble extends StatelessWidget {
                     itemBuilder: (_, index) {
                       final property = message.properties[index];
                       return SizedBox(
-                        width: 280,
+                        width: 220,
                         child: _AiPropertyMiniCard(
                           property: property,
                           onTap: () => onPropertyTap(property.propertyId),
@@ -425,14 +433,14 @@ class _AiPropertyMiniCard extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: SizedBox(
-                  width: 74,
-                  height: 74,
+                  width: double.infinity,
+                  height: 96,
                   child:
                       property.imageUrl != null && property.imageUrl!.isNotEmpty
                       ? Image.network(
@@ -444,7 +452,7 @@ class _AiPropertyMiniCard extends StatelessWidget {
                       : _imageFallback(theme),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(height: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,7 +611,10 @@ class _AiPropertyMiniCard extends StatelessWidget {
                       const SizedBox(height: 4),
                     ],
                     const SizedBox(height: 6),
-                    Row(
+                    Wrap(
+                      spacing: 2,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         if (property.referenceCode?.isNotEmpty == true) ...[
                           Icon(
@@ -633,7 +644,6 @@ class _AiPropertyMiniCard extends StatelessWidget {
                           _chip(context, 'غير متاح', WajhatakColors.terracotta)
                         else if (property.isFurnished)
                           _chip(context, 'مفروش', WajhatakColors.teal),
-                        const Spacer(),
                         TextButton.icon(
                           onPressed: onTap,
                           icon: const Icon(Icons.visibility_rounded, size: 15),

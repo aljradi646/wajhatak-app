@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// نظام الألوان — وجهتك.
 /// زمردة عميقة + كهرماني دافئ: هوية عقارية عربية عصرية فاخرة.
@@ -98,54 +99,65 @@ ThemeData buildWajhatakTheme([Brightness brightness = Brightness.light]) {
   final muted = dark
       ? WajhatakColors.inkMutedDark
       : WajhatakColors.inkMutedLight;
-  final outline = dark
-      ? const Color(0xFF274238)
-      : const Color(0xFFDDE8E4);
+  final outline = dark ? const Color(0xFF274238) : const Color(0xFFDDE8E4);
 
   final primary = dark ? WajhatakColors.emeraldSoft : WajhatakColors.emerald;
   final onPrimary = dark ? WajhatakColors.emeraldDeep : Colors.white;
 
-  final scheme = ColorScheme.fromSeed(
-    seedColor: WajhatakColors.emerald,
-    brightness: brightness,
-    error: WajhatakColors.terracotta,
-  ).copyWith(
-    primary: primary,
-    onPrimary: onPrimary,
-    primaryContainer: dark
-        ? const Color(0xFF0C3D30)
-        : const Color(0xFFD5F3E9),
-    onPrimaryContainer: dark
-        ? WajhatakColors.emeraldSoft
-        : WajhatakColors.emeraldDeep,
-    secondary: dark ? WajhatakColors.amber : WajhatakColors.amberDeep,
-    onSecondary: dark ? const Color(0xFF2B1B02) : Colors.white,
-    secondaryContainer: dark
-        ? const Color(0xFF3D2A08)
-        : const Color(0xFFFCEED2),
-    onSecondaryContainer: dark ? WajhatakColors.amber : Color(0xFF6B4A0E),
-    tertiary: WajhatakColors.sky,
-    surface: surface,
-    onSurface: text,
-    surfaceContainerLowest: background,
-    surfaceContainerLow: dark
-        ? const Color(0xFF0D1B16)
-        : const Color(0xFFFAFCFB),
-    surfaceContainer: dark ? surface : const Color(0xFFF1F6F4),
-    surfaceContainerHigh: dark
-        ? WajhatakColors.surfaceHighDark
-        : const Color(0xFFEAF1EF),
-    surfaceContainerHighest: dark
-        ? const Color(0xFF24453A)
-        : const Color(0xFFE0EAE7),
-    onSurfaceVariant: muted,
-    outline: outline,
-    outlineVariant: dark ? const Color(0xFF1E352C) : const Color(0xFFE8F0EE),
-  );
+  final scheme =
+      ColorScheme.fromSeed(
+        seedColor: WajhatakColors.emerald,
+        brightness: brightness,
+        error: WajhatakColors.terracotta,
+      ).copyWith(
+        primary: primary,
+        onPrimary: onPrimary,
+        primaryContainer: dark
+            ? const Color(0xFF0C3D30)
+            : const Color(0xFFD5F3E9),
+        onPrimaryContainer: dark
+            ? WajhatakColors.emeraldSoft
+            : WajhatakColors.emeraldDeep,
+        secondary: dark ? WajhatakColors.amber : WajhatakColors.amberDeep,
+        onSecondary: dark ? const Color(0xFF2B1B02) : Colors.white,
+        secondaryContainer: dark
+            ? const Color(0xFF3D2A08)
+            : const Color(0xFFFCEED2),
+        onSecondaryContainer: dark ? WajhatakColors.amber : Color(0xFF6B4A0E),
+        tertiary: WajhatakColors.sky,
+        surface: surface,
+        onSurface: text,
+        surfaceContainerLowest: background,
+        surfaceContainerLow: dark
+            ? const Color(0xFF0D1B16)
+            : const Color(0xFFFAFCFB),
+        surfaceContainer: dark ? surface : const Color(0xFFF1F6F4),
+        surfaceContainerHigh: dark
+            ? WajhatakColors.surfaceHighDark
+            : const Color(0xFFEAF1EF),
+        surfaceContainerHighest: dark
+            ? const Color(0xFF24453A)
+            : const Color(0xFFE0EAE7),
+        onSurfaceVariant: muted,
+        outline: outline,
+        outlineVariant: dark
+            ? const Color(0xFF1E352C)
+            : const Color(0xFFE8F0EE),
+      );
 
   final inputBorder = OutlineInputBorder(
     borderRadius: BorderRadius.circular(WajhatakRadius.input),
     borderSide: BorderSide(color: outline),
+  );
+
+  final systemOverlayStyle = SystemUiOverlayStyle(
+    statusBarColor: background,
+    statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+    statusBarBrightness: brightness,
+    systemNavigationBarColor: surface,
+    systemNavigationBarIconBrightness: dark
+        ? Brightness.light
+        : Brightness.dark,
   );
 
   return ThemeData(
@@ -170,6 +182,7 @@ ThemeData buildWajhatakTheme([Brightness brightness = Brightness.light]) {
         fontFamily: WajhatakTypography.family,
       ),
       iconTheme: IconThemeData(color: text),
+      systemOverlayStyle: systemOverlayStyle,
     ),
     cardTheme: CardThemeData(
       color: surface,
@@ -187,10 +200,7 @@ ThemeData buildWajhatakTheme([Brightness brightness = Brightness.light]) {
           ? WajhatakColors.surfaceAltDark
           : WajhatakColors.surfaceLight,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      hintStyle: TextStyle(
-        color: muted,
-        fontFamily: WajhatakTypography.family,
-      ),
+      hintStyle: TextStyle(color: muted, fontFamily: WajhatakTypography.family),
       labelStyle: TextStyle(
         color: muted,
         fontWeight: FontWeight.w600,
@@ -205,7 +215,10 @@ ThemeData buildWajhatakTheme([Brightness brightness = Brightness.light]) {
         borderSide: const BorderSide(color: WajhatakColors.terracotta),
       ),
       focusedErrorBorder: inputBorder.copyWith(
-        borderSide: const BorderSide(color: WajhatakColors.terracotta, width: 1.8),
+        borderSide: const BorderSide(
+          color: WajhatakColors.terracotta,
+          width: 1.8,
+        ),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -274,7 +287,9 @@ ThemeData buildWajhatakTheme([Brightness brightness = Brightness.light]) {
       ),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: dark ? const Color(0xFFEAF6F1) : WajhatakColors.emeraldDeep,
+      backgroundColor: dark
+          ? const Color(0xFFEAF6F1)
+          : WajhatakColors.emeraldDeep,
       contentTextStyle: TextStyle(
         color: dark ? WajhatakColors.inkLight : Colors.white,
         fontWeight: FontWeight.w700,

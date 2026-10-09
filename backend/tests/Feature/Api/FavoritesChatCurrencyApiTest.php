@@ -162,12 +162,27 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $this->assertSame($conversationId, $second->json('data.id'));
         $this->assertSame(1, Conversation::query()->where('client_id', $client->id)->count());
 
-        // The initial conversation carries a property card message.
+        // Opening the conversation does not send anything automatically.
+        $this->assertDatabaseMissing('messages', [
+            'conversation_id' => $conversationId,
+            'message_type' => 'property',
+            'property_id' => $propertyA->id,
+            'sender_id' => $client->id,
+        ]);
+
+        // The property card is created only after the user explicitly sends it.
+        $this->postJson("/api/v1/conversations/{$conversationId}/messages", [
+            'body' => 'أرغب في معرفة المزيد',
+            'message_type' => 'property',
+            'property_id' => $propertyA->id,
+        ])->assertCreated();
+
         $this->assertDatabaseHas('messages', [
             'conversation_id' => $conversationId,
             'message_type' => 'property',
             'property_id' => $propertyA->id,
             'sender_id' => $client->id,
+            'body' => 'أرغب في معرفة المزيد',
         ]);
     }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/media_permission_service.dart';
 import '../../../core/utils/notice.dart' as util;
 import '../../../data/api_client.dart';
 import '../../../data/models/models.dart';
@@ -18,7 +19,10 @@ class EditListingScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final property = ref.watch(propertyDetailProvider(propertyId));
     return Scaffold(
-      appBar: WajhatakScreenHeader(title: 'تعديل العقار', subtitle: 'حدّث بيانات وصور عقارك'),
+      appBar: WajhatakScreenHeader(
+        title: 'تعديل العقار',
+        subtitle: 'حدّث بيانات وصور عقارك',
+      ),
       body: LuxAsyncView<LuxProperty>(
         value: property,
         errorRetry: () => ref.invalidate(propertyDetailProvider(propertyId)),
@@ -88,12 +92,8 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
     _description = TextEditingController(text: item.description ?? '');
     _price = TextEditingController(text: item.price.toStringAsFixed(0));
     _area = TextEditingController(text: item.area?.toStringAsFixed(0) ?? '');
-    _bedrooms = TextEditingController(
-      text: item.bedrooms?.toString() ?? '',
-    );
-    _bathrooms = TextEditingController(
-      text: item.bathrooms?.toString() ?? '',
-    );
+    _bedrooms = TextEditingController(text: item.bedrooms?.toString() ?? '');
+    _bathrooms = TextEditingController(text: item.bathrooms?.toString() ?? '');
     _parkingSpaces = TextEditingController(
       text: item.parkingSpaces?.toString() ?? '',
     );
@@ -171,6 +171,15 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
   }
 
   Future<void> _uploadImage() async {
+    if (!await MediaPermissionService.requestPhotoAccess()) {
+      if (mounted) {
+        util.notice(
+          context,
+          'اسمح للتطبيق بالوصول إلى الصور لإضافة صورة العقار.',
+        );
+      }
+      return;
+    }
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 82,
@@ -255,8 +264,9 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
           children: [
             Text(
               'المعلومات الأساسية',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w800),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -277,8 +287,7 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                     DropdownMenuItem(value: item.id, child: Text(item.name)),
                 ],
                 onChanged: (value) => setState(() => _typeId = value),
-                validator: (value) =>
-                    value == null ? 'اختر نوع العقار.' : null,
+                validator: (value) => value == null ? 'اختر نوع العقار.' : null,
               ),
               loading: () => const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
@@ -304,8 +313,9 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _price,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(
                 labelText: 'السعر',
                 prefixIcon: Icon(Icons.attach_money_rounded),
@@ -326,8 +336,7 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                   child: TextFormField(
                     controller: _area,
                     keyboardType: TextInputType.number,
-                    decoration:
-                        const InputDecoration(labelText: 'المساحة م²'),
+                    decoration: const InputDecoration(labelText: 'المساحة م²'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -335,8 +344,7 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                   child: TextFormField(
                     controller: _bedrooms,
                     keyboardType: TextInputType.number,
-                    decoration:
-                        const InputDecoration(labelText: 'غرف النوم'),
+                    decoration: const InputDecoration(labelText: 'غرف النوم'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -344,8 +352,7 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                   child: TextFormField(
                     controller: _bathrooms,
                     keyboardType: TextInputType.number,
-                    decoration:
-                        const InputDecoration(labelText: 'الحمامات'),
+                    decoration: const InputDecoration(labelText: 'الحمامات'),
                   ),
                 ),
               ],
@@ -354,8 +361,7 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
             TextFormField(
               controller: _parkingSpaces,
               keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'مواقف السيارات'),
+              decoration: const InputDecoration(labelText: 'مواقف السيارات'),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -383,8 +389,9 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
             const SizedBox(height: 24),
             Text(
               'الموقع',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w800),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -408,8 +415,9 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
             const SizedBox(height: 24),
             Text(
               'المزايا',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w800),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 8),
             features.when(
@@ -446,8 +454,9 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                 Expanded(
                   child: Text(
                     'صور العقار',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 TextButton.icon(
@@ -458,7 +467,10 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.add_photo_alternate_outlined, size: 20),
+                      : const Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 20,
+                        ),
                   label: Text(_uploadingImage ? 'جارٍ الرفع…' : 'إضافة صورة'),
                 ),
               ],
@@ -473,7 +485,11 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                 ),
                 child: Column(
                   children: [
-                    Icon(Icons.image_outlined, size: 48, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.image_outlined,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       'لا توجد صور حالياً',
@@ -589,7 +605,6 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
   }
 }
 
-
 /// حقل اختيار العملة — data-driven من GET /api/v1/currencies.
 class _CurrencyField extends ConsumerWidget {
   const _CurrencyField({required this.value, required this.onChanged});
@@ -602,7 +617,11 @@ class _CurrencyField extends ConsumerWidget {
     final currencies = ref.watch(currenciesProvider);
     return currencies.when(
       data: (list) => DropdownButtonFormField<String>(
-        initialValue: list.any((c) => c.code == value) ? value : (list.where((c) => c.isDefault).isEmpty ? list.first.code : list.where((c) => c.isDefault).first.code),
+        initialValue: list.any((c) => c.code == value)
+            ? value
+            : (list.where((c) => c.isDefault).isEmpty
+                  ? list.first.code
+                  : list.where((c) => c.isDefault).first.code),
         isExpanded: true,
         menuMaxHeight: 300,
         decoration: const InputDecoration(

@@ -185,6 +185,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           Expanded(
             child: LuxAsyncView<List<LuxProperty>>(
               value: results,
+              loading: const ExploreSkeleton(),
               errorRetry: () => ref.invalidate(propertySearchProvider(query)),
               data: (items) => items.isEmpty
                   ? const EmptyState(

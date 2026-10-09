@@ -17,8 +17,7 @@ import '../feedback/empty_state.dart';
 /// - لا نعدل State من داخل build().
 /// - يمنع الوميض عند الطلبات السريعة.
 /// - يعيد تشغيل الحارس فقط عند بدء Loading جديد فعليًا.
-abstract class _MinimumLoadingState<W extends StatefulWidget>
-    extends State<W> {
+abstract class _MinimumLoadingState<W extends StatefulWidget> extends State<W> {
   Timer? _loadingTimer;
 
   bool _wasBlockingLoading = false;
@@ -30,6 +29,7 @@ abstract class _MinimumLoadingState<W extends StatefulWidget>
 
   bool get _isMinimumLoadingActive => _minimumLoadingActive;
 
+  @override
   @override
   void initState() {
     super.initState();
@@ -113,10 +113,7 @@ bool _isBackgroundUpdating(AsyncValue<dynamic> value) {
 
 /// Scope داخلي يشارك نفس Animation بين جميع عناصر Skeleton.
 class _LuxShimmerScope extends InheritedWidget {
-  const _LuxShimmerScope({
-    required this.animation,
-    required super.child,
-  });
+  const _LuxShimmerScope({required this.animation, required super.child});
 
   final Animation<double> animation;
 
@@ -138,9 +135,7 @@ class _LuxShimmerScope extends InheritedWidget {
 /// لأن هذا Widget لا ينتج RenderObject بنفسه، وإنما يمرر
 /// الـInherited scope إلى child.
 class _LuxShimmer extends StatefulWidget {
-  const _LuxShimmer({
-    required this.child,
-  });
+  const _LuxShimmer({required this.child});
 
   final Widget child;
 
@@ -150,11 +145,10 @@ class _LuxShimmer extends StatefulWidget {
 
 class _LuxShimmerState extends State<_LuxShimmer>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller =
-      AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 1350),
-      );
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1350),
+  );
 
   @override
   void initState() {
@@ -166,9 +160,7 @@ class _LuxShimmerState extends State<_LuxShimmer>
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final disabled =
-        MediaQuery.maybeOf(context)?.disableAnimations ??
-            false;
+    final disabled = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     final tickerEnabled = TickerMode.valuesOf(context).enabled;
 
@@ -189,10 +181,7 @@ class _LuxShimmerState extends State<_LuxShimmer>
 
   @override
   Widget build(BuildContext context) {
-    return _LuxShimmerScope(
-      animation: _controller,
-      child: widget.child,
-    );
+    return _LuxShimmerScope(animation: _controller, child: widget.child);
   }
 }
 
@@ -222,21 +211,17 @@ class LuxAsyncView<T> extends StatefulWidget {
   final Duration minLoading;
 
   @override
-  State<LuxAsyncView<T>> createState() =>
-      _LuxAsyncViewState<T>();
+  State<LuxAsyncView<T>> createState() => _LuxAsyncViewState<T>();
 }
 
-class _LuxAsyncViewState<T>
-    extends _MinimumLoadingState<LuxAsyncView<T>> {
+class _LuxAsyncViewState<T> extends _MinimumLoadingState<LuxAsyncView<T>> {
   @override
   AsyncValue<dynamic> get _loadingValue => widget.value;
 
   @override
-  Duration get _minimumLoadingDuration =>
-      widget.minLoading;
+  Duration get _minimumLoadingDuration => widget.minLoading;
 
-  Widget get _skeleton =>
-      widget.loading ?? const LuxContentSkeleton();
+  Widget get _skeleton => widget.loading ?? const LuxContentSkeleton();
 
   @override
   Widget build(BuildContext context) {
@@ -266,9 +251,7 @@ class _LuxAsyncViewState<T>
               child: IgnorePointer(
                 child: SizedBox(
                   height: 2,
-                  child: LinearProgressIndicator(
-                    minHeight: 2,
-                  ),
+                  child: LinearProgressIndicator(minHeight: 2),
                 ),
               ),
             ),
@@ -318,8 +301,7 @@ class LuxSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final animation =
-        _LuxShimmerScope.maybeOf(context);
+    final animation = _LuxShimmerScope.maybeOf(context);
 
     if (animation != null) {
       return _LuxSkeletonBody(
@@ -332,11 +314,7 @@ class LuxSkeleton extends StatelessWidget {
 
     /// دعم استخدام LuxSkeleton منفردًا.
     return _LuxShimmer(
-      child: _LuxSkeletonBody(
-        width: width,
-        height: height,
-        radius: radius,
-      ),
+      child: _LuxSkeletonBody(width: width, height: height, radius: radius),
     );
   }
 }
@@ -368,27 +346,19 @@ class _LuxSkeletonBody extends StatelessWidget {
       base,
     );
 
-    final disabled =
-        MediaQuery.maybeOf(context)?.disableAnimations ??
-            false;
+    final disabled = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     final shape = BorderRadius.circular(radius);
 
     Widget child() {
-      return SizedBox(
-        width: width,
-        height: height,
-      );
+      return SizedBox(width: width, height: height);
     }
 
     if (animation == null || disabled) {
       return ExcludeSemantics(
         child: RepaintBoundary(
           child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: base,
-              borderRadius: shape,
-            ),
+            decoration: BoxDecoration(color: base, borderRadius: shape),
             child: child(),
           ),
         ),
@@ -400,14 +370,9 @@ class _LuxSkeletonBody extends StatelessWidget {
         child: AnimatedBuilder(
           animation: animation!,
           builder: (context, _) {
-            final rtl =
-                Directionality.of(context) ==
-                    TextDirection.rtl;
+            final rtl = Directionality.of(context) == TextDirection.rtl;
 
-            final progress =
-                Curves.easeInOut.transform(
-              animation!.value,
-            );
+            final progress = Curves.easeInOut.transform(animation!.value);
 
             final shift = rtl
                 ? 1.25 - (progress * 2.5)
@@ -418,26 +383,9 @@ class _LuxSkeletonBody extends StatelessWidget {
                 borderRadius: shape,
                 gradient: LinearGradient(
                   begin: Alignment(shift, 0),
-                  end: Alignment(
-                    shift + 0.95,
-                    0,
-                  ),
-                  colors: [
-                    base,
-                    base,
-                    highlight,
-                    highlight,
-                    base,
-                    base,
-                  ],
-                  stops: const [
-                    0.00,
-                    0.27,
-                    0.42,
-                    0.53,
-                    0.68,
-                    1.00,
-                  ],
+                  end: Alignment(shift + 0.95, 0),
+                  colors: [base, base, highlight, highlight, base, base],
+                  stops: const [0.00, 0.27, 0.42, 0.53, 0.68, 1.00],
                 ),
               ),
               child: child(),
@@ -449,36 +397,193 @@ class _LuxSkeletonBody extends StatelessWidget {
   }
 }
 
-/// Skeleton مطابق لتخطيط تفاصيل العقار الفعلي.
+/// Skeleton مطابق لتخطيط تفاصيل العقار الفعلي، بما فيه معرض الصور العلوي.
 class PropertyDetailsSkeleton extends StatelessWidget {
   const PropertyDetailsSkeleton({super.key});
 
   @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final expandedHeight = width >= 1024
+        ? 460.0
+        : width >= 600
+        ? 400.0
+        : 330.0;
+
+    return _LuxShimmer(
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: expandedHeight,
+            pinned: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            leading: const Padding(
+              padding: EdgeInsets.only(right: 10, top: 4),
+              child: LuxSkeleton(width: 40, height: 40, radius: 20),
+            ),
+            actions: const [
+              Padding(
+                padding: EdgeInsets.only(left: 10, top: 4),
+                child: LuxSkeleton(width: 40, height: 40, radius: 20),
+              ),
+            ],
+            flexibleSpace: const FlexibleSpaceBar(
+              background: LuxSkeleton(height: 460, radius: 0),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 150),
+            sliver: SliverList.list(
+              children: [
+                const LuxSkeleton(width: 260, height: 30, radius: 9),
+                const SizedBox(height: 10),
+                Row(
+                  children: const [
+                    LuxSkeleton(width: 150, height: 38, radius: 14),
+                    SizedBox(width: 8),
+                    LuxSkeleton(width: 100, height: 30, radius: 14),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: const [
+                    LuxSkeleton(width: 18, height: 18, radius: 9),
+                    SizedBox(width: 6),
+                    Expanded(child: LuxSkeleton(height: 18, radius: 8)),
+                    SizedBox(width: 56),
+                    LuxSkeleton(width: 72, height: 34, radius: 12),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: const [
+                    Expanded(child: LuxSkeleton(height: 54, radius: 16)),
+                    SizedBox(width: 10),
+                    Expanded(child: LuxSkeleton(height: 54, radius: 16)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const LuxSkeleton(width: 120, height: 20, radius: 8),
+                const SizedBox(height: 10),
+                const LuxSkeleton(height: 88, radius: 16),
+                const SizedBox(height: 24),
+                const LuxSkeleton(width: 100, height: 20, radius: 8),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: const [
+                    LuxSkeleton(width: 86, height: 32, radius: 14),
+                    LuxSkeleton(width: 104, height: 32, radius: 14),
+                    LuxSkeleton(width: 76, height: 32, radius: 14),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const LuxSkeleton(height: 112, radius: 18),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Skeleton لقائمة المحادثات مطابق لبطاقة الطرف الآخر والمعاينة الزمنية.
+class ConversationListSkeleton extends StatelessWidget {
+  const ConversationListSkeleton({super.key, this.showTitle = true});
+
+  final bool showTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = _LuxShimmer(
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        itemCount: 6,
+        separatorBuilder: (_, _) => const SizedBox(height: 6),
+        itemBuilder: (_, _) => const _ConversationTileSkeleton(),
+      ),
+    );
+
+    if (!showTitle) return list;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 6),
+          child: LuxSkeleton(width: 100, height: 30, radius: 9),
+        ),
+        Expanded(child: list),
+      ],
+    );
+  }
+}
+
+class _ConversationTileSkeleton extends StatelessWidget {
+  const _ConversationTileSkeleton();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    child: Row(
+      children: const [
+        LuxSkeleton(width: 52, height: 52, radius: 17),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: LuxSkeleton(height: 16, radius: 7)),
+                  SizedBox(width: 20),
+                  LuxSkeleton(width: 38, height: 12, radius: 6),
+                ],
+              ),
+              SizedBox(height: 10),
+              LuxSkeleton(width: 170, height: 14, radius: 7),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Skeleton لمنطقة الرسائل، يحاكي فقاعات المستخدم وبطاقة العقار.
+class ChatConversationSkeleton extends StatelessWidget {
+  const ChatConversationSkeleton({super.key});
+
+  @override
   Widget build(BuildContext context) => _LuxShimmer(
-    child: CustomScrollView(
-      slivers: [
-        const SliverToBoxAdapter(child: LuxSkeleton(height: 330, radius: 0)),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 70),
-          sliver: SliverList.list(children: [
-            const LuxSkeleton(width: 260, height: 26),
-            const SizedBox(height: 10),
-            Row(children: const [LuxSkeleton(width: 150, height: 38), SizedBox(width: 8), LuxSkeleton(width: 100, height: 30)]),
-            const SizedBox(height: 16),
-            Row(children: const [Expanded(child: LuxSkeleton(height: 54)), SizedBox(width: 10), Expanded(child: LuxSkeleton(height: 54))]),
-            const SizedBox(height: 24),
-            const LuxSkeleton(width: 120, height: 20),
-            const SizedBox(height: 10),
-            const LuxSkeleton(height: 90),
-            const SizedBox(height: 20),
-            const LuxSkeleton(width: 120, height: 20),
-            const SizedBox(height: 10),
-            const LuxSkeleton(height: 120),
-            const SizedBox(height: 22),
-            const LuxSkeleton(height: 84),
-            const SizedBox(height: 18),
-            const LuxSkeleton(height: 54),
-          ]),
+    child: ListView(
+      reverse: true,
+      padding: const EdgeInsets.all(16),
+      children: const [
+        Align(
+          alignment: Alignment.centerRight,
+          child: LuxSkeleton(width: 190, height: 56, radius: 18),
+        ),
+        SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: LuxSkeleton(width: 230, height: 72, radius: 18),
+        ),
+        SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: LuxSkeleton(width: 270, height: 150, radius: 18),
+        ),
+        SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: LuxSkeleton(width: 150, height: 54, radius: 18),
         ),
       ],
     ),
@@ -490,7 +595,113 @@ class ExploreSkeleton extends StatelessWidget {
   const ExploreSkeleton({super.key});
 
   @override
-  Widget build(BuildContext context) => const PropertyGridSkeleton(count: 6);
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 700 ? 3 : 2;
+      return PropertyGridSkeleton(count: 6, columns: columns);
+    },
+  );
+}
+
+class NotificationListSkeleton extends StatelessWidget {
+  const NotificationListSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => _LuxShimmer(
+    child: ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: 6,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (_, _) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+        child: const Row(
+          children: [
+            LuxSkeleton(width: 44, height: 44, radius: 14),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LuxSkeleton(width: 180, height: 16, radius: 7),
+                  SizedBox(height: 9),
+                  LuxSkeleton(height: 13, radius: 7),
+                  SizedBox(height: 7),
+                  LuxSkeleton(width: 76, height: 11, radius: 6),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class ViewingRequestsSkeleton extends StatelessWidget {
+  const ViewingRequestsSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => _LuxShimmer(
+    child: ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: 5,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (_, _) => const LuxSkeleton(height: 164, radius: 20),
+    ),
+  );
+}
+
+class AgentProfileSkeleton extends StatelessWidget {
+  const AgentProfileSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => _LuxShimmer(
+    child: CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: const [
+                LuxSkeleton(width: 92, height: 92, radius: 46),
+                SizedBox(height: 14),
+                LuxSkeleton(width: 180, height: 22, radius: 8),
+                SizedBox(height: 9),
+                LuxSkeleton(width: 240, height: 15, radius: 7),
+                SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(child: LuxSkeleton(height: 58, radius: 16)),
+                    SizedBox(width: 10),
+                    Expanded(child: LuxSkeleton(height: 58, radius: 16)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          sliver: SliverGrid.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: .72,
+            ),
+            itemCount: 4,
+            itemBuilder: (_, _) => const PropertyCardSkeleton(),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Skeleton لتقرير الوكيل مع KPI وجدول، بدون بيانات وهمية.
@@ -499,18 +710,24 @@ class AgentReportSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _LuxShimmer(
-    child: Column(children: [
-      const LuxSkeleton(height: 92),
-      const SizedBox(height: 12),
-      Wrap(spacing: 10, runSpacing: 10, children: [
-        SizedBox(width: 160, child: LuxSkeleton(height: 72)),
-        SizedBox(width: 160, child: LuxSkeleton(height: 72)),
-        SizedBox(width: 160, child: LuxSkeleton(height: 72)),
-        SizedBox(width: 160, child: LuxSkeleton(height: 72)),
-      ]),
-      const SizedBox(height: 12),
-      const LuxSkeleton(height: 300),
-    ]),
+    child: Column(
+      children: [
+        const LuxSkeleton(height: 92),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            SizedBox(width: 160, child: LuxSkeleton(height: 72)),
+            SizedBox(width: 160, child: LuxSkeleton(height: 72)),
+            SizedBox(width: 160, child: LuxSkeleton(height: 72)),
+            SizedBox(width: 160, child: LuxSkeleton(height: 72)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const LuxSkeleton(height: 300),
+      ],
+    ),
   );
 }
 
@@ -519,10 +736,7 @@ class AgentReportSkeleton extends StatelessWidget {
 /// ===============================================================
 
 class LuxContentSkeleton extends StatelessWidget {
-  const LuxContentSkeleton({
-    super.key,
-    this.lines = 5,
-  });
+  const LuxContentSkeleton({super.key, this.lines = 5});
 
   final int lines;
 
@@ -534,23 +748,14 @@ class LuxContentSkeleton extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const LuxSkeleton(
-                width: 160,
-                height: 22,
-                radius: 9,
-              ),
+              const LuxSkeleton(width: 160, height: 22, radius: 9),
               const SizedBox(height: 16),
 
-              for (var index = 0;
-                  index < lines;
-                  index++) ...[
+              for (var index = 0; index < lines; index++) ...[
                 LuxSkeleton(
-                  width: index % 3 == 1
-                      ? 185
-                      : double.infinity,
+                  width: index % 3 == 1 ? 185 : double.infinity,
                   height: index == 0 ? 16 : 14,
                   radius: 8,
                 ),
@@ -559,11 +764,7 @@ class LuxContentSkeleton extends StatelessWidget {
 
               const SizedBox(height: 7),
 
-              LuxSkeleton(
-                width: 125,
-                height: 42,
-                radius: 13,
-              ),
+              LuxSkeleton(width: 125, height: 42, radius: 13),
             ],
           ),
         ),
@@ -577,11 +778,7 @@ class LuxContentSkeleton extends StatelessWidget {
 /// ===============================================================
 
 class PropertyGridSkeleton extends StatelessWidget {
-  const PropertyGridSkeleton({
-    super.key,
-    this.count = 6,
-    this.columns = 2,
-  });
+  const PropertyGridSkeleton({super.key, this.count = 6, this.columns = 2});
 
   final int count;
   final int columns;
@@ -593,11 +790,9 @@ class PropertyGridSkeleton extends StatelessWidget {
     return _LuxShimmer(
       child: GridView.builder(
         shrinkWrap: true,
-        physics:
-            const NeverScrollableScrollPhysics(),
+        physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
-        gridDelegate:
-            SliverGridDelegateWithFixedCrossAxisCount(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: safeColumns,
           childAspectRatio: 0.70,
           mainAxisSpacing: 14,
@@ -616,12 +811,8 @@ class PropertyGridSkeleton extends StatelessWidget {
 /// Sliver Property Grid Skeleton
 /// ===============================================================
 
-class SliverPropertyGridSkeleton
-    extends StatelessWidget {
-  const SliverPropertyGridSkeleton({
-    super.key,
-    this.count = 6,
-  });
+class SliverPropertyGridSkeleton extends StatelessWidget {
+  const SliverPropertyGridSkeleton({super.key, this.count = 6});
 
   final int count;
 
@@ -629,26 +820,19 @@ class SliverPropertyGridSkeleton
   Widget build(BuildContext context) {
     return _LuxShimmer(
       child: SliverPadding(
-        padding: const EdgeInsets.fromLTRB(
-          20,
-          0,
-          20,
-          28,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
         sliver: SliverLayoutBuilder(
           builder: (context, constraints) {
-            final width =
-                constraints.crossAxisExtent;
+            final width = constraints.crossAxisExtent;
 
             final columns = width >= 1100
                 ? 4
                 : width >= 700
-                    ? 3
-                    : 2;
+                ? 3
+                : 2;
 
             return SliverGrid.builder(
-              gridDelegate:
-                  SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
@@ -683,14 +867,10 @@ class PropertyCardSkeleton extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
-        side: BorderSide(
-          color:
-              theme.colorScheme.outlineVariant,
-        ),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           /// =====================================================
           /// Image / Hero area
@@ -710,22 +890,14 @@ class PropertyCardSkeleton extends StatelessWidget {
                 Positioned(
                   top: 12,
                   right: 12,
-                  child: LuxSkeleton(
-                    width: 38,
-                    height: 38,
-                    radius: 19,
-                  ),
+                  child: LuxSkeleton(width: 38, height: 38, radius: 19),
                 ),
 
                 /// status badge
                 Positioned(
                   top: 12,
                   left: 12,
-                  child: LuxSkeleton(
-                    width: 76,
-                    height: 26,
-                    radius: 13,
-                  ),
+                  child: LuxSkeleton(width: 76, height: 26, radius: 13),
                 ),
 
                 /// bottom media controls
@@ -735,17 +907,9 @@ class PropertyCardSkeleton extends StatelessWidget {
                   bottom: 12,
                   child: Row(
                     children: [
-                      LuxSkeleton(
-                        width: 54,
-                        height: 20,
-                        radius: 10,
-                      ),
+                      LuxSkeleton(width: 54, height: 20, radius: 10),
                       const Spacer(),
-                      LuxSkeleton(
-                        width: 30,
-                        height: 20,
-                        radius: 10,
-                      ),
+                      LuxSkeleton(width: 30, height: 20, radius: 10),
                     ],
                   ),
                 ),
@@ -759,22 +923,12 @@ class PropertyCardSkeleton extends StatelessWidget {
           Expanded(
             flex: 7,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                13,
-                10,
-                13,
-                10,
-              ),
+              padding: const EdgeInsets.fromLTRB(13, 10, 13, 10),
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   /// price
-                  const LuxSkeleton(
-                    width: 104,
-                    height: 19,
-                    radius: 8,
-                  ),
+                  const LuxSkeleton(width: 104, height: 19, radius: 8),
 
                   const SizedBox(height: 8),
 
@@ -788,37 +942,18 @@ class PropertyCardSkeleton extends StatelessWidget {
                   const SizedBox(height: 6),
 
                   /// second title line
-                  const LuxSkeleton(
-                    width: 155,
-                    height: 13,
-                    radius: 7,
-                  ),
+                  const LuxSkeleton(width: 155, height: 13, radius: 7),
 
                   const Spacer(),
 
                   /// metadata
                   Row(
                     children: [
-                      Expanded(
-                        child: LuxSkeleton(
-                          height: 22,
-                          radius: 11,
-                        ),
-                      ),
+                      Expanded(child: LuxSkeleton(height: 22, radius: 11)),
                       const SizedBox(width: 7),
-                      Expanded(
-                        child: LuxSkeleton(
-                          height: 22,
-                          radius: 11,
-                        ),
-                      ),
+                      Expanded(child: LuxSkeleton(height: 22, radius: 11)),
                       const SizedBox(width: 7),
-                      Expanded(
-                        child: LuxSkeleton(
-                          height: 22,
-                          radius: 11,
-                        ),
-                      ),
+                      Expanded(child: LuxSkeleton(height: 22, radius: 11)),
                     ],
                   ),
                 ],
@@ -855,12 +990,8 @@ class ListTileSkeleton extends StatelessWidget {
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius:
-            BorderRadius.circular(radius),
-        border: Border.all(
-          color:
-              theme.colorScheme.outlineVariant,
-        ),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -874,14 +1005,9 @@ class ListTileSkeleton extends StatelessWidget {
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const LuxSkeleton(
-                  width: 135,
-                  height: 15,
-                  radius: 7,
-                ),
+                const LuxSkeleton(width: 135, height: 15, radius: 7),
                 const SizedBox(height: 8),
                 const LuxSkeleton(
                   width: double.infinity,
@@ -891,17 +1017,9 @@ class ListTileSkeleton extends StatelessWidget {
                 const SizedBox(height: 9),
                 Row(
                   children: [
-                    LuxSkeleton(
-                      width: 48,
-                      height: 18,
-                      radius: 9,
-                    ),
+                    LuxSkeleton(width: 48, height: 18, radius: 9),
                     const SizedBox(width: 6),
-                    LuxSkeleton(
-                      width: 56,
-                      height: 18,
-                      radius: 9,
-                    ),
+                    LuxSkeleton(width: 56, height: 18, radius: 9),
                   ],
                 ),
               ],
@@ -910,11 +1028,7 @@ class ListTileSkeleton extends StatelessWidget {
 
           if (trailing) ...[
             const SizedBox(width: 12),
-            LuxSkeleton(
-              width: 32,
-              height: 32,
-              radius: 16,
-            ),
+            LuxSkeleton(width: 32, height: 32, radius: 16),
           ],
         ],
       ),
@@ -927,11 +1041,7 @@ class ListTileSkeleton extends StatelessWidget {
 /// ===============================================================
 
 class ListSkeleton extends StatelessWidget {
-  const ListSkeleton({
-    super.key,
-    this.count = 6,
-    this.trailing = false,
-  });
+  const ListSkeleton({super.key, this.count = 6, this.trailing = false});
 
   final int count;
   final bool trailing;
@@ -942,16 +1052,13 @@ class ListSkeleton extends StatelessWidget {
       child: ListView.separated(
         shrinkWrap: true,
         padding: const EdgeInsets.all(20),
-        physics:
-            const NeverScrollableScrollPhysics(),
+        physics: const NeverScrollableScrollPhysics(),
         itemCount: count,
         separatorBuilder: (context, index) {
           return const SizedBox(height: 10);
         },
         itemBuilder: (context, index) {
-          return ListTileSkeleton(
-            trailing: trailing,
-          );
+          return ListTileSkeleton(trailing: trailing);
         },
       ),
     );
@@ -962,12 +1069,8 @@ class ListSkeleton extends StatelessWidget {
 /// Account Skeleton
 /// ===============================================================
 
-class AccountScreenSkeleton
-    extends StatelessWidget {
-  const AccountScreenSkeleton({
-    super.key,
-    this.tiles = 4,
-  });
+class AccountScreenSkeleton extends StatelessWidget {
+  const AccountScreenSkeleton({super.key, this.tiles = 4});
 
   final int tiles;
 
@@ -977,57 +1080,29 @@ class AccountScreenSkeleton
 
     return _LuxShimmer(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          20,
-          12,
-          20,
-          28,
-        ),
-        physics:
-            const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: theme.colorScheme
-                  .surfaceContainerHighest,
-              borderRadius:
-                  BorderRadius.circular(26),
-              border: Border.all(
-                color:
-                    theme.colorScheme.outlineVariant,
-              ),
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
             ),
             child: Row(
               children: [
-                const LuxSkeleton(
-                  width: 68,
-                  height: 68,
-                  radius: 34,
-                ),
+                const LuxSkeleton(width: 68, height: 68, radius: 34),
                 const SizedBox(width: 15),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [
-                      LuxSkeleton(
-                        width: 155,
-                        height: 18,
-                        radius: 8,
-                      ),
+                      LuxSkeleton(width: 155, height: 18, radius: 8),
                       SizedBox(height: 9),
-                      LuxSkeleton(
-                        width: 180,
-                        height: 13,
-                        radius: 7,
-                      ),
+                      LuxSkeleton(width: 180, height: 13, radius: 7),
                       SizedBox(height: 11),
-                      LuxSkeleton(
-                        width: 100,
-                        height: 24,
-                        radius: 12,
-                      ),
+                      LuxSkeleton(width: 100, height: 24, radius: 12),
                     ],
                   ),
                 ),
@@ -1035,28 +1110,21 @@ class AccountScreenSkeleton
             ),
           ),
 
-          for (var index = 0;
-              index < tiles;
-              index++) ...[
+          for (var index = 0; index < tiles; index++) ...[
             const SizedBox(height: 10),
             const _AccountTileSkeleton(),
           ],
 
           const SizedBox(height: 26),
 
-          const LuxSkeleton(
-            width: double.infinity,
-            height: 52,
-            radius: 15,
-          ),
+          const LuxSkeleton(width: double.infinity, height: 52, radius: 15),
         ],
       ),
     );
   }
 }
 
-class _AccountTileSkeleton
-    extends StatelessWidget {
+class _AccountTileSkeleton extends StatelessWidget {
   const _AccountTileSkeleton();
 
   @override
@@ -1067,50 +1135,29 @@ class _AccountTileSkeleton
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius:
-            BorderRadius.circular(20),
-        border: Border.all(
-          color:
-              theme.colorScheme.outlineVariant,
-        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
-          const LuxSkeleton(
-            width: 46,
-            height: 46,
-            radius: 14,
-          ),
+          const LuxSkeleton(width: 46, height: 46, radius: 14),
 
           const SizedBox(width: 13),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                LuxSkeleton(
-                  width: 140,
-                  height: 15,
-                  radius: 7,
-                ),
+                LuxSkeleton(width: 140, height: 15, radius: 7),
                 SizedBox(height: 8),
-                LuxSkeleton(
-                  width: 100,
-                  height: 12,
-                  radius: 6,
-                ),
+                LuxSkeleton(width: 100, height: 12, radius: 6),
               ],
             ),
           ),
 
           const SizedBox(width: 12),
 
-          const LuxSkeleton(
-            width: 30,
-            height: 30,
-            radius: 15,
-          ),
+          const LuxSkeleton(width: 30, height: 30, radius: 15),
         ],
       ),
     );
@@ -1121,8 +1168,7 @@ class _AccountTileSkeleton
 /// Profile Skeleton
 /// ===============================================================
 
-class ProfileScreenSkeleton
-    extends StatelessWidget {
+class ProfileScreenSkeleton extends StatelessWidget {
   const ProfileScreenSkeleton({super.key});
 
   @override
@@ -1132,58 +1178,28 @@ class ProfileScreenSkeleton
     return _LuxShimmer(
       child: ListView(
         padding: const EdgeInsets.all(20),
-        physics:
-            const NeverScrollableScrollPhysics(),
+        physics: const NeverScrollableScrollPhysics(),
         children: [
-          const Center(
-            child: LuxSkeleton(
-              width: 100,
-              height: 100,
-              radius: 50,
-            ),
-          ),
+          const Center(child: LuxSkeleton(width: 100, height: 100, radius: 50)),
 
           const SizedBox(height: 16),
 
-          const Center(
-            child: LuxSkeleton(
-              width: 125,
-              height: 15,
-              radius: 7,
-            ),
-          ),
+          const Center(child: LuxSkeleton(width: 125, height: 15, radius: 7)),
 
           const SizedBox(height: 7),
 
-          const Center(
-            child: LuxSkeleton(
-              width: 165,
-              height: 12,
-              radius: 6,
-            ),
-          ),
+          const Center(child: LuxSkeleton(width: 165, height: 12, radius: 6)),
 
           const SizedBox(height: 30),
 
-          for (var index = 0;
-              index < 2;
-              index++) ...[
-            const LuxSkeleton(
-              width: 90,
-              height: 13,
-              radius: 6,
-            ),
+          for (var index = 0; index < 2; index++) ...[
+            const LuxSkeleton(width: 90, height: 13, radius: 6),
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                borderRadius:
-                    BorderRadius.circular(15),
-                border: Border.all(
-                  color: theme
-                      .colorScheme
-                      .outlineVariant,
-                ),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
               ),
               padding: const EdgeInsets.all(1),
               child: const LuxSkeleton(
@@ -1195,11 +1211,7 @@ class ProfileScreenSkeleton
             const SizedBox(height: 20),
           ],
 
-          const LuxSkeleton(
-            width: double.infinity,
-            height: 52,
-            radius: 15,
-          ),
+          const LuxSkeleton(width: double.infinity, height: 52, radius: 15),
         ],
       ),
     );
@@ -1231,19 +1243,15 @@ class AwaitContent<T> extends StatefulWidget {
   final Duration minLoading;
 
   @override
-  State<AwaitContent<T>> createState() =>
-      _AwaitContentState<T>();
+  State<AwaitContent<T>> createState() => _AwaitContentState<T>();
 }
 
-class _AwaitContentState<T>
-    extends _MinimumLoadingState<AwaitContent<T>> {
+class _AwaitContentState<T> extends _MinimumLoadingState<AwaitContent<T>> {
   @override
-  AsyncValue<dynamic> get _loadingValue =>
-      widget.value;
+  AsyncValue<dynamic> get _loadingValue => widget.value;
 
   @override
-  Duration get _minimumLoadingDuration =>
-      widget.minLoading;
+  Duration get _minimumLoadingDuration => widget.minLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -1254,8 +1262,7 @@ class _AwaitContentState<T>
     }
 
     if (value.hasValue) {
-      final content =
-          widget.onData(value.requireValue);
+      final content = widget.onData(value.requireValue);
 
       if (_isBackgroundUpdating(value)) {
         return Stack(
@@ -1269,9 +1276,7 @@ class _AwaitContentState<T>
               child: IgnorePointer(
                 child: SizedBox(
                   height: 2,
-                  child: LinearProgressIndicator(
-                    minHeight: 2,
-                  ),
+                  child: LinearProgressIndicator(minHeight: 2),
                 ),
               ),
             ),
@@ -1332,24 +1337,18 @@ class SliverAsyncView<T> extends StatefulWidget {
   final Duration minLoading;
 
   @override
-  State<SliverAsyncView<T>> createState() =>
-      _SliverAsyncViewState<T>();
+  State<SliverAsyncView<T>> createState() => _SliverAsyncViewState<T>();
 }
 
 class _SliverAsyncViewState<T>
-    extends _MinimumLoadingState<
-        SliverAsyncView<T>> {
+    extends _MinimumLoadingState<SliverAsyncView<T>> {
   @override
-  AsyncValue<dynamic> get _loadingValue =>
-      widget.value;
+  AsyncValue<dynamic> get _loadingValue => widget.value;
 
   @override
-  Duration get _minimumLoadingDuration =>
-      widget.minLoading;
+  Duration get _minimumLoadingDuration => widget.minLoading;
 
-  Widget get _skeleton =>
-      widget.loading ??
-      const SliverPropertyGridSkeleton();
+  Widget get _skeleton => widget.loading ?? const SliverPropertyGridSkeleton();
 
   @override
   Widget build(BuildContext context) {
@@ -1362,44 +1361,30 @@ class _SliverAsyncViewState<T>
     if (value.hasValue) {
       final data = value.requireValue;
 
-      final empty =
-          widget.emptyOverride != null &&
-          _isEmptyCollection(data);
+      final empty = widget.emptyOverride != null && _isEmptyCollection(data);
 
       if (empty) {
-        final sliver =
-            SliverFillRemaining(
+        final sliver = SliverFillRemaining(
           hasScrollBody: false,
           child: widget.emptyOverride!,
         );
 
         if (_isBackgroundUpdating(value)) {
-          return SliverMainAxisGroup(
-            slivers: [
-              _refreshProgressSliver,
-              sliver,
-            ],
-          );
+          return SliverMainAxisGroup(slivers: [_refreshProgressSliver, sliver]);
         }
 
         return sliver;
       }
 
-      final contentSlivers =
-          widget.data(data);
+      final contentSlivers = widget.data(data);
 
       if (_isBackgroundUpdating(value)) {
         return SliverMainAxisGroup(
-          slivers: [
-            _refreshProgressSliver,
-            ...contentSlivers,
-          ],
+          slivers: [_refreshProgressSliver, ...contentSlivers],
         );
       }
 
-      return SliverMainAxisGroup(
-        slivers: contentSlivers,
-      );
+      return SliverMainAxisGroup(slivers: contentSlivers);
     }
 
     if (value.isLoading || value.retrying) {
@@ -1411,10 +1396,10 @@ class _SliverAsyncViewState<T>
 
       return SliverFillRemaining(
         hasScrollBody: false,
-        child: widget.error?.call(error) ??
+        child:
+            widget.error?.call(error) ??
             ErrorState(
-              message:
-                  _readableError(error),
+              message: _readableError(error),
               onRetry: widget.errorRetry,
               offline: _isOffline(error),
             ),
@@ -1426,12 +1411,7 @@ class _SliverAsyncViewState<T>
 
   Widget get _refreshProgressSliver {
     return const SliverToBoxAdapter(
-      child: SizedBox(
-        height: 2,
-        child: LinearProgressIndicator(
-          minHeight: 2,
-        ),
-      ),
+      child: SizedBox(height: 2, child: LinearProgressIndicator(minHeight: 2)),
     );
   }
 }
@@ -1442,8 +1422,7 @@ class _SliverAsyncViewState<T>
 
 String _readableError(Object error) {
   if (error is ApiFailure) {
-    final message =
-        error.message.trim();
+    final message = error.message.trim();
 
     if (message.isNotEmpty) {
       return message;
@@ -1456,15 +1435,13 @@ String _readableError(Object error) {
     return 'انتهت مهلة الاتصال. تحقق من الشبكة ثم حاول مرة أخرى.';
   }
 
-  final raw =
-      error.toString().trim();
+  final raw = error.toString().trim();
 
   if (raw.isEmpty) {
     return 'حدث خطأ غير متوقع. حاول مرة أخرى.';
   }
 
-  final normalized =
-      raw.toLowerCase();
+  final normalized = raw.toLowerCase();
 
   const technicalPatterns = <String>[
     'socketexception',
@@ -1481,8 +1458,7 @@ String _readableError(Object error) {
     'xmlhttprequest',
   ];
 
-  for (final pattern
-      in technicalPatterns) {
+  for (final pattern in technicalPatterns) {
     if (normalized.contains(pattern)) {
       return 'تعذر الاتصال بالخدمة. تحقق من الشبكة ثم أعد المحاولة.';
     }
@@ -1493,9 +1469,7 @@ String _readableError(Object error) {
   }
 
   if (raw.startsWith('Exception: ')) {
-    return raw
-        .substring('Exception: '.length)
-        .trim();
+    return raw.substring('Exception: '.length).trim();
   }
 
   return raw;
@@ -1510,8 +1484,7 @@ bool _isOffline(Object error) {
     return true;
   }
 
-  final normalized =
-      error.toString().toLowerCase();
+  final normalized = error.toString().toLowerCase();
 
   const networkPatterns = <String>[
     'socket',
@@ -1525,9 +1498,7 @@ bool _isOffline(Object error) {
     'xmlhttprequest',
   ];
 
-  return networkPatterns.any(
-    normalized.contains,
-  );
+  return networkPatterns.any(normalized.contains);
 }
 
 bool _isEmptyCollection(Object? value) {

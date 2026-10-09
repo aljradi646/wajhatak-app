@@ -36,6 +36,7 @@ class NotificationsScreen extends ConsumerWidget {
       appBar: WajhatakScreenHeader(title: 'الإشعارات'),
       body: LuxAsyncView<List<LuxNotification>>(
         value: notifications,
+        loading: const NotificationListSkeleton(),
         errorRetry: () => ref.invalidate(notificationsProvider),
         data: (items) {
           if (items.isEmpty) {
@@ -79,8 +80,9 @@ class _NotificationCard extends StatelessWidget {
   };
 
   IconData get _icon => switch (item.kind) {
-    'message_received' || 'message' || 'message_sent' =>
-      Icons.chat_bubble_rounded,
+    'message_received' ||
+    'message' ||
+    'message_sent' => Icons.chat_bubble_rounded,
     'viewing_request_created' ||
     'viewing_request_updated' ||
     'viewing_request' => Icons.event_available_rounded,

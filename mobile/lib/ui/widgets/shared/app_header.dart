@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../brand.dart';
 
@@ -33,52 +34,64 @@ class WajhatakHeader extends StatelessWidget implements PreferredSizeWidget {
     final bool canPop = ModalRoute.of(context)?.canPop ?? false;
     final showBack = automaticallyImplyLeading && canPop;
 
-    return SafeArea(
-      bottom: false,
-      child: SizedBox(
-        height: 74,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
-          child: Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              // أقصى اليمين: القائمة أو رجوع
-              _HeaderIconButton(
-                icon: showBack
-                    ? Icons.arrow_forward_ios_rounded
-                    : Icons.menu_rounded,
-                onPressed: showBack
-                    ? (onBackPressed ?? () => Navigator.of(context).maybePop())
-                    : onMenuTap,
-                tooltip: showBack ? 'رجوع' : 'القائمة',
-                tinted: !showBack,
-              ),
-              const SizedBox(width: 8),
-              // اسم التطبيق / عنوان الشاشة
-              Expanded(
-                child: title != null
-                    ? Text(
-                        title!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      )
-                    : showTitleLockup
-                    ? const Align(
-                        alignment: Alignment.centerRight,
-                        child: _HeaderBrand(),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              // أقصى اليسار: الإشعارات مع شارة غير المقروء
-              _NotificationsBell(
-                onTap: onNotificationsTap,
-                unreadCount: unreadCount,
-              ),
-            ],
+    final overlayStyle = SystemUiOverlayStyle(
+      statusBarColor: theme.scaffoldBackgroundColor,
+      statusBarIconBrightness: theme.brightness == Brightness.dark
+          ? Brightness.light
+          : Brightness.dark,
+      statusBarBrightness: theme.brightness,
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 74,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+            child: Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                // أقصى اليمين: القائمة أو رجوع
+                _HeaderIconButton(
+                  icon: showBack
+                      ? Icons.arrow_forward_ios_rounded
+                      : Icons.menu_rounded,
+                  onPressed: showBack
+                      ? (onBackPressed ??
+                            () => Navigator.of(context).maybePop())
+                      : onMenuTap,
+                  tooltip: showBack ? 'رجوع' : 'القائمة',
+                  tinted: !showBack,
+                ),
+                const SizedBox(width: 8),
+                // اسم التطبيق / عنوان الشاشة
+                Expanded(
+                  child: title != null
+                      ? Text(
+                          title!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        )
+                      : showTitleLockup
+                      ? const Align(
+                          alignment: Alignment.centerRight,
+                          child: _HeaderBrand(),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                // أقصى اليسار: الإشعارات مع شارة غير المقروء
+                _NotificationsBell(
+                  onTap: onNotificationsTap,
+                  unreadCount: unreadCount,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -266,61 +279,68 @@ class WajhatakScreenHeader extends StatelessWidget
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SafeArea(
-      bottom: false,
-      child: SizedBox(
-        height: 72,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 8, 4),
-          child: Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              Material(
-                color: theme.colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(14),
-                child: InkWell(
-                  onTap:
-                      onBackPressed ??
-                      () => Navigator.of(context).maybePop(),
+    final overlayStyle = SystemUiOverlayStyle(
+      statusBarColor: theme.scaffoldBackgroundColor,
+      statusBarIconBrightness: theme.brightness == Brightness.dark
+          ? Brightness.light
+          : Brightness.dark,
+      statusBarBrightness: theme.brightness,
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 72,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 8, 4),
+            child: Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                Material(
+                  color: theme.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(14),
-                  child: const SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 18,
+                  child: InkWell(
+                    onTap:
+                        onBackPressed ?? () => Navigator.of(context).maybePop(),
+                    borderRadius: BorderRadius.circular(14),
+                    child: const SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Icon(Icons.arrow_forward_ios_rounded, size: 18),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (subtitle != null)
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
                       Text(
-                        subtitle!,
+                        title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                  ],
+                      if (subtitle != null)
+                        Text(
+                          subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              ...actions,
-            ],
+                ...actions,
+              ],
+            ),
           ),
         ),
       ),

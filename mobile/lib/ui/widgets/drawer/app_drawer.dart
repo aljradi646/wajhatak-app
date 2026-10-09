@@ -49,6 +49,8 @@ class AppDrawer extends ConsumerWidget {
       backgroundColor: theme.scaffoldBackgroundColor,
       width: 330,
       child: SafeArea(
+        top: true,
+        bottom: true,
         child: Column(
           children: [
             // رأس القائمة — بطاقة المستخدم بتدرج زمردي

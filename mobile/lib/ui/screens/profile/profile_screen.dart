@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/media_permission_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/icon_badges.dart';
 import '../../../core/utils/notice.dart' as util;
@@ -121,6 +122,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _chooseAvatar() async {
     try {
+      if (!await MediaPermissionService.requestPhotoAccess()) {
+        if (mounted) {
+          util.notice(
+            context,
+            'اسمح للتطبيق بالوصول إلى الصور لاختيار صورة الملف الشخصي.',
+          );
+        }
+        return;
+      }
       final file = await ImagePicker().pickImage(
         source: ImageSource.gallery,
         maxWidth: 1600,
@@ -224,9 +234,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 14),
                 Text(
                   'اختر صورة شخصية',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -302,7 +312,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onTap: () async {
                 await Navigator.of(context).push<bool>(
                   MaterialPageRoute(
-                    builder: (_) => const EmailVerificationScreen(autoSend: true),
+                    builder: (_) =>
+                        const EmailVerificationScreen(autoSend: true),
                   ),
                 );
               },
@@ -323,7 +334,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
 
           // توثيق حساب الوكيل — بيانات الإدارة للقبول (للوكلاء غير الموثقين).
-          if (widget.user.isAgent && widget.user.agentVerificationStatus != 'approved') ...[
+          if (widget.user.isAgent &&
+              widget.user.agentVerificationStatus != 'approved') ...[
             const SizedBox(height: 12),
             _ActionTile(
               icon: Icons.real_estate_agent_rounded,
@@ -401,9 +413,21 @@ class _ActionTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: TextStyle(fontWeight: FontWeight.w800, color: color, fontSize: 13.5)),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                        fontSize: 13.5,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -442,7 +466,12 @@ class _FieldTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              TintedIcon(icon: icon, tone: AccentTone.emerald, size: 34, iconSize: 17),
+              TintedIcon(
+                icon: icon,
+                tone: AccentTone.emerald,
+                size: 34,
+                iconSize: 17,
+              ),
               const SizedBox(width: 10),
               Text(
                 label,

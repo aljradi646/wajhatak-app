@@ -63,16 +63,20 @@ class _EmailVerificationScreenState
 
   DateTime _serverNow() => DateTime.now().toUtc().add(_serverClockOffset);
 
-  void _startResendTimer(int seconds, {DateTime? serverTime, DateTime? availableAt}) {
+  void _startResendTimer(
+    int seconds, {
+    DateTime? serverTime,
+    DateTime? availableAt,
+  }) {
     _syncServerClock(serverTime);
-    final target = availableAt ??
-        _serverNow().add(Duration(seconds: seconds));
+    final target = availableAt ?? _serverNow().add(Duration(seconds: seconds));
     _resendUntil = target.toUtc();
     _ticker?.cancel();
     void tick() {
       if (!mounted || _resendUntil == null) return;
       final remaining = _resendUntil!.difference(_serverNow());
-      final secondsLeft = remaining.inSeconds + (remaining.inMilliseconds % 1000 == 0 ? 0 : 1);
+      final secondsLeft =
+          remaining.inSeconds + (remaining.inMilliseconds % 1000 == 0 ? 0 : 1);
       if (secondsLeft <= 0) {
         _ticker?.cancel();
         _resendUntil = null;
@@ -81,6 +85,7 @@ class _EmailVerificationScreenState
       }
       setState(() => _resendIn = secondsLeft);
     }
+
     tick();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => tick());
   }
@@ -117,15 +122,23 @@ class _EmailVerificationScreenState
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final result =
-          await ref.read(accountRepositoryProvider).sendVerificationCode();
+      final result = await ref
+          .read(accountRepositoryProvider)
+          .sendVerificationCode();
       if (!mounted) return;
       util.notice(context, result.message);
       if (result.resendAvailableAt != null || result.resendIn > 0) {
-        _startResendTimer(result.resendIn, serverTime: result.serverTime, availableAt: result.resendAvailableAt);
+        _startResendTimer(
+          result.resendIn,
+          serverTime: result.serverTime,
+          availableAt: result.resendAvailableAt,
+        );
       }
     } on ApiFailure catch (error) {
-      if (mounted) util.notice(context, error.message);
+      if (mounted) {
+        util.notice(context, error.message);
+        await _refreshServerStatus();
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -175,8 +188,9 @@ class _EmailVerificationScreenState
                 Text(
                   'أدخل رمز التحقق',
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w900),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -196,16 +210,18 @@ class _EmailVerificationScreenState
                   maxLength: 6,
                   autofocus: !widget.autoSend,
                   style: const TextStyle(
-                      fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.w800),
+                    fontSize: 24,
+                    letterSpacing: 8,
+                    fontWeight: FontWeight.w800,
+                  ),
                   decoration: const InputDecoration(
                     counterText: '',
                     hintText: '••••••',
                     prefixIcon: Icon(Icons.lock_outline_rounded),
                   ),
-                  validator: (value) =>
-                      (value ?? '').trim().length == 6
-                          ? null
-                          : 'أدخل الرمز المكوّن من 6 أرقام.',
+                  validator: (value) => (value ?? '').trim().length == 6
+                      ? null
+                      : 'أدخل الرمز المكوّن من 6 أرقام.',
                   onFieldSubmitted: (_) => _confirm(),
                 ),
                 const SizedBox(height: 18),
@@ -216,13 +232,17 @@ class _EmailVerificationScreenState
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2.2, color: Colors.white),
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Icon(Icons.verified_rounded, size: 20),
                   label: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 13),
-                    child: Text('تأكيد وتوثيق البريد',
-                        style: TextStyle(fontSize: 15.5)),
+                    child: Text(
+                      'تأكيد وتوثيق البريد',
+                      style: TextStyle(fontSize: 15.5),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),

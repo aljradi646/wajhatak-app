@@ -17,7 +17,7 @@ class MessagesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     if (session.isLoading) {
-      return const ListSkeleton();
+      return const ConversationListSkeleton();
     }
     if (session.asData?.value == null) {
       return AuthRequiredScreen(
@@ -34,19 +34,21 @@ class MessagesScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
           child: Text(
             'الرسائل',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
           ),
         ),
         Expanded(
           child: LuxAsyncView<List<ConversationItem>>(
             value: conversations,
+            loading: const ConversationListSkeleton(showTitle: false),
             errorRetry: () => ref.invalidate(conversationsProvider),
             data: (data) => data.isEmpty
                 ? const EmptyState(
                     title: 'لا توجد محادثات',
-                    body: 'ابدأ محادثة من صفحة تفاصيل أي عقار عبر "مراسلة الوكيل".',
+                    body:
+                        'ابدأ محادثة من صفحة تفاصيل أي عقار عبر "مراسلة الوكيل".',
                     icon: Icons.chat_bubble_outline_rounded,
                   )
                 : ListView.separated(
@@ -72,9 +74,11 @@ class _ConversationTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isAgentView = ref.watch(sessionProvider).asData?.value?.user.isAgent == true;
+    final isAgentView =
+        ref.watch(sessionProvider).asData?.value?.user.isAgent == true;
     // الاسم المعروض: الطرف الآخر في المحادثة.
-    final displayName = (isAgentView ? item.clientName : item.agentName) ?? item.title;
+    final displayName =
+        (isAgentView ? item.clientName : item.agentName) ?? item.title;
     // صورة الطرف الآخر الحقيقية (الوكيل للعميل / العميل للوكيل).
     final otherAvatarUrl = isAgentView
         ? item.clientAvatarUrl

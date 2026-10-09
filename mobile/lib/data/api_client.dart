@@ -216,11 +216,10 @@ class LuxApiClient {
             unawaited(_tokenStore.clear());
           }
           final payload = error.response?.data;
-          final message =
-              payload is Map<String, dynamic>
-                  ? (payload['message'] as String? ??
-                     _extractValidationErrors(payload))
-                  : null;
+          final message = payload is Map<String, dynamic>
+              ? (payload['message'] as String? ??
+                    _extractValidationErrors(payload))
+              : null;
           handler.reject(
             DioException(
               requestOptions: error.requestOptions,
@@ -386,10 +385,7 @@ class LuxApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> patch(
-    String path, {
-    Object? data,
-  }) async {
+  Future<Map<String, dynamic>> patch(String path, {Object? data}) async {
     try {
       final response = await _dio.patch<dynamic>(path, data: data);
       final body = response.data;
@@ -408,13 +404,12 @@ class LuxApiClient {
     }
   }
 
-  ApiFailure _toFailure(DioException error) =>
-      error.error is ApiFailure
-          ? error.error! as ApiFailure
-          : ApiFailure(
-              _fallbackMessage(error),
-              statusCode: error.response?.statusCode,
-            );
+  ApiFailure _toFailure(DioException error) => error.error is ApiFailure
+      ? error.error! as ApiFailure
+      : ApiFailure(
+          _fallbackMessage(error),
+          statusCode: error.response?.statusCode,
+        );
 
   String _fallbackMessage(DioException error) {
     if (error.type == DioExceptionType.connectionTimeout ||
@@ -428,6 +423,13 @@ class LuxApiClient {
   }
 
   String _extractValidationErrors(Map<String, dynamic> payload) {
+    final data = payload['data'];
+    if (data is Map<String, dynamic>) {
+      final nestedMessage = data['message'];
+      if (nestedMessage is String && nestedMessage.trim().isNotEmpty) {
+        return nestedMessage;
+      }
+    }
     final errors = payload['errors'];
     if (errors is Map<String, dynamic> && errors.isNotEmpty) {
       final messages = <String>[];

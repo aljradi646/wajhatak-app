@@ -64,6 +64,7 @@ class _AgentProfileScreenState extends ConsumerState<AgentProfileScreen> {
       ),
       body: LuxAsyncView<AgentProfileData>(
         value: profile,
+        loading: const AgentProfileSkeleton(),
         errorRetry: () => ref.invalidate(agentProfileProvider(widget.agentId)),
         data: _buildBody,
       ),

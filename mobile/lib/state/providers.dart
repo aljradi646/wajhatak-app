@@ -537,7 +537,11 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
   }
 
   /// إرسال رسالة — تظهر فورًا في المحادثة، ثم يتأكد التحديث الخلفي.
-  Future<void> send(String body) async {
+  Future<void> send(
+    String body, {
+    String messageType = 'text',
+    int? propertyId,
+  }) async {
     if (AppConfig.isUiPreview) {
       final user = ref.read(sessionProvider).asData?.value?.user;
       final message = ChatMessage(
@@ -552,7 +556,12 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
     }
     final message = await ref
         .read(conversationRepositoryProvider)
-        .sendMessage(_conversationId, body);
+        .sendMessage(
+          _conversationId,
+          body,
+          messageType: messageType,
+          propertyId: propertyId,
+        );
     state = AsyncData([
       message,
       ...(state.value ?? const <ChatMessage>[]).where(

@@ -16,8 +16,13 @@ import '../property/property_detail_screen.dart';
 
 /// شاشة المحادثة — العنوان اسم الوكيل، مع بطاقات عقارات سياقية.
 class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({super.key, required this.conversation});
+  const ChatScreen({
+    super.key,
+    required this.conversation,
+    this.pendingProperty,
+  });
   final ConversationItem conversation;
+  final LuxProperty? pendingProperty;
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -26,6 +31,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _controller = TextEditingController();
   bool _sending = false;
+  late LuxProperty? _pendingProperty = widget.pendingProperty;
   Timer? _refreshTimer;
 
   @override
@@ -54,13 +60,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty || _sending) return; // منع الإرسال المزدوج
+    final property = _pendingProperty;
+    if ((text.isEmpty && property == null) || _sending) return;
     setState(() => _sending = true);
     try {
       await ref
           .read(messagesProvider(widget.conversation.id).notifier)
-          .send(text);
+          .send(
+            text,
+            messageType: property == null ? 'text' : 'property',
+            propertyId: property?.id,
+          );
       _controller.clear();
+      if (mounted) setState(() => _pendingProperty = null);
       ref.invalidate(conversationsProvider);
     } on ApiFailure catch (error) {
       if (mounted) util.notice(context, error.message);
@@ -106,6 +118,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Expanded(
             child: LuxAsyncView<List<ChatMessage>>(
               value: messages,
+              loading: const ChatConversationSkeleton(),
               errorRetry: () =>
                   ref.invalidate(messagesProvider(widget.conversation.id)),
               data: (data) => data.isEmpty
@@ -150,30 +163,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                child: Row(
+                child: Column(
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        minLines: 1,
-                        maxLines: 4,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _send(),
-                        decoration: InputDecoration(
-                          hintText: 'اكتب رسالة…',
-                          filled: true,
-                          fillColor: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHigh,
-                          prefixIcon: Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            color: Theme.of(context).colorScheme.primary,
+                    if (_pendingProperty != null)
+                      _PendingPropertyAttachment(
+                        property: _pendingProperty!,
+                        onRemove: () => setState(() => _pendingProperty = null),
+                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            minLines: 1,
+                            maxLines: 4,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => _send(),
+                            decoration: InputDecoration(
+                              hintText: 'أضف رسالة اختيارية…',
+                              filled: true,
+                              fillColor: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHigh,
+                              prefixIcon: Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        _SendButton(
+                          onTap: _sending ? null : _send,
+                          busy: _sending,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    _SendButton(onTap: _sending ? null : _send, busy: _sending),
                   ],
                 ),
               ),
@@ -227,6 +252,74 @@ class _SendButton extends StatelessWidget {
   }
 }
 
+class _PendingPropertyAttachment extends StatelessWidget {
+  const _PendingPropertyAttachment({
+    required this.property,
+    required this.onRemove,
+  });
+
+  final LuxProperty property;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: .45),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: .3),
+        ),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: SizedBox(
+              width: 54,
+              height: 54,
+              child: property.coverUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: property.coverUrl,
+                      fit: BoxFit.cover,
+                    )
+                  : const _CoverFallback(),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'مرفق غير مرسل',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  property.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'إلغاء المرفق',
+            onPressed: onRemove,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TextMessage extends StatelessWidget {
   const _TextMessage({
     required this.body,
@@ -256,17 +349,11 @@ class _TextMessage extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   colors: [
                     theme.colorScheme.primary,
-                    Color.lerp(
-                      theme.colorScheme.primary,
-                      Colors.black,
-                      .12,
-                    )!,
+                    Color.lerp(theme.colorScheme.primary, Colors.black, .12)!,
                   ],
                 )
               : null,
-          color: isMine
-              ? null
-              : theme.colorScheme.surfaceContainerHigh,
+          color: isMine ? null : theme.colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadiusDirectional.only(
             topStart: const Radius.circular(18),
             topEnd: const Radius.circular(18),
@@ -313,7 +400,9 @@ class _TextMessage extends StatelessWidget {
                 if (isMine) ...[
                   const SizedBox(width: 4),
                   Icon(
-                    readAt == null ? Icons.done_rounded : Icons.done_all_rounded,
+                    readAt == null
+                        ? Icons.done_rounded
+                        : Icons.done_all_rounded,
                     size: 15,
                     color: readAt == null
                         ? theme.colorScheme.onPrimary.withValues(alpha: .75)
@@ -338,10 +427,10 @@ class _PropertyCardMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final locationLabel = [property.district, property.city]
-        .whereType<String>()
-        .where((s) => s.isNotEmpty)
-        .join('، ');
+    final locationLabel = [
+      property.district,
+      property.city,
+    ].whereType<String>().where((s) => s.isNotEmpty).join('، ');
     final isSale = property.transactionType != 'rent';
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
@@ -380,7 +469,8 @@ class _PropertyCardMessage extends StatelessWidget {
                   SizedBox(
                     height: 140,
                     width: double.infinity,
-                    child: property.coverUrl != null &&
+                    child:
+                        property.coverUrl != null &&
                             property.coverUrl!.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: property.coverUrl!,
@@ -404,10 +494,11 @@ class _PropertyCardMessage extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: (isSale
-                                ? WajhatakColors.emerald
-                                : WajhatakColors.sky)
-                            .withValues(alpha: .94),
+                        color:
+                            (isSale
+                                    ? WajhatakColors.emerald
+                                    : WajhatakColors.sky)
+                                .withValues(alpha: .94),
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: Text(
