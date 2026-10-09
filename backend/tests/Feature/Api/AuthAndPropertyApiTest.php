@@ -11,7 +11,10 @@ use App\Models\PropertyType;
 use App\Models\User;
 use App\Models\ViewingRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -321,6 +324,58 @@ class AuthAndPropertyApiTest extends TestCase
         $this->getJson('/api/v1/properties?page=0')
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['page']);
+    }
+
+    public function test_search_uses_composite_location_index_and_keeps_query_count_bounded(): void
+    {
+        $city = 'perf-'.strtolower(uniqid());
+        for ($i = 0; $i < 16; $i++) {
+            $this->createProperty(
+                PropertyStatus::Published,
+                ['price' => 100000 + ($i * 1000)],
+                ['city' => $city, 'district' => 'حي-الاختبار', 'neighborhood' => 'الحي-الفرعي'],
+            );
+        }
+
+        $locationIndexNames = collect(Schema::getIndexes('property_locations'))
+            ->pluck('name')
+            ->all();
+        $this->assertContains('property_locations_city_district_search_idx', $locationIndexNames);
+
+        $selects = [];
+        DB::listen(static function (QueryExecuted $event) use (&$selects): void {
+            if (str_starts_with(strtolower(ltrim($event->sql)), 'select')) {
+                $selects[] = $event->sql;
+            }
+        });
+
+        $this->getJson('/api/v1/properties?'.http_build_query([
+            'city' => $city,
+            'district' => 'حي-الاختبار',
+            'neighborhood' => 'الحي-الفرعي',
+            'per_page' => 1,
+        ]))->assertOk()->assertJsonCount(1, 'data');
+        $singleItemQueryCount = count($selects);
+
+        $selects = [];
+        $this->getJson('/api/v1/properties?'.http_build_query([
+            'city' => $city,
+            'district' => 'حي-الاختبار',
+            'neighborhood' => 'الحي-الفرعي',
+            'per_page' => 15,
+        ]))->assertOk()->assertJsonCount(15, 'data');
+        $multipleItemQueryCount = count($selects);
+
+        $this->assertGreaterThan(0, $singleItemQueryCount, 'The query listener should capture SQL selects.');
+        $this->assertLessThanOrEqual(
+            $singleItemQueryCount + 2,
+            $multipleItemQueryCount,
+            sprintf(
+                'Eager-loaded search query count should remain nearly constant (1 item: %d; 15 items: %d).',
+                $singleItemQueryCount,
+                $multipleItemQueryCount,
+            ),
+        );
     }
 
     private function createProperty(

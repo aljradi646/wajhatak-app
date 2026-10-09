@@ -208,9 +208,17 @@ class PropertyController extends Controller
         $query->when($request->filled('q'), fn (Builder $q) => $q->where(fn (Builder $search) => $search
             ->where('title', 'like', '%'.$request->string('q')->toString().'%')
             ->orWhere('description', 'like', '%'.$request->string('q')->toString().'%')))
-            ->when($request->filled('city'), fn (Builder $q) => $q->whereHas('location', fn (Builder $location) => $location->where('city', $request->string('city')->toString())))
-            ->when($request->filled('district'), fn (Builder $q) => $q->whereHas('location', fn (Builder $location) => $location->where('district', $request->string('district')->toString())))
-            ->when($request->filled('neighborhood'), fn (Builder $q) => $q->whereHas('location', fn (Builder $location) => $location->where('neighborhood', $request->string('neighborhood')->toString())))
+            // Combine related location predicates into one EXISTS so MySQL can use
+            // the composite (city, district) index for the common location search.
+            ->when(
+                $request->filled('city') || $request->filled('district') || $request->filled('neighborhood'),
+                fn (Builder $q) => $q->whereHas('location', function (Builder $location) use ($request) {
+                    $location
+                        ->when($request->filled('city'), fn (Builder $q) => $q->where('city', $request->string('city')->toString()))
+                        ->when($request->filled('district'), fn (Builder $q) => $q->where('district', $request->string('district')->toString()))
+                        ->when($request->filled('neighborhood'), fn (Builder $q) => $q->where('neighborhood', $request->string('neighborhood')->toString()));
+                }),
+            )
             ->when($request->filled('property_type'), fn (Builder $q) => $q->whereHas('type', fn (Builder $type) => $type->where('slug', $request->string('property_type')->toString())))
             ->when($request->filled('transaction_type'), fn (Builder $q) => $q->where('transaction_type', $request->string('transaction_type')->toString()))
             ->when($request->filled('min_price'), fn (Builder $q) => $q->where('price', '>=', $request->float('min_price')))
