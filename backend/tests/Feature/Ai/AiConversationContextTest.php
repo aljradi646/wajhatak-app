@@ -107,4 +107,45 @@ class AiConversationContextTest extends TestCase
 
         $this->assertNull($conversation->fresh()->context_state['pending_action']??null);
     }
+
+    public function test_pruning_archives_expired_conversations_and_deletes_their_messages(): void
+    {
+        $user = User::factory()->create();
+        $expired = AiConversation::query()->create([
+            'user_id' => $user->id,
+            'locale' => 'ar',
+            'status' => 'active',
+            'title' => 'بحث قديم',
+            'last_message_at' => now()->subDays(45),
+            'context_state' => ['active_search' => ['city' => 'صنعاء']],
+        ]);
+        $expired->messages()->create([
+            'role' => 'user',
+            'content' => 'أريد شقة قديمة',
+            'status' => 'ok',
+        ]);
+
+        $recent = AiConversation::query()->create([
+            'user_id' => $user->id,
+            'locale' => 'ar',
+            'status' => 'active',
+            'title' => 'بحث حديث',
+            'last_message_at' => now()->subDay(),
+            'context_state' => ['active_search' => ['city' => 'عدن']],
+        ]);
+        $recent->messages()->create([
+            'role' => 'user',
+            'content' => 'أريد شقة حديثة',
+            'status' => 'ok',
+        ]);
+
+        $pruned = app(\App\Services\AI\AiConversationService::class)->pruneExpired();
+
+        $this->assertSame(1, $pruned);
+        $this->assertSame('archived', $expired->fresh()->status);
+        $this->assertNull($expired->fresh()->context_state);
+        $this->assertSame(0, $expired->messages()->count());
+        $this->assertSame('active', $recent->fresh()->status);
+        $this->assertSame(1, $recent->messages()->count());
+    }
 }
