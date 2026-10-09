@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -27,6 +28,7 @@ class PropertyDetailScreen extends ConsumerWidget {
     return Scaffold(
       body: LuxAsyncView<LuxProperty>(
         value: property,
+        loading: const PropertyDetailsSkeleton(),
         errorRetry: () => ref.invalidate(propertyDetailProvider(propertyId)),
         data: (item) {
           final isFav = overrides[item.id] ?? item.isFavorited;
@@ -43,6 +45,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                 pinned: true,
                 backgroundColor: WajhatakColors.emeraldDeep,
                 foregroundColor: Colors.white,
+                systemOverlayStyle: SystemUiOverlayStyle.light,
                 leading: Padding(
                   padding: const EdgeInsets.only(right: 10, top: 4),
                   child: GlassIconButton(
@@ -218,6 +221,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                       ref,
                       item.id,
                       agentId: item.agent?.id,
+                      pendingProperty: item,
                     ),
                     icon: const Icon(Icons.chat_bubble_rounded, size: 19),
                     label: const Text('مراسلة الوكيل'),

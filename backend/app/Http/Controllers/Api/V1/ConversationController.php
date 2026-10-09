@@ -50,7 +50,7 @@ class ConversationController extends Controller
                 'client_id' => $request->user()->id,
                 'agent_id' => $agentUserId,
                 'property_id' => $property->id,
-                'last_message_at' => now(),
+                'last_message_at' => null,
             ]);
             $isNew = true;
         } catch (UniqueConstraintViolationException) {
@@ -60,17 +60,6 @@ class ConversationController extends Controller
                 ->where('agent_id', $agentUserId)
                 ->firstOrFail();
             $isNew = false;
-        }
-
-        if ($isNew) {
-            // WhatsApp-style contextual property card as the first message.
-            $conversation->messages()->create([
-                'sender_id' => $request->user()->id,
-                'body' => '',
-                'message_type' => 'property',
-                'property_id' => $property->id,
-            ]);
-            $conversation->update(['last_message_at' => now()]);
         }
 
         return response()->json(['data' => new ConversationResource($conversation->load(['property', 'client', 'agent']))], 201);

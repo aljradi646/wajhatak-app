@@ -11,7 +11,10 @@ use App\Models\PropertyType;
 use App\Models\User;
 use App\Models\ViewingRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -169,13 +172,229 @@ class AuthAndPropertyApiTest extends TestCase
         $this->assertDatabaseHas('user_devices', ['user_id' => $user->id, 'platform' => 'android']);
     }
 
-    private function createProperty(PropertyStatus $status): Property
+    public function test_property_filters_support_ranges_and_explicit_false_values(): void
+    {
+        $matching = $this->createProperty(
+            PropertyStatus::Published,
+            [
+                'area' => 120,
+                'bedrooms' => 3,
+                'bathrooms' => 2,
+                'parking_spaces' => 1,
+                'is_furnished' => false,
+                'is_new' => false,
+                'is_featured' => false,
+            ],
+            ['city' => 'صنعاء', 'district' => 'حدة', 'neighborhood' => 'السنينة'],
+        );
+        $this->createProperty(
+            PropertyStatus::Published,
+            [
+                'area' => 220,
+                'bedrooms' => 4,
+                'bathrooms' => 3,
+                'parking_spaces' => 2,
+                'is_furnished' => true,
+                'is_new' => true,
+                'is_featured' => true,
+            ],
+            ['city' => 'صنعاء', 'district' => 'حدة', 'neighborhood' => 'السنينة'],
+        );
+
+        $response = $this->getJson('/api/v1/properties?'.http_build_query([
+            'city' => 'صنعاء',
+            'district' => 'حدة',
+            'neighborhood' => 'السنينة',
+            'min_area' => 100,
+            'max_area' => 150,
+            'bedrooms_min' => 2,
+            'bedrooms_max' => 3,
+            'bathrooms_min' => 1,
+            'bathrooms_max' => 2,
+            'parking_spaces_min' => 1,
+            'parking_spaces_max' => 1,
+            'is_furnished' => 0,
+            'is_new' => 0,
+            'is_featured' => 0,
+        ]));
+
+        $response->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $matching->id);
+    }
+
+    public function test_property_search_rejects_inverted_numeric_ranges(): void
+    {
+        $this->getJson('/api/v1/properties?min_area=150&max_area=90')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['max_area']);
+    }
+
+    public function test_property_sort_options_order_price_area_and_publication_date(): void
+    {
+        $city = 'فرز-اختبار-'.strtolower(uniqid());
+        $a = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 300000, 'area' => 75, 'published_at' => now()->subDays(3)],
+            ['city' => $city],
+        );
+        $b = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 100000, 'area' => 180, 'published_at' => now()->subDay()],
+            ['city' => $city],
+        );
+        $c = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 200000, 'area' => 120, 'published_at' => now()->subDays(10)],
+            ['city' => $city],
+        );
+
+        $idsFor = fn (string $sort) => array_column(
+            $this->getJson('/api/v1/properties?'.http_build_query([
+                'city' => $city,
+                'sort' => $sort,
+            ]))->assertOk()->json('data'),
+            'id',
+        );
+
+        $this->assertSame([$b->id, $c->id, $a->id], $idsFor('price_asc'));
+        $this->assertSame([$a->id, $c->id, $b->id], $idsFor('price_desc'));
+        $this->assertSame([$a->id, $c->id, $b->id], $idsFor('area_asc'));
+        $this->assertSame([$b->id, $a->id, $c->id], $idsFor('newest'));
+        $this->assertSame([$c->id, $a->id, $b->id], $idsFor('oldest'));
+    }
+
+    public function test_property_search_keeps_combined_filters_across_pages_and_validates_page_size(): void
+    {
+        $city = 'pagination-'.strtolower(uniqid());
+        $first = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 100000, 'area' => 80],
+            ['city' => $city, 'district' => 'حدة'],
+        );
+        $second = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 150000, 'area' => 100],
+            ['city' => $city, 'district' => 'حدة'],
+        );
+        $third = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 200000, 'area' => 120],
+            ['city' => $city, 'district' => 'حدة'],
+        );
+        $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 125000, 'area' => 90],
+            ['city' => $city, 'district' => 'حي مختلف'],
+        );
+
+        $parameters = [
+            'city' => $city,
+            'district' => 'حدة',
+            'min_price' => 90000,
+            'max_price' => 210000,
+            'min_area' => 70,
+            'max_area' => 130,
+            'sort' => 'price_asc',
+            'per_page' => 1,
+        ];
+
+        $pageOne = $this->getJson('/api/v1/properties?'.http_build_query($parameters + ['page' => 1]));
+        $pageOne->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $first->id)
+            ->assertJsonPath('meta.current_page', 1)
+            ->assertJsonPath('meta.per_page', 1)
+            ->assertJsonPath('meta.total', 3)
+            ->assertJsonPath('meta.last_page', 3);
+
+        $pageTwo = $this->getJson('/api/v1/properties?'.http_build_query($parameters + ['page' => 2]));
+        $pageTwo->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $second->id)
+            ->assertJsonPath('meta.current_page', 2);
+
+        $pageThree = $this->getJson('/api/v1/properties?'.http_build_query($parameters + ['page' => 3]));
+        $pageThree->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $third->id)
+            ->assertJsonPath('meta.current_page', 3);
+
+        $this->getJson('/api/v1/properties?per_page=51')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['per_page']);
+        $this->getJson('/api/v1/properties?page=0')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['page']);
+    }
+
+    public function test_search_uses_composite_location_index_and_keeps_query_count_bounded(): void
+    {
+        $city = 'perf-'.strtolower(uniqid());
+        for ($i = 0; $i < 16; $i++) {
+            $this->createProperty(
+                PropertyStatus::Published,
+                ['price' => 100000 + ($i * 1000)],
+                ['city' => $city, 'district' => 'حي-الاختبار', 'neighborhood' => 'الحي-الفرعي'],
+            );
+        }
+
+        $locationIndexNames = collect(Schema::getIndexes('property_locations'))
+            ->pluck('name')
+            ->all();
+        $this->assertContains('property_locations_city_district_search_idx', $locationIndexNames);
+
+        $selects = [];
+        DB::listen(static function (QueryExecuted $event) use (&$selects): void {
+            if (str_starts_with(strtolower(ltrim($event->sql)), 'select')) {
+                $selects[] = $event->sql;
+            }
+        });
+
+        $this->getJson('/api/v1/properties?'.http_build_query([
+            'city' => $city,
+            'district' => 'حي-الاختبار',
+            'neighborhood' => 'الحي-الفرعي',
+            'per_page' => 1,
+        ]))->assertOk()->assertJsonCount(1, 'data');
+        $singleItemQueryCount = count($selects);
+
+        $selects = [];
+        $this->getJson('/api/v1/properties?'.http_build_query([
+            'city' => $city,
+            'district' => 'حي-الاختبار',
+            'neighborhood' => 'الحي-الفرعي',
+            'per_page' => 15,
+        ]))->assertOk()->assertJsonCount(15, 'data');
+        $multipleItemQueryCount = count($selects);
+
+        $this->assertGreaterThan(0, $singleItemQueryCount, 'The query listener should capture SQL selects.');
+        $this->assertLessThanOrEqual(
+            $singleItemQueryCount + 2,
+            $multipleItemQueryCount,
+            sprintf(
+                'Eager-loaded search query count should remain nearly constant (1 item: %d; 15 items: %d).',
+                $singleItemQueryCount,
+                $multipleItemQueryCount,
+            ),
+        );
+    }
+
+    private function createProperty(
+        PropertyStatus $status,
+        array $attributes = [],
+        array $locationAttributes = [],
+    ): Property
     {
         $agentUser = User::factory()->create();
         $agentUser->assignRole('agent');
         $agent = Agent::query()->create(['user_id' => $agentUser->id, 'is_active' => true]);
         $type = PropertyType::query()->firstOrCreate(['slug' => 'apartment'], ['name_ar' => 'شقة', 'name_en' => 'Apartment', 'is_active' => true]);
-        $location = PropertyLocation::query()->create(['city' => 'الرياض', 'address' => 'حي العليا', 'latitude' => 24.7136, 'longitude' => 46.6753]);
+        $location = PropertyLocation::query()->create([
+            'city' => 'الرياض',
+            'address' => 'حي العليا',
+            'latitude' => 24.7136,
+            'longitude' => 46.6753,
+            ...$locationAttributes,
+        ]);
 
         return Property::query()->create([
             'agent_id' => $agent->id,
@@ -190,6 +409,7 @@ class AuthAndPropertyApiTest extends TestCase
             'price' => 850000,
             'currency' => 'SAR',
             'published_at' => $status === PropertyStatus::Published ? now() : null,
+            ...$attributes,
         ]);
     }
 }

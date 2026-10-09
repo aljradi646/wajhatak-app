@@ -47,27 +47,48 @@ class AiAssistantController extends Controller
             ], 429);
         }
 
-        $sessionToken = (string) $request->input('session_token', '');
+        $sessionToken = trim((string) $request->input('session_token', ''));
         $conversation = null;
+
         if ($id = $request->integer('conversation_id')) {
             $conversation = AiConversation::query()->find($id);
-            if ($conversation) {
-                // حماية الملكية: محادثة المستخدم أو محادثة زائر بمفتاحه الصحيح فقط.
-                if ($user && $conversation->user_id !== null && $conversation->user_id !== $user->id) {
-                    return response()->json(['message' => 'غير مصرح للوصول لهذه المحادثة.'], 403);
+
+            // نفس الرد للمحادثة غير الموجودة أو التي لا يملكها صاحب الطلب؛ لا
+            // نعيد محاولة فتح محادثة أخرى عند تقديم معرّف صريح غير مخوّل.
+            if (! $conversation) {
+                return response()->json(['message' => 'المحادثة غير متاحة.'], 404);
+            }
+
+            if ($user !== null) {
+                if ((int) $conversation->user_id !== (int) $user->id) {
+                    return response()->json(['message' => 'المحادثة غير متاحة.'], 404);
                 }
-                if ($conversation->user_id === null
-                    && ($user !== null || $sessionToken === '' || ! hash_equals((string) $conversation->session_token, $sessionToken))) {
-                    $conversation = null; // تُنشأ محادثة جديدة بدل كشف محادثات الغير.
+            } else {
+                $storedToken = (string) ($conversation->session_token ?? '');
+
+                // مفاتيح جلسات الزوار يصدرها الخادم فقط (32 بايت عشوائية بصيغة hex).
+                // لا نقبل رموزًا قديمة قصيرة أو رموزًا يختارها العميل.
+                if ($conversation->user_id !== null
+                    || ! $this->isValidGuestSessionToken($sessionToken)
+                    || $storedToken === ''
+                    || ! hash_equals($storedToken, $sessionToken)) {
+                    return response()->json(['message' => 'المحادثة غير متاحة.'], 404);
                 }
             }
         }
 
         if ($conversation === null) {
-            // فشل فتح المحادثة (جدول ناقص/قاعدة مشغولة) لا يجب أن يمنع الرد:
-            // نُكمل بلا محادثة محفوظة ويجيب المساعد من العقارات الحقيقية.
+            // رمز الجلسة مُعرّف بحث فقط؛ لا يصبح سرّ ملكية جديدًا يختاره العميل.
+            // عند غيابه/عدم صلاحيته يصدر AiConversationService رمزًا قويًا من الخادم.
             try {
-                $conversation = $this->conversations->currentFor($user, (string) $request->input('locale', 'ar'), $sessionToken ?: null);
+                $guestSessionToken = $user === null && $this->isValidGuestSessionToken($sessionToken)
+                    ? $sessionToken
+                    : null;
+                $conversation = $this->conversations->currentFor(
+                    $user,
+                    (string) $request->input('locale', 'ar'),
+                    $guestSessionToken,
+                );
             } catch (Throwable $e) {
                 report($e);
                 $conversation = null;
@@ -317,6 +338,11 @@ class AiAssistantController extends Controller
     }
 
     // ------------------------------------------------------------------
+
+    private function isValidGuestSessionToken(string $token): bool
+    {
+        return preg_match('/^[a-f0-9]{64}$/iD', $token) === 1;
+    }
 
     private function available(): bool
     {

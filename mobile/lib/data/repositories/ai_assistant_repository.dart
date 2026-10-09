@@ -41,7 +41,8 @@ class AiAssistantRepository {
     final payload = <String, dynamic>{
       'message': message,
       'conversation_id': ?conversationId,
-      if (conversationId == null) 'session_token': await _sessionToken(),
+      // يُرسل رمز الجلسة مع كل رسالة للزائر، حتى عند وجود معرّف المحادثة.
+      'session_token': await _sessionToken(),
       'locale': 'ar',
       if (latitude != null && longitude != null) ...{
         'latitude': latitude,
@@ -94,7 +95,8 @@ class AiAssistantRepository {
     final payload = <String, dynamic>{
       'message': message,
       'conversation_id': ?conversationId,
-      if (conversationId == null) 'session_token': await _sessionToken(),
+      // يُرسل رمز الجلسة مع كل رسالة للزائر، حتى عند وجود معرّف المحادثة.
+      'session_token': await _sessionToken(),
       'locale': 'ar',
       if (latitude != null && longitude != null) ...{
         'latitude': latitude,

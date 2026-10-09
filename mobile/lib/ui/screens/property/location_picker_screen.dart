@@ -57,7 +57,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _mapController.move(_center, 16);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message), duration: const Duration(seconds: 3)),
+        SnackBar(
+          content: Text(result.message),
+          duration: const Duration(seconds: 3),
+        ),
       );
     }
   }
@@ -86,12 +89,18 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate:
+                    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                userAgentPackageName: 'com.wajhatak.app',
+              ),
+              TileLayer(
+                urlTemplate:
+                    'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
                 userAgentPackageName: 'com.wajhatak.app',
               ),
               const RichAttributionWidget(
                 attributions: [
-                  TextSourceAttribution('© OpenStreetMap contributors'),
+                  TextSourceAttribution('© Esri, Maxar, Earthstar Geographics'),
                 ],
               ),
             ],
@@ -102,9 +111,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.location_on, size: 52, color: WajhatakColors.terracotta),
+                const Icon(
+                  Icons.location_on,
+                  size: 52,
+                  color: WajhatakColors.terracotta,
+                ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: .6),
                     borderRadius: BorderRadius.circular(12),
@@ -145,12 +161,18 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             child: SafeArea(
               child: FilledButton.icon(
                 onPressed: () => Navigator.of(context).pop(
-                  PickedLocation(latitude: _center.latitude, longitude: _center.longitude),
+                  PickedLocation(
+                    latitude: _center.latitude,
+                    longitude: _center.longitude,
+                  ),
                 ),
                 icon: const Icon(Icons.check_rounded),
                 label: const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('تأكيد موقع العقار', style: TextStyle(fontSize: 15)),
+                  child: Text(
+                    'تأكيد موقع العقار',
+                    style: TextStyle(fontSize: 15),
+                  ),
                 ),
               ),
             ),

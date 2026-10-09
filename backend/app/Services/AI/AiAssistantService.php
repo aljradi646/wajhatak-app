@@ -182,12 +182,24 @@ class AiAssistantService
         $started = $this->ms();
         $filters = collect($filters)->only([
             'transaction_type', 'property_type', 'city', 'district', 'neighborhood',
-            'bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'min_price', 'max_price',
-            'min_area', 'max_area', 'furnished', 'is_new', 'sort', 'q',
+            'bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'bathrooms_max',
+            'min_price', 'max_price', 'min_area', 'max_area', 'furnished',
+            'is_new', 'is_featured', 'sort', 'q', 'limit',
+            'latitude', 'longitude', 'radius_km',
         ])->filter(fn ($v) => $v !== null && $v !== '')->all();
 
+        $limit = isset($filters['limit']) ? (int) $filters['limit'] : null;
+        if (isset($filters['latitude'], $filters['longitude'])) {
+            $filters['nearby'] = [
+                'latitude' => (float) $filters['latitude'],
+                'longitude' => (float) $filters['longitude'],
+                'radius_km' => max(0.5, min(100, (float) ($filters['radius_km'] ?? 10))),
+            ];
+        }
+        unset($filters['latitude'], $filters['longitude'], $filters['radius_km']);
+
         try {
-            $results = $this->search->search($filters);
+            $results = $this->search->search($filters, $limit);
             $this->logging->record(null, $user?->id, 'search', $filters, null, count($results['items']), AiRequestStatus::Ok->value, $this->ms() - $started);
 
             return [

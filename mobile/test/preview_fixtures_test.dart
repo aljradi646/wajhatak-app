@@ -29,4 +29,22 @@ void main() {
       );
     },
   );
+
+  test('preview search applies price and area bounds and real sort options', () async {
+    final fixtures = await PreviewFixtureRepository.load();
+    final all = await fixtures.list();
+    expect(all, isNotEmpty);
+
+    final ascending = await fixtures.list(const PropertyQuery(sort: 'price_asc'));
+    final prices = ascending.map((item) => item.price).toList();
+    expect(prices, orderedEquals([...prices]..sort()));
+
+    final availableWithArea = all.where((item) => item.area != null).toList();
+    if (availableWithArea.isNotEmpty) {
+      final minArea = availableWithArea.map((item) => item.area!).reduce((a, b) => a < b ? a : b);
+      final maxArea = availableWithArea.map((item) => item.area!).reduce((a, b) => a > b ? a : b);
+      final bounded = await fixtures.list(PropertyQuery(minArea: minArea, maxArea: maxArea));
+      expect(bounded.every((item) => item.area != null && item.area! >= minArea && item.area! <= maxArea), isTrue);
+    }
+  });
 }

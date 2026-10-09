@@ -41,16 +41,14 @@ window.LuxTheme = (() => {
 
     function preferred() {
         try {
-            const server = window.__LUX_THEME_SERVER__;
-            if (['light', 'dark', 'system'].includes(server)) return server;
             try {
                 const cookie = document.cookie.split('; ').find(part => part.startsWith(storageKey + '='))?.split('=')[1];
                 if (['light', 'dark', 'system'].includes(cookie)) return cookie;
                 const stored = localStorage.getItem(storageKey);
-                return ['light', 'dark', 'system'].includes(stored) ? stored : 'system';
-            } catch {
-                return 'system';
-            }
+                if (['light', 'dark', 'system'].includes(stored)) return stored;
+            } catch {}
+            const server = window.__LUX_THEME_SERVER__;
+            return ['light', 'dark', 'system'].includes(server) ? server : 'system';
         } catch {
             return 'system';
         }

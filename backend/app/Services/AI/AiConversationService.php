@@ -25,9 +25,19 @@ class AiConversationService
         if ($user) {
             $query->where('user_id', $user->id);
         } else {
+            // لا نختار أي محادثة زائر عند غياب الرمز. الرموز المقبولة 64
+            // رقمًا سداسيًا عشوائيًا يصدره الخادم، وليست قيمًا يختارها العميل.
             $query->whereNull('user_id');
-            if ($sessionToken) {
-                $query->where('session_token', $sessionToken);
+            $validSessionToken = is_string($sessionToken)
+                && preg_match('/^[a-f0-9]{64}$/iD', $sessionToken) === 1
+                    ? $sessionToken
+                    : null;
+
+            if ($validSessionToken !== null) {
+                $query->where('session_token', $validSessionToken);
+            } else {
+                // لا يمكن لأي سجل قديم بلا رمز أو برمز ضعيف أن يطابق.
+                $query->whereRaw('1 = 0');
             }
         }
 
@@ -52,7 +62,8 @@ class AiConversationService
                 // زائر: محادثة مرتبطة بمفتاح جلسة عشوائي غير قابل للتخمين.
                 $conversation = AiConversation::query()->create([
                     'user_id' => null,
-                    'session_token' => $sessionToken ?: bin2hex(random_bytes(32)),
+                    // لا يُستخدم أي رمز أرسله العميل كرمز ملكية جديد.
+                    'session_token' => bin2hex(random_bytes(32)),
                     'locale' => $locale,
                 ]);
             }

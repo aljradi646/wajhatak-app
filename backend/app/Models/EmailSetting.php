@@ -129,15 +129,22 @@ class EmailSetting extends Model
      */
     public function getLogoUrlForEmail(): ?string
     {
-        if ($this->logo_url) {
-            return $this->logo_url;
+        $url = $this->logo_url;
+
+        if (! $url && $this->logo_path && Storage::disk('public')->exists($this->logo_path)) {
+            $url = Storage::disk('public')->url($this->logo_path);
         }
 
-        if ($this->logo_path && Storage::disk('public')->exists($this->logo_path)) {
-            return Storage::disk('public')->url($this->logo_path);
+        if (! $url) {
+            return null;
         }
 
-        return null;
+        // Email clients require a publicly reachable absolute URL.
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        return rtrim((string) config('app.url'), '/').'/'.ltrim($url, '/');
     }
 
     /**

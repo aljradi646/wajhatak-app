@@ -18,6 +18,9 @@ FROM composer:2 AS composer_stage
 
 WORKDIR /app
 
+# ar-php requires PHP's calendar extension during Composer dependency resolution.
+RUN docker-php-ext-install calendar
+
 # Only composer.json / lockfile here so dependency resolution is cached
 # independently from source. --no-scripts because Laravel needs the full app
 # (package:discover) which runs later in the runtime stage.
@@ -28,7 +31,6 @@ RUN composer install \
         --no-interaction \
         --no-progress \
         --prefer-dist \
-        --ignore-platform-reqs \
     && if [ -d vendor/laravel/pail ]; then rm -rf vendor/laravel/pail; fi
 
 # --- Stage 2: Frontend assets (Vite + Tailwind) ---------------------------
@@ -49,6 +51,9 @@ RUN npm run build
 
 # --- Stage 3: Final runtime image -----------------------------------------
 FROM php:8.4-fpm-alpine AS runtime
+
+# Production Laravel deployments use Railway MySQL; the entrypoint keeps this invariant.
+ENV DB_CONNECTION=mysql
 
 # PHP extensions required by Laravel + the Caddy web server (reverse proxy to
 # php-fpm, HTTPS by default via Railway's public domain).
@@ -73,6 +78,7 @@ RUN apk add --no-cache \
         intl \
         bcmath \
         exif \
+        calendar \
         pcntl \
         opcache \
         gd \
@@ -110,7 +116,7 @@ RUN chmod +x /usr/local/bin/entrypoint \
 
 RUN rm -rf vendor/laravel/pail 2>/dev/null || true \
     && composer dump-autoload --optimize --no-dev --no-interaction \
-    && php artisan package:discover --ansi || true
+    && php artisan package:discover --ansi
 
 # Production PHP configuration
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"

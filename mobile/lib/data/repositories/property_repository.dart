@@ -44,6 +44,21 @@ class PropertyRepository {
     return _propertyList(json);
   }
 
+  /// صفحة من نتائج الاستكشاف مع الاحتفاظ بكل معايير البحث والفرز.
+  Future<PropertyPageResult> searchPage(
+    PropertyQuery query, {
+    int page = 1,
+    int perPage = 15,
+  }) async {
+    final parameters = <String, dynamic>{
+      ...query.toParameters(),
+      'page': page,
+      'per_page': perPage,
+    };
+    final json = await _api.get('/properties', query: parameters);
+    return _parsePage(json);
+  }
+
   Future<LuxProperty> detail(int id) async {
     final json = await _api.get('/properties/$id');
     return LuxProperty.fromJson(json['data'] as Map<String, dynamic>);

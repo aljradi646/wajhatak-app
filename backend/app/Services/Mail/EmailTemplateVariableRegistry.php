@@ -20,6 +20,7 @@ final class EmailTemplateVariableRegistry
             'agent.phone' => ['type' => 'phone', 'description' => 'هاتف الوكيل', 'preview' => '+967700000000'],
             'app.url' => ['type' => 'url', 'description' => 'رابط المنصة', 'preview' => rtrim((string) config('app.url'), '/')],
             'app.logo_url' => ['type' => 'url', 'description' => 'رابط شعار المنصة للبريد', 'preview' => ''],
+            'logo' => ['type' => 'url', 'description' => 'اختصار قديم لرابط الشعار', 'preview' => ''],
             'app.name' => ['type' => 'string', 'description' => 'اسم المنصة', 'preview' => (string) config('app.name', 'وجهتك')],
             'name' => ['type' => 'string', 'description' => 'اسم المستخدم (صيغة قديمة)', 'preview' => 'أحمد محمد'],
             'email' => ['type' => 'email', 'description' => 'البريد الإلكتروني (صيغة قديمة)', 'preview' => 'ahmed@example.com'],

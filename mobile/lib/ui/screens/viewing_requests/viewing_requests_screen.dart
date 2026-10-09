@@ -40,6 +40,7 @@ class ViewingRequestsScreen extends ConsumerWidget {
         ref.watch(sessionProvider).asData?.value?.user.isAgent ?? false;
     final content = LuxAsyncView<List<ViewingRequestItem>>(
       value: requests,
+      loading: const ViewingRequestsSkeleton(),
       errorRetry: () => ref.invalidate(viewingRequestsProvider),
       data: (data) {
         if (data.isEmpty) {
@@ -104,7 +105,9 @@ class _ViewingRequestCardState extends ConsumerState<_ViewingRequestCard> {
     final item = widget.item;
     final picked = await showDatePicker(
       context: context,
-      initialDate: item.date.isBefore(DateTime.now()) ? DateTime.now() : item.date,
+      initialDate: item.date.isBefore(DateTime.now())
+          ? DateTime.now()
+          : item.date,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
       locale: const Locale('ar'),
@@ -313,7 +316,8 @@ class _ViewingRequestCardState extends ConsumerState<_ViewingRequestCard> {
                 spacing: 8,
                 runSpacing: 6,
                 children: [
-                  if (item.status == 'pending' || item.status == 'confirmed') ...[
+                  if (item.status == 'pending' ||
+                      item.status == 'confirmed') ...[
                     OutlinedButton.icon(
                       onPressed: _updatingStatus == null ? _reschedule : null,
                       icon: const Icon(Icons.edit_calendar_rounded, size: 18),

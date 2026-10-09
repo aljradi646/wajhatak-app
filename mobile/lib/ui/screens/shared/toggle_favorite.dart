@@ -35,7 +35,9 @@ Future<void> toggleFavorite(
           size: 40,
         ),
         title: const Text('إزالة من المفضلة'),
-        content: const Text('هل أنت متأكد من إزالة هذا العقار من قائمة المفضلة؟'),
+        content: const Text(
+          'هل أنت متأكد من إزالة هذا العقار من قائمة المفضلة؟',
+        ),
         actions: [
           Row(
             children: [
@@ -95,6 +97,7 @@ Future<void> startConversation(
   WidgetRef ref,
   int propertyId, {
   int? agentId,
+  LuxProperty? pendingProperty,
 }) async {
   if (ref.read(sessionProvider).asData?.value == null) {
     await Navigator.of(
@@ -111,7 +114,10 @@ Future<void> startConversation(
     if (context.mounted) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => ChatScreen(conversation: conversation),
+          builder: (_) => ChatScreen(
+            conversation: conversation,
+            pendingProperty: pendingProperty,
+          ),
         ),
       );
     }

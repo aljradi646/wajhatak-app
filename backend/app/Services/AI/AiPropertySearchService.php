@@ -83,15 +83,18 @@ class AiPropertySearchService
             ->when(! empty($filters['district']), fn (Builder $q) => $q->where(function (Builder $q) use ($filters) {
                 $q->where('district', $filters['district'])->orWhere('neighborhood', $filters['district']);
             }))
+            ->when(! empty($filters['neighborhood']), fn (Builder $q) => $q->where('neighborhood', $filters['neighborhood']))
             ->when(isset($filters['bedrooms_min']), fn (Builder $q) => $q->where('bedrooms', '>=', (int) $filters['bedrooms_min']))
             ->when(isset($filters['bedrooms_max']), fn (Builder $q) => $q->where('bedrooms', '<=', (int) $filters['bedrooms_max']))
             ->when(isset($filters['bathrooms_min']), fn (Builder $q) => $q->where('bathrooms', '>=', (int) $filters['bathrooms_min']))
+            ->when(isset($filters['bathrooms_max']), fn (Builder $q) => $q->where('bathrooms', '<=', (int) $filters['bathrooms_max']))
             ->when(isset($filters['min_price']), fn (Builder $q) => $q->where('price', '>=', (float) $filters['min_price']))
             ->when(isset($filters['max_price']), fn (Builder $q) => $q->where('price', '<=', (float) $filters['max_price']))
             ->when(isset($filters['min_area']), fn (Builder $q) => $q->where('area', '>=', (float) $filters['min_area']))
             ->when(isset($filters['max_area']), fn (Builder $q) => $q->where('area', '<=', (float) $filters['max_area']))
             ->when(array_key_exists('furnished', $filters) && $filters['furnished'] !== null, fn (Builder $q) => $q->where('is_furnished', (bool) $filters['furnished']))
-            ->when(! empty($filters['is_new']), fn (Builder $q) => $q->where('is_new', true));
+            ->when(array_key_exists('is_new', $filters) && $filters['is_new'] !== null, fn (Builder $q) => $q->where('is_new', (bool) $filters['is_new']))
+            ->when(array_key_exists('is_featured', $filters) && $filters['is_featured'] !== null, fn (Builder $q) => $q->where('is_featured', (bool) $filters['is_featured']));
 
         // --- بحث جغرافي حقيقي: «قريب مني» بإحداثيات العميل ---
         // يُحدد مربعًا محيطيًا (bounding box) حول الموقع ثم يحسب المسافة
@@ -415,7 +418,7 @@ class AiPropertySearchService
         }
 
         $location = $property->location;
-        foreach (['city', 'district'] as $field) {
+        foreach (['city', 'district', 'neighborhood'] as $field) {
             if (! empty($filters[$field])) {
                 $actual = $location?->{$field};
                 if ($field === 'district') {
@@ -429,13 +432,17 @@ class AiPropertySearchService
         if (isset($filters['bedrooms_min']) && ((int) ($property->bedrooms ?? -1) < (int) $filters['bedrooms_min'])) return false;
         if (isset($filters['bedrooms_max']) && ((int) ($property->bedrooms ?? PHP_INT_MAX) > (int) $filters['bedrooms_max'])) return false;
         if (isset($filters['bathrooms_min']) && ((int) ($property->bathrooms ?? -1) < (int) $filters['bathrooms_min'])) return false;
+        if (isset($filters['bathrooms_max']) && ((int) ($property->bathrooms ?? PHP_INT_MAX) > (int) $filters['bathrooms_max'])) return false;
         if (isset($filters['min_price']) && (float) ($property->price ?? 0) < (float) $filters['min_price']) return false;
         if (isset($filters['max_price']) && (float) ($property->price ?? INF) > (float) $filters['max_price']) return false;
         if (isset($filters['min_area']) && (float) ($property->area ?? 0) < (float) $filters['min_area']) return false;
         if (isset($filters['max_area']) && (float) ($property->area ?? INF) > (float) $filters['max_area']) return false;
         if (array_key_exists('furnished', $filters) && $filters['furnished'] !== null
             && (bool) $property->is_furnished !== (bool) $filters['furnished']) return false;
-        if (! empty($filters['is_new']) && ! (bool) $property->is_new) return false;
+        if (array_key_exists('is_new', $filters) && $filters['is_new'] !== null
+            && (bool) $property->is_new !== (bool) $filters['is_new']) return false;
+        if (array_key_exists('is_featured', $filters) && $filters['is_featured'] !== null
+            && (bool) $property->is_featured !== (bool) $filters['is_featured']) return false;
 
         return true;
     }
@@ -686,7 +693,7 @@ class AiPropertySearchService
         $checks = 0;
         $passed = 0;
 
-        foreach ([['transaction_type', 'transaction_type'], ['type_slug', 'type'], ['city', 'city'], ['district', 'district']] as [$column, $filterKey]) {
+        foreach ([['transaction_type', 'transaction_type'], ['type_slug', 'type'], ['city', 'city'], ['district', 'district'], ['neighborhood', 'neighborhood']] as [$column, $filterKey]) {
             if (! empty($filters[$filterKey])) {
                 $checks++;
                 $value = $filterKey === 'type' ? $this->typeSlug($filters[$filterKey]) : $filters[$filterKey];
@@ -703,6 +710,14 @@ class AiPropertySearchService
             $checks++;
             $passed += ($row->bedrooms !== null && $row->bedrooms <= (int) $filters['bedrooms_max']) ? 1 : 0;
         }
+        if (isset($filters['bathrooms_min'])) {
+            $checks++;
+            $passed += ($row->bathrooms !== null && $row->bathrooms >= (int) $filters['bathrooms_min']) ? 1 : 0;
+        }
+        if (isset($filters['bathrooms_max'])) {
+            $checks++;
+            $passed += ($row->bathrooms !== null && $row->bathrooms <= (int) $filters['bathrooms_max']) ? 1 : 0;
+        }
         if (isset($filters['max_price'])) {
             $checks++;
             $passed += ($row->price !== null && (float) $row->price <= (float) $filters['max_price']) ? 1 : 0;
@@ -711,9 +726,25 @@ class AiPropertySearchService
             $checks++;
             $passed += ($row->price !== null && (float) $row->price >= (float) $filters['min_price']) ? 1 : 0;
         }
+        if (isset($filters['min_area'])) {
+            $checks++;
+            $passed += ($row->area !== null && (float) $row->area >= (float) $filters['min_area']) ? 1 : 0;
+        }
+        if (isset($filters['max_area'])) {
+            $checks++;
+            $passed += ($row->area !== null && (float) $row->area <= (float) $filters['max_area']) ? 1 : 0;
+        }
         if (array_key_exists('furnished', $filters) && $filters['furnished'] !== null) {
             $checks++;
-            $passed += ($row->is_furnished === (bool) $filters['furnished']) ? 1 : 0;
+            $passed += ((bool) $row->is_furnished === (bool) $filters['furnished']) ? 1 : 0;
+        }
+        if (array_key_exists('is_new', $filters) && $filters['is_new'] !== null) {
+            $checks++;
+            $passed += ((bool) $row->is_new === (bool) $filters['is_new']) ? 1 : 0;
+        }
+        if (array_key_exists('is_featured', $filters) && $filters['is_featured'] !== null) {
+            $checks++;
+            $passed += ((bool) $row->is_featured === (bool) $filters['is_featured']) ? 1 : 0;
         }
 
         $score = $checks > 0 ? $passed / $checks : 0.5;

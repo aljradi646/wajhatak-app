@@ -98,16 +98,19 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('mail/templates', [MailSettingsController::class, 'updateTemplates'])->name('mail.templates');
     Route::post('mail/preview', [MailSettingsController::class, 'previewEmail'])->name('mail.preview');
 
-    // قوالب البريد الإلكتروني (HTML/CSS قابل للتخصيص)
-    Route::resource('email-templates', EmailTemplateController::class)->parameters(['email-templates' => 'emailTemplate']);
+    // قوالب البريد الإلكتروني — المسارات الثابتة يجب أن تسبق resource حتى لا يلتقطها show. 
+    Route::get('email-templates/{emailTemplate}/history', [EmailTemplateController::class, 'history'])->name('email-templates.history');
+    Route::get('email-templates/{emailTemplate}/editor-data', [EmailTemplateController::class, 'editorData'])->name('email-templates.editor-data');
+    Route::post('email-templates/preview-draft', [EmailTemplateController::class, 'previewDraft'])->name('email-templates.preview-draft');
+    Route::post('email-templates/assets', [EmailTemplateController::class, 'uploadAsset'])->name('email-templates.assets');
     Route::post('email-templates/{emailTemplate}/preview', [EmailTemplateController::class, 'preview'])->name('email-templates.preview');
     Route::post('email-templates/{emailTemplate}/autosave', [EmailTemplateController::class, 'autosave'])->name('email-templates.autosave');
     Route::post('email-templates/{emailTemplate}/publish', [EmailTemplateController::class, 'publish'])->name('email-templates.publish');
     Route::post('email-templates/{emailTemplate}/archive', [EmailTemplateController::class, 'archive'])->name('email-templates.archive');
     Route::post('email-templates/{emailTemplate}/test-email', [EmailTemplateController::class, 'sendTest'])->name('email-templates.test-email');
     Route::post('email-templates/{emailTemplate}/duplicate', [EmailTemplateController::class, 'duplicate'])->name('email-templates.duplicate');
-    Route::get('email-templates/{emailTemplate}/history', [EmailTemplateController::class, 'history'])->name('email-templates.history');
     Route::post('email-templates/{emailTemplate}/history/{version}/restore', [EmailTemplateController::class, 'restore'])->name('email-templates.restore');
+    Route::resource('email-templates', EmailTemplateController::class)->parameters(['email-templates' => 'emailTemplate']);
 
     // Settings
     Route::post('preferences/ui', [UserPreferenceController::class, 'updateUi'])->name('preferences.ui');

@@ -306,6 +306,11 @@ if [ "$SERVICE_TYPE" != "static" ]; then
     echo "==> [Wajhatak] Running migrations (idempotent — syncs new tables/columns with the live database)..."
     php artisan migrate --force || echo "    migrate reported an issue (non-fatal, continuing)."
 
+    # EmailTemplateSeeder is idempotent. Run it on every application boot so
+    # old production databases receive the five built-in email templates.
+    echo "==> [Wajhatak] Synchronizing production email templates..."
+    php artisan db:seed --class=EmailTemplateSeeder --force || echo "    EmailTemplateSeeder reported an issue (non-fatal, continuing)."
+
     SEEDED_FLAG=$(php artisan tinker --execute="echo \App\Models\Setting::get('system_initialized','0') === '1' ? 'SEEDED' : 'PENDING';" 2>/dev/null || true)
 
     case "$SEEDED_FLAG" in

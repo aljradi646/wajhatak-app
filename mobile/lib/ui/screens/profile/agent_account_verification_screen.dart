@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/media_permission_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/icon_badges.dart';
 import '../../../core/utils/notice.dart' as util;
 import '../../../data/api_client.dart';
-import '../../../data/repositories/account_verification_repository.dart' as verification;
+import '../../../data/repositories/account_verification_repository.dart'
+    as verification;
 import '../../../state/providers.dart';
 import '../../widgets.dart';
 
@@ -53,8 +55,16 @@ class _AgentAccountVerificationScreenState
   @override
   void dispose() {
     for (final controller in [
-      _agencyName, _jobTitle, _phone, _whatsapp, _city,
-      _nationalId, _experienceYears, _address, _bio, _licenseNumber,
+      _agencyName,
+      _jobTitle,
+      _phone,
+      _whatsapp,
+      _city,
+      _nationalId,
+      _experienceYears,
+      _address,
+      _bio,
+      _licenseNumber,
     ]) {
       controller.dispose();
     }
@@ -88,7 +98,18 @@ class _AgentAccountVerificationScreenState
   }
 
   Future<void> _pickImage(ImageSource source, String purpose) async {
-    final picked = await _picker.pickImage(source: source, imageQuality: 85, maxWidth: 1600);
+    if (source == ImageSource.gallery &&
+        !await MediaPermissionService.requestPhotoAccess()) {
+      if (mounted) {
+        util.notice(context, 'اسمح للتطبيق بالوصول إلى الصور لاختيار المستند.');
+      }
+      return;
+    }
+    final picked = await _picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
     if (picked == null || !mounted) return;
     setState(() {
       if (purpose == 'photo') _photo = File(picked.path);
@@ -101,7 +122,9 @@ class _AgentAccountVerificationScreenState
     if (!(_form.currentState?.validate() ?? false) || _saving) return;
     setState(() => _saving = true);
     try {
-      final updated = await ref.read(accountRepositoryProvider).saveAgentProfile(
+      final updated = await ref
+          .read(accountRepositoryProvider)
+          .saveAgentProfile(
             data: {
               'agency_name': _agencyName.text.trim(),
               'job_title': _jobTitle.text.trim(),
@@ -152,14 +175,17 @@ class _AgentAccountVerificationScreenState
                       tone: AccentTone.rose,
                       icon: Icons.cancel_rounded,
                       title: 'تم رفض التوثيق',
-                      body: _profile!.rejectionReason ?? 'راجع بياناتك وأعد الإرسال.',
+                      body:
+                          _profile!.rejectionReason ??
+                          'راجع بياناتك وأعد الإرسال.',
                     )
                   else if (_profile != null && _profile!.isPending)
                     _StatusBanner(
                       tone: AccentTone.amber,
                       icon: Icons.hourglass_top_rounded,
                       title: 'قيد مراجعة الإدارة',
-                      body: 'لا يمكنك نشر العقارات حتى يتم توثيق حسابك. أكمل بياناتك لزيادة فرصة القبول.',
+                      body:
+                          'لا يمكنك نشر العقارات حتى يتم توثيق حسابك. أكمل بياناتك لزيادة فرصة القبول.',
                     )
                   else if (_profile != null && _profile!.isApproved)
                     _StatusBanner(
@@ -172,21 +198,65 @@ class _AgentAccountVerificationScreenState
                   _Section(
                     title: 'بيانات المكتب العقاري',
                     children: [
-                      _Field(controller: _agencyName, label: 'اسم المكتب / الشركة *', icon: Icons.business_rounded, validator: true),
-                      _Field(controller: _jobTitle, label: 'المسمى الوظيفي * (مثال: مسوق عقاري)', icon: Icons.badge_rounded, validator: true),
-                      _Field(controller: _phone, label: 'رقم الجوال للتواصل *', icon: Icons.phone_rounded, keyboardType: TextInputType.phone, validator: true),
-                      _Field(controller: _whatsapp, label: 'رقم واتساب (اختياري)', icon: Icons.chat_rounded, keyboardType: TextInputType.phone),
-                      _Field(controller: _city, label: 'مدينة العمل الأساسية *', icon: Icons.location_city_rounded, validator: true),
-                      _Field(controller: _address, label: 'العنوان الوطني (اختياري)', icon: Icons.home_work_rounded),
-                      _Field(controller: _experienceYears, label: 'سنوات الخبرة', icon: Icons.work_history_rounded, keyboardType: TextInputType.number),
+                      _Field(
+                        controller: _agencyName,
+                        label: 'اسم المكتب / الشركة *',
+                        icon: Icons.business_rounded,
+                        validator: true,
+                      ),
+                      _Field(
+                        controller: _jobTitle,
+                        label: 'المسمى الوظيفي * (مثال: مسوق عقاري)',
+                        icon: Icons.badge_rounded,
+                        validator: true,
+                      ),
+                      _Field(
+                        controller: _phone,
+                        label: 'رقم الجوال للتواصل *',
+                        icon: Icons.phone_rounded,
+                        keyboardType: TextInputType.phone,
+                        validator: true,
+                      ),
+                      _Field(
+                        controller: _whatsapp,
+                        label: 'رقم واتساب (اختياري)',
+                        icon: Icons.chat_rounded,
+                        keyboardType: TextInputType.phone,
+                      ),
+                      _Field(
+                        controller: _city,
+                        label: 'مدينة العمل الأساسية *',
+                        icon: Icons.location_city_rounded,
+                        validator: true,
+                      ),
+                      _Field(
+                        controller: _address,
+                        label: 'العنوان الوطني (اختياري)',
+                        icon: Icons.home_work_rounded,
+                      ),
+                      _Field(
+                        controller: _experienceYears,
+                        label: 'سنوات الخبرة',
+                        icon: Icons.work_history_rounded,
+                        keyboardType: TextInputType.number,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   _Section(
                     title: 'التوثيق الرسمي',
                     children: [
-                      _Field(controller: _nationalId, label: 'الرقم الوطني / رقم الهوية *', icon: Icons.credit_card_rounded, validator: true),
-                      _Field(controller: _licenseNumber, label: 'رقم رخصة الوساطة (إن وُجد)', icon: Icons.policy_rounded),
+                      _Field(
+                        controller: _nationalId,
+                        label: 'الرقم الوطني / رقم الهوية *',
+                        icon: Icons.credit_card_rounded,
+                        validator: true,
+                      ),
+                      _Field(
+                        controller: _licenseNumber,
+                        label: 'رقم رخصة الوساطة (إن وُجد)',
+                        icon: Icons.policy_rounded,
+                      ),
                       _DocumentTile(
                         label: 'صورة الهوية / البطاقة',
                         icon: Icons.badge_rounded,
@@ -199,7 +269,8 @@ class _AgentAccountVerificationScreenState
                         icon: Icons.receipt_long_rounded,
                         file: _licenseDocument,
                         existingUrl: _profile?.licenseDocumentUrl,
-                        onPick: () => _pickImage(ImageSource.gallery, 'license'),
+                        onPick: () =>
+                            _pickImage(ImageSource.gallery, 'license'),
                       ),
                       _DocumentTile(
                         label: 'صورتك الشخصية (تظهر في ملفك)',
@@ -232,7 +303,10 @@ class _AgentAccountVerificationScreenState
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Icon(Icons.send_rounded, size: 20),
                     label: Padding(
@@ -282,7 +356,10 @@ class _StatusBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontWeight: FontWeight.w900, color: color)),
+                Text(
+                  title,
+                  style: TextStyle(fontWeight: FontWeight.w900, color: color),
+                ),
                 const SizedBox(height: 3),
                 Text(body, style: const TextStyle(fontSize: 12.5, height: 1.4)),
               ],
@@ -313,7 +390,12 @@ class _Section extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 14),
           ...children,
         ],
@@ -346,7 +428,8 @@ class _Field extends StatelessWidget {
         keyboardType: keyboardType,
         decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
         validator: validator
-            ? (value) => (value ?? '').trim().isNotEmpty ? null : 'هذا الحقل مطلوب.'
+            ? (value) =>
+                  (value ?? '').trim().isNotEmpty ? null : 'هذا الحقل مطلوب.'
             : null,
       ),
     );
@@ -380,19 +463,33 @@ class _DocumentTile extends StatelessWidget {
             : Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: hasNew ? WajhatakColors.emerald : Theme.of(context).colorScheme.outline,
+          color: hasNew
+              ? WajhatakColors.emerald
+              : Theme.of(context).colorScheme.outline,
         ),
       ),
       child: ListTile(
         leading: hasNew
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.file(file!, width: 40, height: 40, fit: BoxFit.cover),
+                child: Image.file(
+                  file!,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                ),
               )
             : Icon(icon, color: hasExisting ? WajhatakColors.emerald : null),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+        title: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+        ),
         subtitle: Text(
-          hasNew ? 'جاهزة للرفع ✓' : (hasExisting ? 'مرفوعة مسبقًا — اضغط للاستبدال' : 'لم تُرفع بعد'),
+          hasNew
+              ? 'جاهزة للرفع ✓'
+              : (hasExisting
+                    ? 'مرفوعة مسبقًا — اضغط للاستبدال'
+                    : 'لم تُرفع بعد'),
           style: const TextStyle(fontSize: 11.5),
         ),
         trailing: const Icon(Icons.attach_file_rounded, size: 20),

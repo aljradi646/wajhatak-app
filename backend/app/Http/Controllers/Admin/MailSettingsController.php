@@ -38,6 +38,8 @@ class MailSettingsController extends Controller
             'templateValues' => collect(array_keys(MailSettingsService::TEMPLATES))
                 ->mapWithKeys(fn ($key) => [$key => $this->mailSettings->template($key)])
                 ->all(),
+            'emailTemplates' => \App\Models\EmailTemplate::query()->orderByDesc('is_system')->orderBy('name')->get(),
+            'emailTemplateTypes' => \App\Http\Controllers\Admin\EmailTemplateController::templateTypes(),
         ]);
     }
 

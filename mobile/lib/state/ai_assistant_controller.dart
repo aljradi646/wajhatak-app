@@ -127,12 +127,16 @@ class AiConversationController extends Notifier<AiConversationState> {
       double? latitude;
       double? longitude;
       if (RegExp(
-        r'(قريب|بالقرب|حول[ي|ك]|بجانبي|موقعي|near|nearby)',
+        r'(قريب(?:ة)?|بالقرب|أقرب|الاقرب|الأقرب|حول(?:ي|ك)|بجانبي|بجواري|موقعي|near(?:by)?|closest|nearest)',
         caseSensitive: false,
       ).hasMatch(trimmed)) {
-        final location = await LocationService.silentPosition();
-        latitude = location.latitude;
-        longitude = location.longitude;
+        try {
+          final location = await LocationService.requestAndLocate();
+          latitude = location.latitude;
+          longitude = location.longitude;
+        } catch (_) {
+          // لا تمنع فشل خدمة الموقع إرسال رسالة المستخدم؛ سيطلب الخادم الموقع عند الحاجة.
+        }
       }
 
       final cancel = CancelToken();

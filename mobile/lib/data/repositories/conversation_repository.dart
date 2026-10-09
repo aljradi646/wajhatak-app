@@ -31,10 +31,19 @@ class ConversationRepository {
         .toList();
   }
 
-  Future<ChatMessage> sendMessage(int conversationId, String body) async {
+  Future<ChatMessage> sendMessage(
+    int conversationId,
+    String body, {
+    String messageType = 'text',
+    int? propertyId,
+  }) async {
     final json = await _api.post(
       '/conversations/$conversationId/messages',
-      data: {'body': body},
+      data: {
+        'body': body,
+        'message_type': messageType,
+        if (propertyId != null) 'property_id': propertyId,
+      },
     );
     return ChatMessage.fromJson(json['data'] as Map<String, dynamic>);
   }

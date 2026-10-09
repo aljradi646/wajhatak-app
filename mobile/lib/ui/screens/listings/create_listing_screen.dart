@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/media_permission_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/icon_badges.dart';
 import '../../../core/utils/notice.dart' as util;
@@ -88,6 +89,15 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   }
 
   Future<void> _pickImages() async {
+    if (!await MediaPermissionService.requestPhotoAccess()) {
+      if (mounted) {
+        util.notice(
+          context,
+          'اسمح للتطبيق بالوصول إلى الصور لإضافة صور العقار.',
+        );
+      }
+      return;
+    }
     final picked = await _picker.pickMultiImage(
       imageQuality: 82,
       maxWidth: 1920,
@@ -205,8 +215,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                     labelText: 'عنوان العقار',
                     prefixIcon: Icon(Icons.title_rounded),
                   ),
-                  validator: (value) =>
-                      (value ?? '').trim().length >= 5
+                  validator: (value) => (value ?? '').trim().length >= 5
                       ? null
                       : 'أدخل عنوانًا واضحًا للعقار.',
                 ),
@@ -222,7 +231,10 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                     ),
                     items: [
                       for (final item in data)
-                        DropdownMenuItem(value: item.id, child: Text(item.name)),
+                        DropdownMenuItem(
+                          value: item.id,
+                          child: Text(item.name),
+                        ),
                     ],
                     onChanged: (value) => setState(() => _typeId = value),
                     validator: (value) =>
@@ -270,8 +282,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                     alignLabelWithHint: true,
                     prefixIcon: Icon(Icons.description_rounded),
                   ),
-                  validator: (value) =>
-                      (value ?? '').trim().length >= 15
+                  validator: (value) => (value ?? '').trim().length >= 15
                       ? null
                       : 'اكتب وصفًا لا يقل عن 15 حرفًا.',
                 ),
@@ -450,63 +461,69 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                 ),
                 if (_country != null) ...[
                   const SizedBox(height: 12),
-                  ref.watch(regionsProvider(_country!.id)).when(
-                    data: (list) => _CascadeDropdown<LocationItem>(
-                      label: 'المحافظة / المنطقة',
-                      icon: Icons.map_rounded,
-                      items: list,
-                      value: _region,
-                      onChanged: (value) {
-                        setState(() {
-                          _region = value;
-                          _city = null;
-                          _areaLocation = null;
-                        });
-                      },
-                    ),
-                    loading: () => const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
-                      child: LuxSkeleton(height: 54),
-                    ),
-                    error: (_error, _stackTrace) => const SizedBox.shrink(),
-                  ),
+                  ref
+                      .watch(regionsProvider(_country!.id))
+                      .when(
+                        data: (list) => _CascadeDropdown<LocationItem>(
+                          label: 'المحافظة / المنطقة',
+                          icon: Icons.map_rounded,
+                          items: list,
+                          value: _region,
+                          onChanged: (value) {
+                            setState(() {
+                              _region = value;
+                              _city = null;
+                              _areaLocation = null;
+                            });
+                          },
+                        ),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: LuxSkeleton(height: 54),
+                        ),
+                        error: (_error, _stackTrace) => const SizedBox.shrink(),
+                      ),
                 ],
                 if (_region != null) ...[
                   const SizedBox(height: 12),
-                  ref.watch(citiesProvider(_region!.id)).when(
-                    data: (list) => _CascadeDropdown<LocationItem>(
-                      label: 'المدينة',
-                      icon: Icons.location_city_rounded,
-                      items: list,
-                      value: _city,
-                      onChanged: (value) {
-                        setState(() {
-                          _city = value;
-                          _areaLocation = null;
-                        });
-                      },
-                    ),
-                    loading: () => const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
-                      child: LuxSkeleton(height: 54),
-                    ),
-                    error: (_error, _stackTrace) => const SizedBox.shrink(),
-                  ),
+                  ref
+                      .watch(citiesProvider(_region!.id))
+                      .when(
+                        data: (list) => _CascadeDropdown<LocationItem>(
+                          label: 'المدينة',
+                          icon: Icons.location_city_rounded,
+                          items: list,
+                          value: _city,
+                          onChanged: (value) {
+                            setState(() {
+                              _city = value;
+                              _areaLocation = null;
+                            });
+                          },
+                        ),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: LuxSkeleton(height: 54),
+                        ),
+                        error: (_error, _stackTrace) => const SizedBox.shrink(),
+                      ),
                 ],
                 if (_city != null) ...[
                   const SizedBox(height: 12),
-                  ref.watch(areasProvider(_city!.id)).when(
-                    data: (list) => _CascadeDropdown<LocationItem>(
-                      label: 'الحي / المنطقة الفرعية',
-                      icon: Icons.signpost_rounded,
-                      items: list,
-                      value: _areaLocation,
-                      onChanged: (value) =>
-                          setState(() => _areaLocation = value),
-                    ),
-                    loading: () => const SizedBox.shrink(),
-                    error: (_error, _stackTrace) => const SizedBox.shrink(),
-                  ),
+                  ref
+                      .watch(areasProvider(_city!.id))
+                      .when(
+                        data: (list) => _CascadeDropdown<LocationItem>(
+                          label: 'الحي / المنطقة الفرعية',
+                          icon: Icons.signpost_rounded,
+                          items: list,
+                          value: _areaLocation,
+                          onChanged: (value) =>
+                              setState(() => _areaLocation = value),
+                        ),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_error, _stackTrace) => const SizedBox.shrink(),
+                      ),
                 ],
                 const SizedBox(height: 12),
                 TextFormField(
@@ -553,7 +570,10 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                       _pinLatitude != null
                           ? 'تم تحديد الموقع على الخريطة ✓'
                           : 'حدد موقع العقار على الخريطة',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
                     ),
                     subtitle: _pinLatitude != null
                         ? Text(
@@ -793,7 +813,9 @@ class _TransactionOption extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       decoration: BoxDecoration(
-        color: selected ? color.withValues(alpha: .12) : theme.colorScheme.surfaceContainerHigh,
+        color: selected
+            ? color.withValues(alpha: .12)
+            : theme.colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: selected ? color : theme.colorScheme.outline,
@@ -816,7 +838,9 @@ class _TransactionOption extends StatelessWidget {
                   label,
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                    color: selected ? color : theme.colorScheme.onSurfaceVariant,
+                    color: selected
+                        ? color
+                        : theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -910,9 +934,7 @@ class _CascadeDropdown<T extends Object> extends StatelessWidget {
           DropdownMenuItem(
             value: item,
             child: Text(
-              item is LocationItem
-                  ? item.name
-                  : item.toString(),
+              item is LocationItem ? item.name : item.toString(),
               overflow: TextOverflow.ellipsis,
             ),
           ),

@@ -6,6 +6,8 @@ use App\Models\EmailTemplate;
 use App\Models\EmailTemplateVersion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -26,6 +28,7 @@ class EmailTemplateStudioTest extends TestCase
             'key' => 'tests.template',
             'name' => 'قالب اختبار',
             'description' => 'اختبار',
+            'template_type' => 'custom',
             'subject' => 'مرحبًا {{user.name}}',
             'html_content' => '<p>{{user.name}}</p>',
             'text_content' => 'مرحبًا {{user.name}}',
@@ -132,4 +135,136 @@ class EmailTemplateStudioTest extends TestCase
         $this->assertSame('published', $fresh->status);
         $this->assertSame(2, $fresh->published_version);
     }
+    public function test_history_route_is_not_captured_by_resource_show_route(): void
+    {
+        $template = $this->template();
+
+        $response = $this->actingAs($this->admin())->get(
+            route('admin.email-templates.history', $template)
+        );
+
+        $response->assertOk();
+        $response->assertViewIs('admin.email-templates.history');
+    }
+
+
+    public function test_email_template_index_and_create_entry_render_the_real_editor(): void
+    {
+        $response = $this->actingAs($this->admin())->get(route('admin.email-templates.index', ['create' => 1]));
+
+        $response->assertOk()
+            ->assertSee('grapesjs-preset-newsletter', false)
+            ->assertSee('id="emailGjs"', false)
+            ->assertSee('محرر بصري للنشرات البريدية', false);
+    }
+
+    public function test_new_template_draft_preview_does_not_require_a_database_key(): void
+    {
+        $response = $this->actingAs($this->admin())->postJson(
+            route('admin.email-templates.preview-draft'),
+            [
+                'subject' => 'مرحبًا {{user.name}}',
+                'html_content' => '<table><tr><td>{{user.name}}</td></tr></table>',
+                'text_content' => 'مرحبًا {{user.name}}',
+                'css_styles' => ['td{padding:20px}'],
+                'variables' => ['user.name'],
+                'preview_variables' => ['user.name' => 'عبدالرحمن'],
+            ],
+        );
+
+        $response->assertOk()->assertJsonPath('unknown_variables', []);
+        $this->assertStringContainsString('عبدالرحمن', $response->json('html'));
+    }
+
+    public function test_editor_can_upload_an_image_to_the_email_asset_library(): void
+    {
+        Storage::fake('public');
+
+        $response = $this->actingAs($this->admin())->post(
+            route('admin.email-templates.assets'),
+            ['file' => UploadedFile::fake()->image('property-cover.jpg', 800, 600)],
+            ['Accept' => 'application/json'],
+        );
+
+        $response->assertCreated();
+        $path = basename(parse_url($response->json('data.0.src'), PHP_URL_PATH));
+        Storage::disk('public')->assertExists('email-assets/'.$path);
+    }
+
+
+    public function test_modal_editor_data_exposes_template_type_and_editor_payload(): void
+    {
+        $template = $this->template();
+
+        $response = $this->actingAs($this->admin())->getJson(
+            route('admin.email-templates.editor-data', $template)
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('data.id', $template->id)
+            ->assertJsonPath('data.template_type', 'custom')
+            ->assertJsonPath('data.html_content', '<p>{{user.name}}</p>');
+    }
+
+    public function test_modal_can_create_and_update_template_as_json(): void
+    {
+        $create = $this->actingAs($this->admin())->postJson(
+            route('admin.email-templates.store'),
+            [
+                'name' => 'قالب تسجيل الدخول',
+                'key' => 'auth.login.notice',
+                'template_type' => 'authentication',
+                'description' => 'إشعار تسجيل الدخول',
+                'subject' => 'تم تسجيل الدخول',
+                'html_content' => '<p>تم تسجيل الدخول إلى حسابك.</p>',
+                'text_content' => 'تم تسجيل الدخول إلى حسابك.',
+                'css_styles' => [],
+                'variables' => [],
+            ],
+        );
+
+        $create->assertCreated()->assertJsonPath('data.status', 'draft');
+        $template = EmailTemplate::where('key', 'auth.login.notice')->firstOrFail();
+        $this->assertSame('authentication', $template->template_type);
+
+        $update = $this->actingAs($this->admin())->patchJson(
+            route('admin.email-templates.update', $template),
+            [
+                'name' => 'إشعار تسجيل الدخول المحدث',
+                'template_type' => 'authentication',
+                'subject' => 'تسجيل دخول جديد',
+                'html_content' => '<p>تسجيل دخول جديد.</p>',
+                'text_content' => 'تسجيل دخول جديد.',
+                'css_styles' => [],
+                'variables' => [],
+            ],
+        );
+
+        $update->assertOk()->assertJsonPath('data.version', 2);
+        $this->assertSame('تسجيل دخول جديد', $template->fresh()->subject);
+    }
+
+    public function test_production_email_catalog_seeds_five_real_system_templates(): void
+    {
+        $this->seed(\Database\Seeders\EmailTemplateSeeder::class);
+
+        $this->assertSame(5, EmailTemplate::query()->where('is_system', true)->count());
+
+        foreach ([
+            'email_verification' => 'verification',
+            'agent_approved' => 'agent',
+            'agent_rejected' => 'agent',
+            'property_published' => 'property',
+            'property_rejected' => 'property',
+        ] as $key => $type) {
+            $this->assertDatabaseHas('email_templates', [
+                'key' => $key,
+                'template_type' => $type,
+                'status' => 'published',
+                'is_active' => 1,
+                'is_system' => 1,
+            ]);
+        }
+    }
+
 }

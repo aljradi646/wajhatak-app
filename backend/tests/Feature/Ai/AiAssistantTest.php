@@ -3,6 +3,7 @@
 namespace Tests\Feature\Ai;
 
 use App\Models\AiConversation;
+use App\Models\AiMessage;
 use App\Models\Property;
 use App\Models\PropertyLocation;
 use App\Models\PropertyType;
@@ -548,20 +549,30 @@ class AiAssistantTest extends TestCase
         $this->assertContains('جامعة', $filters['keywords'] ?? []);
     }
 
-    /** ع) حد أسئلة المتابعة: لا يتجاوز سؤالين متتاليين. */
+    /** ع) حد أسئلة المتابعة: لا يتجاوز سؤالين متتاليين داخل الجلسة نفسها. */
     public function test_follow_up_questions_are_capped(): void
     {
-        // ثلاث رسائل قصيرة متتابعة بلا معلومات كافية.
+        // حافظ على معرّف المحادثة ورمز الجلسة اللذين أصدرهما الخادم.
+        // الطلب بلا رمز جلسة يجب ألا يعيد استخدام محادثة زائر آخر.
+        $context = [];
         foreach (['أبحث عن عقار', 'ميزانيتي مرنة', 'اعرض لي كل شيء'] as $message) {
-            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+            $response = $this->postJson('/api/v1/ai/chat', [
+                'message' => $message,
+                ...$context,
+            ]);
             $response->assertOk();
+
+            $context = [
+                'conversation_id' => (int) $response->json('data.conversation_id'),
+                'session_token' => (string) $response->json('data.session_token'),
+            ];
         }
 
-        // رسائل المساعد الاستفهامية المتتالية في القاعدة ≤ 2.
-        $questions = \App\Models\AiMessage::query()
+        // رسائل المساعد الاستفهامية ضمن محادثة الاختبار ≤ 2.
+        $questions = AiMessage::query()
+            ->where('ai_conversation_id', $context['conversation_id'])
             ->where('role', 'assistant')
             ->where('content', 'like', '%؟%')
-            ->where('created_at', '>=', now()->subMinutes(5))
             ->count();
         $this->assertLessThanOrEqual(2, $questions);
     }
@@ -762,6 +773,166 @@ class AiAssistantTest extends TestCase
         $this->assertStringContainsString("event: start\n", $body);
         $this->assertStringContainsString("event: delta\n", $body);
         $this->assertStringContainsString("event: done\n", $body);
+    }
+
+
+
+    /** لا يستطيع مستخدم مصادق عليه استخدام محادثة يملكها مستخدم آخر. */
+    public function test_authenticated_user_cannot_access_another_users_ai_conversation(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $conversation = AiConversation::query()->create([
+            'user_id' => $owner->id,
+            'session_token' => null,
+            'locale' => 'ar',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($otherUser, 'sanctum')
+            ->postJson('/api/v1/ai/chat', [
+                'message' => 'السلام عليكم',
+                'conversation_id' => $conversation->id,
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('ai_messages', [
+            'ai_conversation_id' => $conversation->id,
+            'role' => 'user',
+        ]);
+    }
+
+    /** لا يستطيع الزائر إلحاق رسالة بمحادثة حساب مسجل. */
+    public function test_guest_cannot_access_an_authenticated_users_ai_conversation(): void
+    {
+        $owner = User::factory()->create();
+        $conversation = AiConversation::query()->create([
+            'user_id' => $owner->id,
+            'session_token' => null,
+            'locale' => 'ar',
+            'status' => 'active',
+        ]);
+
+        $this->postJson('/api/v1/ai/chat', [
+            'message' => 'السلام عليكم',
+            'conversation_id' => $conversation->id,
+        ])->assertNotFound();
+
+        $this->assertDatabaseMissing('ai_messages', [
+            'ai_conversation_id' => $conversation->id,
+            'role' => 'user',
+        ]);
+    }
+
+    /** رمز كل جلسة زائر سري ومحدد؛ لا يُعاد استخدام آخر محادثة بلا رمزها. */
+    public function test_guest_sessions_are_isolated_and_require_the_matching_session_token(): void
+    {
+        $first = $this->postJson('/api/v1/ai/chat', ['message' => 'السلام عليكم']);
+        $first->assertOk();
+
+        $firstId = (int) $first->json('data.conversation_id');
+        $firstToken = (string) $first->json('data.session_token');
+        $this->assertGreaterThan(0, $firstId);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/iD', $firstToken);
+
+        $second = $this->postJson('/api/v1/ai/chat', ['message' => 'السلام عليكم']);
+        $second->assertOk();
+        $secondId = (int) $second->json('data.conversation_id');
+        $secondToken = (string) $second->json('data.session_token');
+
+        $this->assertNotSame($firstId, $secondId);
+        $this->assertNotSame($firstToken, $secondToken);
+
+        $messagesBefore = AiMessage::query()
+            ->where('ai_conversation_id', $firstId)->count();
+        $wrongToken = str_repeat('a', 64);
+        if (hash_equals($firstToken, $wrongToken)) {
+            $wrongToken = str_repeat('b', 64);
+        }
+
+        $this->postJson('/api/v1/ai/chat', [
+            'message' => 'تابع',
+            'conversation_id' => $firstId,
+            'session_token' => $wrongToken,
+        ])->assertNotFound();
+
+        $this->assertSame($messagesBefore, AiMessage::query()
+            ->where('ai_conversation_id', $firstId)->count());
+
+        $valid = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'تابع',
+            'conversation_id' => $firstId,
+            'session_token' => $firstToken,
+        ]);
+        $valid->assertOk();
+        $this->assertSame($firstId, (int) $valid->json('data.conversation_id'));
+    }
+
+    /** رمز يختاره العميل لا يصبح سر ملكية؛ الرمز الحقيقي يصدره الخادم. */
+    public function test_server_issues_guest_session_token_instead_of_trusting_client_token(): void
+    {
+        $clientToken = str_repeat('a', 64);
+
+        $first = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'السلام عليكم',
+            'session_token' => $clientToken,
+        ]);
+        $first->assertOk();
+
+        $issuedToken = (string) $first->json('data.session_token');
+        $this->assertNotSame($clientToken, $issuedToken);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/iD', $issuedToken);
+
+        $followUp = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'تابع',
+            'session_token' => $issuedToken,
+        ]);
+        $followUp->assertOk();
+        $this->assertSame(
+            (int) $first->json('data.conversation_id'),
+            (int) $followUp->json('data.conversation_id'),
+        );
+    }
+
+    /** البحث المنظم يقبل الإحداثيات ونصف القطر والحد الأقصى للنتائج. */
+    public function test_structured_ai_search_supports_nearby_coordinates_radius_and_limit(): void
+    {
+        $property = Property::query()->where('status', 'published')->firstOrFail();
+        // اجعل المدينة فريدة في بيانات الاختبار حتى لا تتنافس عقارات أخرى مع
+        // الهدف عند طلب limit=1، مع الإبقاء على اختبار الإحداثيات الحقيقية.
+        $nearbyCity = 'مدينة-اختبار-قريبة-'.strtolower(uniqid());
+        $property->location->update([
+            'city' => $nearbyCity,
+            'latitude' => 15.369445,
+            'longitude' => 44.191006,
+        ]);
+        $property->update(['is_furnished' => false, 'title' => $property->title.' ']);
+
+        $response = $this->postJson('/api/v1/ai/search', [
+            'city' => $nearbyCity,
+            'latitude' => 15.369445,
+            'longitude' => 44.191006,
+            'radius_km' => 5,
+            'furnished' => false,
+            'limit' => 1,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.status', 'ok')
+            ->assertJsonPath('data.filters.nearby.latitude', 15.369445)
+            ->assertJsonPath('data.filters.nearby.longitude', 44.191006)
+            ->assertJsonPath('data.filters.nearby.radius_km', 5);
+
+        $ids = array_column($response->json('data.properties'), 'property_id');
+        $this->assertContains($property->id, $ids);
+        $this->assertLessThanOrEqual(1, count($ids));
+    }
+
+    public function test_structured_ai_search_requires_both_coordinates_for_nearby_filter(): void
+    {
+        $this->postJson('/api/v1/ai/search', ['latitude' => 15.369445])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['longitude']);
     }
 
 

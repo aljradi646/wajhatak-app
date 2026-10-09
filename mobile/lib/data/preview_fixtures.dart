@@ -38,17 +38,119 @@ class PreviewFixtureRepository {
     PropertyQuery query = const PropertyQuery(),
   ]) async {
     final normalizedSearch = query.search.trim().toLowerCase();
-    return properties
-        .where((property) {
-          final searchable =
-              '${property.title} ${property.location?.shortLabel ?? ''} ${property.typeName ?? ''}'
-                  .toLowerCase();
-          return (normalizedSearch.isEmpty ||
-                  searchable.contains(normalizedSearch)) &&
-              (query.transactionType == null ||
-                  property.transactionType == query.transactionType);
-        })
-        .toList(growable: false);
+    final matchingTypeIds = _list('property_types')
+        .where((item) => item['slug'] == query.propertyType)
+        .map((item) => int.tryParse('${item['id']}'))
+        .whereType<int>()
+        .toSet();
+
+    final result = properties.where((property) {
+      final location = property.location;
+      final searchable =
+          '${property.title} ${property.description ?? ''} ${location?.fullLabel ?? ''} ${property.typeName ?? ''}'
+              .toLowerCase();
+      final matchesSearch = normalizedSearch.isEmpty ||
+          searchable.contains(normalizedSearch);
+      final matchesType = query.propertyType == null ||
+          (property.typeId != null && matchingTypeIds.contains(property.typeId));
+      final matchesLocation =
+          (query.city == null || location?.city == query.city) &&
+          (query.district == null || location?.district == query.district) &&
+          (query.neighborhood == null ||
+              location?.neighborhood == query.neighborhood);
+      final matchesNumbers =
+          (query.minPrice == null || property.price >= query.minPrice!) &&
+          (query.maxPrice == null || property.price <= query.maxPrice!) &&
+          (query.minArea == null ||
+              (property.area != null && property.area! >= query.minArea!)) &&
+          (query.maxArea == null ||
+              (property.area != null && property.area! <= query.maxArea!)) &&
+          ((query.bedroomsMin ?? query.bedrooms) == null ||
+              (property.bedrooms != null &&
+                  property.bedrooms! >= (query.bedroomsMin ?? query.bedrooms)!)) &&
+          (query.bedroomsMax == null ||
+              (property.bedrooms != null &&
+                  property.bedrooms! <= query.bedroomsMax!)) &&
+          ((query.bathroomsMin ?? query.bathrooms) == null ||
+              (property.bathrooms != null &&
+                  property.bathrooms! >= (query.bathroomsMin ?? query.bathrooms)!)) &&
+          (query.bathroomsMax == null ||
+              (property.bathrooms != null &&
+                  property.bathrooms! <= query.bathroomsMax!)) &&
+          ((query.parkingSpacesMin ?? query.parkingSpaces) == null ||
+              (property.parkingSpaces != null &&
+                  property.parkingSpaces! >=
+                      (query.parkingSpacesMin ?? query.parkingSpaces)!)) &&
+          (query.parkingSpacesMax == null ||
+              (property.parkingSpaces != null &&
+                  property.parkingSpaces! <= query.parkingSpacesMax!));
+      return matchesSearch &&
+          (query.transactionType == null ||
+              property.transactionType == query.transactionType) &&
+          matchesType &&
+          matchesLocation &&
+          matchesNumbers &&
+          (query.isFurnished == null ||
+              property.isFurnished == query.isFurnished) &&
+          (query.isNew == null || property.isNew == query.isNew) &&
+          (query.isFeatured == null || property.isFeatured == query.isFeatured);
+    }).toList(growable: true);
+
+    result.sort((a, b) {
+      switch (query.sort) {
+        case 'price_asc':
+          return a.price.compareTo(b.price);
+        case 'price_desc':
+          return b.price.compareTo(a.price);
+        case 'area_asc':
+          return _compareNullableNumber(a.area, b.area, descending: false);
+        case 'area_desc':
+          return _compareNullableNumber(a.area, b.area, descending: true);
+        case 'newest':
+          return _compareNullableDateTime(
+            a.publishedAt,
+            b.publishedAt,
+            descending: true,
+          );
+        case 'oldest':
+          return _compareNullableDateTime(
+            a.publishedAt,
+            b.publishedAt,
+            descending: false,
+          );
+        default:
+          final featured = (b.isFeatured ? 1 : 0).compareTo(a.isFeatured ? 1 : 0);
+          if (featured != 0) return featured;
+          final date = _compareNullableDateTime(
+            a.publishedAt,
+            b.publishedAt,
+            descending: true,
+          );
+          return date != 0 ? date : b.id.compareTo(a.id);
+      }
+    });
+
+    return result;
+  }
+
+  int _compareNullableNumber(
+    double? a,
+    double? b, {
+    required bool descending,
+  }) {
+    if (a == null) return b == null ? 0 : 1;
+    if (b == null) return -1;
+    return descending ? b.compareTo(a) : a.compareTo(b);
+  }
+
+  int _compareNullableDateTime(
+    DateTime? a,
+    DateTime? b, {
+    required bool descending,
+  }) {
+    if (a == null) return b == null ? 0 : 1;
+    if (b == null) return -1;
+    return descending ? b.compareTo(a) : a.compareTo(b);
   }
 
   List<LuxProperty> get properties =>

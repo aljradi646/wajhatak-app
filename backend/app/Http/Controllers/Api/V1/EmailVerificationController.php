@@ -33,6 +33,8 @@ class EmailVerificationController extends Controller
             'ok' => $result['ok'],
             'message' => $result['message'],
             'resend_in' => $result['resend_in'],
+            'resend_available_at' => $result['resend_available_at'] ?? null,
+            'server_time' => $result['server_time'] ?? now()->toIso8601String(),
         ]], $result['ok'] ? 200 : 422);
     }
 
@@ -63,6 +65,8 @@ class EmailVerificationController extends Controller
         return response()->json(['data' => [
             'verified' => $user->email_verified_at !== null,
             'resend_in' => $this->verifier->resendIn($user),
+            'resend_available_at' => $this->verifier->resendAvailableAt($user),
+            'server_time' => now()->toIso8601String(),
         ]]);
     }
 }

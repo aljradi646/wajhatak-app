@@ -13,6 +13,8 @@ use App\Services\Mail\UnifiedMailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -22,13 +24,46 @@ class EmailTemplateController extends Controller
     {
         return view('admin.email-templates.index', [
             'templates' => EmailTemplate::query()->orderByDesc('is_system')->orderBy('name')->paginate(24)->withQueryString(),
+            'templateTypes' => self::templateTypes(),
             'variableRegistry' => EmailTemplateVariableRegistry::definitions(),
         ]);
     }
 
     public function create()
     {
-        return view('admin.email-templates.create', ['variables' => EmailTemplateVariableRegistry::definitions()]);
+        return redirect()->route('admin.email-templates.index', ['create' => 1]);
+    }
+
+    public function editorData(EmailTemplate $emailTemplate): JsonResponse
+    {
+        return response()->json(['data' => [
+            'id' => $emailTemplate->id,
+            'name' => $emailTemplate->name,
+            'key' => $emailTemplate->key,
+            'description' => $emailTemplate->description,
+            'template_type' => $emailTemplate->template_type ?: 'custom',
+            'subject' => $emailTemplate->subject,
+            'html_content' => $emailTemplate->html_content,
+            'css_styles' => $emailTemplate->css_styles,
+            'text_content' => $emailTemplate->text_content,
+            'variables' => $emailTemplate->variables ?: [],
+            'is_system' => (bool) $emailTemplate->is_system,
+            'version' => (int) $emailTemplate->version,
+            'status' => $emailTemplate->status,
+        ]]);
+    }
+
+    public static function templateTypes(): array
+    {
+        return [
+            'verification' => 'رموز التحقق',
+            'authentication' => 'تسجيل الدخول والحساب',
+            'account' => 'الحساب والمستخدم',
+            'agent' => 'الوكلاء والتوثيق',
+            'property' => 'العقارات',
+            'notification' => 'الإشعارات العامة',
+            'custom' => 'قالب مخصص',
+        ];
     }
 
     public function store(Request $request)
@@ -47,17 +82,20 @@ class EmailTemplateController extends Controller
         });
 
         ActivityLog::record('email_template', "تم إنشاء قالب بريد: {$template->name}", $template);
-        return redirect()->route('admin.email-templates.edit', $template)->with('status', 'تم إنشاء القالب كمسودة.');
+        if ($request->expectsJson()) {
+            return response()->json(['data' => [
+                'id' => $template->id,
+                'key' => $template->key,
+                'version' => $template->version,
+                'status' => $template->status,
+            ]], 201);
+        }
+        return redirect()->route('admin.email-templates.index', ['edit' => $template->id])->with('status', 'تم إنشاء القالب كمسودة.');
     }
 
     public function edit(EmailTemplate $emailTemplate)
     {
-        return view('admin.email-templates.edit', [
-            'template' => $emailTemplate,
-            'logoUrl' => EmailSetting::current()->getLogoUrlForEmail(),
-            'variables' => EmailTemplateVariableRegistry::definitions(),
-            'previewValues' => EmailTemplateVariableRegistry::previewValues(['app.logo_url' => EmailSetting::current()->getLogoUrlForEmail() ?? '']),
-        ]);
+        return redirect()->route('admin.email-templates.index', ['edit' => $emailTemplate->id]);
     }
 
     public function update(Request $request, EmailTemplate $emailTemplate)
@@ -79,6 +117,15 @@ class EmailTemplateController extends Controller
         });
 
         ActivityLog::record('email_template', "تم حفظ إصدار جديد من قالب: {$emailTemplate->name}", $emailTemplate, properties: ['version' => $emailTemplate->version]);
+        if ($request->expectsJson()) {
+            $fresh = $emailTemplate->fresh();
+            return response()->json(['data' => [
+                'id' => $fresh->id,
+                'key' => $fresh->key,
+                'version' => $fresh->version,
+                'status' => $fresh->status,
+            ]]);
+        }
         return back()->with('status', 'تم حفظ المسودة وإنشاء إصدار جديد.');
     }
 
@@ -204,6 +251,49 @@ class EmailTemplateController extends Controller
         ]);
     }
 
+    /** معاينة مسودة جديدة قبل وجود سجل في قاعدة البيانات. */
+    public function previewDraft(Request $request): JsonResponse
+    {
+        $data = $this->validated($request, null, false);
+        $variables = array_merge(
+            EmailTemplateVariableRegistry::previewValues(),
+            $this->decodeArray($request->input('preview_variables', [])) ?? [],
+        );
+        $variables['app.logo_url'] ??= EmailSetting::current()->getLogoUrlForEmail() ?? '';
+
+        $rendered = app(EmailTemplateRenderer::class)->renderPayload(
+            (string) ($data['subject'] ?? ''),
+            $data['html_content'] ?? '',
+            $data['text_content'] ?? '',
+            $data['css_styles'] ?? null,
+            $variables,
+        );
+
+        return response()->json($rendered);
+    }
+
+    /** رفع صورة حقيقية من جهاز المدير إلى مكتبة أصول البريد. */
+    public function uploadAsset(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'max:5120', 'mimetypes:image/jpeg,image/png,image/gif,image/webp'],
+        ]);
+
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'png');
+        $name = Str::uuid()->toString().'.'.$extension;
+        $path = $file->storeAs('email-assets', $name, 'public');
+
+        return response()->json([
+            'data' => [[
+                'src' => Storage::disk('public')->url($path),
+                'name' => $file->getClientOriginalName(),
+                'type' => 'image',
+                'size' => $file->getSize(),
+            ]],
+        ], 201);
+    }
+
     public function sendTest(Request $request, EmailTemplate $emailTemplate): JsonResponse
     {
         $request->validate(['recipient' => ['required', 'email:rfc,dns', 'max:254']]);
@@ -275,6 +365,7 @@ class EmailTemplateController extends Controller
         $rules = [
             'name' => [$require ? 'required' : 'sometimes', 'string', 'max:190'],
             'description' => ['nullable', 'string', 'max:5000'],
+            'template_type' => ['nullable', Rule::in(array_keys(self::templateTypes()))],
             'subject' => [$require ? 'required' : 'sometimes', 'string', 'max:190'],
             'html_content' => ['nullable', 'string', 'max:1000000'],
             'text_content' => ['nullable', 'string', 'max:500000'],
@@ -284,13 +375,14 @@ class EmailTemplateController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ];
 
-        if (! $template) {
+        if (! $template && $require) {
             $rules['key'] = ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:email_templates,key'];
-        } elseif (! $template->is_system) {
+        } elseif ($template && ! $template->is_system) {
             $rules['key'] = ['sometimes', 'required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('email_templates', 'key')->ignore($template->id)];
         }
 
         $data = $request->validate($rules);
+        $data['template_type'] = $data['template_type'] ?? 'custom';
         $data['css_styles'] = $this->decodeArray($data['css_styles'] ?? null);
         $data['variables'] = $this->decodeArray($data['variables'] ?? null);
 

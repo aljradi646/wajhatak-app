@@ -8,7 +8,7 @@ import '../../../data/models/models.dart';
 import '../../widgets.dart';
 import 'property_detail_screen.dart';
 
-/// خريطة حقيقية (OpenStreetMap) — تطلب صلاحية الموقع عند الدخول،
+/// خريطة أقمار صناعية حقيقية — تطلب صلاحية الموقع عند الدخول،
 /// وتُظهر موقعك الحقيقي بجانب بطاقات العقارات، والنقر على أي بطاقة
 /// يفتح تفاصيل العقار.
 class PropertyMapScreen extends StatefulWidget {
@@ -76,11 +76,19 @@ class _PropertyMapScreenState extends State<PropertyMapScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: center,
-              initialZoom: _myLatitude != null ? 14 : (mapped.isEmpty ? 10 : 12),
+              initialZoom: _myLatitude != null
+                  ? 14
+                  : (mapped.isEmpty ? 10 : 12),
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate:
+                    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                userAgentPackageName: 'com.wajhatak.app',
+              ),
+              TileLayer(
+                urlTemplate:
+                    'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
                 userAgentPackageName: 'com.wajhatak.app',
               ),
               MarkerLayer(
@@ -132,7 +140,7 @@ class _PropertyMapScreenState extends State<PropertyMapScreen> {
               ),
               const RichAttributionWidget(
                 attributions: [
-                  TextSourceAttribution('© OpenStreetMap contributors'),
+                  TextSourceAttribution('© Esri, Maxar, Earthstar Geographics'),
                 ],
               ),
             ],
