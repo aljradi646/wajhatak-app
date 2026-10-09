@@ -3,6 +3,7 @@
 namespace Tests\Feature\Ai;
 
 use App\Models\AiConversation;
+use App\Models\AiMessage;
 use App\Models\Property;
 use App\Models\PropertyLocation;
 use App\Models\PropertyType;
@@ -764,5 +765,123 @@ class AiAssistantTest extends TestCase
         $this->assertStringContainsString("event: done\n", $body);
     }
 
+
+
+    /** لا يستطيع مستخدم مصادق عليه استخدام محادثة يملكها مستخدم آخر. */
+    public function test_authenticated_user_cannot_access_another_users_ai_conversation(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $conversation = AiConversation::query()->create([
+            'user_id' => $owner->id,
+            'session_token' => null,
+            'locale' => 'ar',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($otherUser, 'sanctum')
+            ->postJson('/api/v1/ai/chat', [
+                'message' => 'السلام عليكم',
+                'conversation_id' => $conversation->id,
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('ai_messages', [
+            'ai_conversation_id' => $conversation->id,
+            'role' => 'user',
+        ]);
+    }
+
+    /** لا يستطيع الزائر إلحاق رسالة بمحادثة حساب مسجل. */
+    public function test_guest_cannot_access_an_authenticated_users_ai_conversation(): void
+    {
+        $owner = User::factory()->create();
+        $conversation = AiConversation::query()->create([
+            'user_id' => $owner->id,
+            'session_token' => null,
+            'locale' => 'ar',
+            'status' => 'active',
+        ]);
+
+        $this->postJson('/api/v1/ai/chat', [
+            'message' => 'السلام عليكم',
+            'conversation_id' => $conversation->id,
+        ])->assertNotFound();
+
+        $this->assertDatabaseMissing('ai_messages', [
+            'ai_conversation_id' => $conversation->id,
+            'role' => 'user',
+        ]);
+    }
+
+    /** رمز كل جلسة زائر سري ومحدد؛ لا يُعاد استخدام آخر محادثة بلا رمزها. */
+    public function test_guest_sessions_are_isolated_and_require_the_matching_session_token(): void
+    {
+        $first = $this->postJson('/api/v1/ai/chat', ['message' => 'السلام عليكم']);
+        $first->assertOk();
+
+        $firstId = (int) $first->json('data.conversation_id');
+        $firstToken = (string) $first->json('data.session_token');
+        $this->assertGreaterThan(0, $firstId);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/iD', $firstToken);
+
+        $second = $this->postJson('/api/v1/ai/chat', ['message' => 'السلام عليكم']);
+        $second->assertOk();
+        $secondId = (int) $second->json('data.conversation_id');
+        $secondToken = (string) $second->json('data.session_token');
+
+        $this->assertNotSame($firstId, $secondId);
+        $this->assertNotSame($firstToken, $secondToken);
+
+        $messagesBefore = AiMessage::query()
+            ->where('ai_conversation_id', $firstId)->count();
+        $wrongToken = str_repeat('a', 64);
+        if (hash_equals($firstToken, $wrongToken)) {
+            $wrongToken = str_repeat('b', 64);
+        }
+
+        $this->postJson('/api/v1/ai/chat', [
+            'message' => 'تابع',
+            'conversation_id' => $firstId,
+            'session_token' => $wrongToken,
+        ])->assertNotFound();
+
+        $this->assertSame($messagesBefore, AiMessage::query()
+            ->where('ai_conversation_id', $firstId)->count());
+
+        $valid = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'تابع',
+            'conversation_id' => $firstId,
+            'session_token' => $firstToken,
+        ]);
+        $valid->assertOk();
+        $this->assertSame($firstId, (int) $valid->json('data.conversation_id'));
+    }
+
+    /** رمز يختاره العميل لا يصبح سر ملكية؛ الرمز الحقيقي يصدره الخادم. */
+    public function test_server_issues_guest_session_token_instead_of_trusting_client_token(): void
+    {
+        $clientToken = str_repeat('a', 64);
+
+        $first = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'السلام عليكم',
+            'session_token' => $clientToken,
+        ]);
+        $first->assertOk();
+
+        $issuedToken = (string) $first->json('data.session_token');
+        $this->assertNotSame($clientToken, $issuedToken);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/iD', $issuedToken);
+
+        $followUp = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'تابع',
+            'session_token' => $issuedToken,
+        ]);
+        $followUp->assertOk();
+        $this->assertSame(
+            (int) $first->json('data.conversation_id'),
+            (int) $followUp->json('data.conversation_id'),
+        );
+    }
 
 }

@@ -26,7 +26,9 @@ class AiChatRequest extends FormRequest
     {
         return [
             'message' => ['required', 'string', 'min:1', 'max:'.(int) config('ai.limits.max_message_length', 600)],
-            'conversation_id' => ['nullable', 'integer', 'exists:ai_conversations,id'],
+            // التحقق من الملكية داخل المتحكم لتوحيد الرد (404) للمحادثات
+            // غير الموجودة أو التي لا يملكها صاحب الطلب.
+            'conversation_id' => ['nullable', 'integer', 'min:1'],
             'session_token' => ['nullable', 'string', 'max:64'],
             'locale' => ['nullable', 'string', 'max:5'],
             // إحداثيات موقع العميل الحقيقية (اختيارية) — للتعبيرات «قريب مني».
