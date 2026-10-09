@@ -79,7 +79,7 @@ class AiContractEvaluationTest extends TestCase
         $this->app->instance(AiToolRegistry::class, $registry);
 
         $response = $this->postJson('/api/v1/ai/chat', [
-            'message' => 'أريد شقة للإيجار في صنعاء، 2-3 غرف، من 100 إلى 150 متر مربع، حمامين، هادئة',
+            'message' => 'أريد شقة للإيجار في صنعاء، 2-3 غرف، من 100 إلى 150 متر مربع، حمامين، هادئة، وبميزانية من 2 إلى 3 مليون',
         ]);
 
         $response->assertOk();
@@ -93,6 +93,8 @@ class AiContractEvaluationTest extends TestCase
         $this->assertSame(2, $capturedArguments['bathrooms_min'] ?? null);
         $this->assertSame(100.0, $capturedArguments['min_area'] ?? null);
         $this->assertSame(150.0, $capturedArguments['max_area'] ?? null);
+        $this->assertSame(2000000.0, $capturedArguments['min_price'] ?? null);
+        $this->assertSame(3000000.0, $capturedArguments['max_price'] ?? null);
         $this->assertSame(['هادئ'], $capturedArguments['keywords'] ?? null);
     }
 
