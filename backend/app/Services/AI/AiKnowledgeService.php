@@ -14,7 +14,7 @@ use Throwable;
  */
 class AiKnowledgeService
 {
-    public const VERSION = '2026-10-04.2';
+    public const VERSION = '2026-10-09.1';
 
     private const KNOWLEDGE_BASE = [
         [
@@ -115,8 +115,47 @@ class AiKnowledgeService
     }
 
     /**
-     * المعرفة الثابتة تبقى مرجعًا افتراضيًا؛ المقالات النشطة المضافة من لوحة التحكم
-     * تُحمّل من قاعدة البيانات وتُفلتر حسب الدور الحالي.
+     * يضمن وجود نسخة قابلة للتحرير من الأسئلة المضمنة دون استبدال أي تعديل سابق.
+     * يُستدعى من شاشة إدارة المعرفة فقط؛ تبقى المعرفة المضمنة متاحة إن لم تُنفذ الهجرة.
+     */
+    public function syncBuiltInArticles(): int
+    {
+        try {
+            if (! Schema::hasTable('ai_knowledge_articles')) {
+                return 0;
+            }
+
+            $created = 0;
+            foreach (self::KNOWLEDGE_BASE as $item) {
+                $article = AiKnowledgeArticle::query()->firstOrCreate(
+                    ['slug' => $item['id']],
+                    [
+                        'topic' => $item['topic'],
+                        'content' => $item['content'],
+                        'keywords' => $item['keywords'],
+                        'roles' => $item['roles'],
+                        'target_screen' => $item['target_screen'],
+                        'is_active' => true,
+                        'priority' => 100,
+                        'version' => 1,
+                    ],
+                );
+                if ($article->wasRecentlyCreated) {
+                    $created++;
+                }
+            }
+
+            return $created;
+        } catch (Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+    }
+
+    /**
+     * المعرفة المضمنة تعمل كقيمة افتراضية، ويمكن تحريرها من لوحة التحكم.
+     * المقالات المخزنة تتجاوز الافتراضي ذي slug نفسه؛ المقالات الأخرى تضاف إليه.
      *
      * @return list<array<string, mixed>>
      */
@@ -156,6 +195,7 @@ class AiKnowledgeService
             }
 
             if ($score > 0) {
+                unset($item['slug'], $item['is_active'], $item['is_builtin']);
                 $item['version'] = $item['version'] ?? $this->version();
                 $item['score'] = $score;
                 $results[] = $item;
@@ -175,40 +215,79 @@ class AiKnowledgeService
     private function entriesForRole(string $role): array
     {
         $role = strtolower(trim($role)) ?: 'client';
-        $builtIn = array_values(array_map(
-            fn (array $item) => $item + ['version' => $this->version(), 'priority' => 100],
-            array_filter(self::KNOWLEDGE_BASE, fn (array $item) => in_array($role, $item['roles'], true)),
-        ));
+        $entries = [];
+        $builtInSlugs = array_column(self::KNOWLEDGE_BASE, 'id');
 
-        return array_values(array_merge($builtIn, $this->databaseEntries($role)));
+        foreach (self::KNOWLEDGE_BASE as $item) {
+            if (! in_array($role, $item['roles'], true)) {
+                continue;
+            }
+
+            $item['version'] = $this->version();
+            $item['priority'] = 100;
+            $entries[$item['id']] = $item;
+        }
+
+        foreach ($this->databaseEntries() as $article) {
+            $slug = (string) $article['slug'];
+            $isBuiltIn = in_array($slug, $builtInSlugs, true);
+
+            if ($isBuiltIn) {
+                // وجود سجل مخصص لهذا slug يعني أن قرارات التفعيل والأدوار
+                // والمحتوى في قاعدة البيانات هي المرجع، حتى إذا عُطّلت المادة.
+                unset($entries[$slug]);
+                if (! $article['is_active'] || ! in_array($role, $article['roles'], true)) {
+                    continue;
+                }
+
+                $article['id'] = $slug;
+                $entries[$slug] = $article;
+                continue;
+            }
+
+            if (! $article['is_active'] || ! in_array($role, $article['roles'], true)) {
+                continue;
+            }
+
+            $article['id'] = 'article-'.$article['id'];
+            $entries[$article['id']] = $article;
+        }
+
+        return array_values($entries);
     }
 
     /**
+     * تضمين المقالات المضمنة حتى لو أوقفها المدير كي لا تظهر النسخة الافتراضية
+     * مجددًا؛ أما المقالات الإضافية المتوقفة فتبقى خارج البحث.
+     *
      * @return list<array<string, mixed>>
      */
-    private function databaseEntries(string $role): array
+    private function databaseEntries(): array
     {
         try {
             if (! Schema::hasTable('ai_knowledge_articles')) {
                 return [];
             }
 
+            $builtInSlugs = array_column(self::KNOWLEDGE_BASE, 'id');
+
             return AiKnowledgeArticle::query()
-                ->where('is_active', true)
+                ->where(fn ($query) => $query->whereIn('slug', $builtInSlugs)->orWhere('is_active', true))
                 ->orderBy('priority')
                 ->orderByDesc('updated_at')
-                ->limit(200)
+                ->limit(250)
                 ->get()
-                ->filter(fn (AiKnowledgeArticle $article) => in_array($role, (array) $article->roles, true))
                 ->map(fn (AiKnowledgeArticle $article) => [
-                    'id' => 'article-'.$article->id,
-                    'topic' => $article->topic,
-                    'content' => $article->content,
+                    'id' => (int) $article->id,
+                    'slug' => (string) $article->slug,
+                    'topic' => (string) $article->topic,
+                    'content' => (string) $article->content,
                     'keywords' => (array) $article->keywords,
                     'target_screen' => $article->target_screen,
                     'roles' => (array) $article->roles,
                     'priority' => (int) $article->priority,
                     'version' => 'article-'.$article->id.'-v'.$article->version,
+                    'is_active' => (bool) $article->is_active,
                 ])
                 ->values()
                 ->all();
