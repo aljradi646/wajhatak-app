@@ -82,7 +82,7 @@ class AiLlmClient
                 if ($insideThink) {
                     $end = stripos($pendingText, '</think>');
                     if ($end === false) {
-                        $pendingText = $flush ? '' : substr($pendingText, -7);
+                        $pendingText = $flush ? '' : mb_substr($pendingText, -7, null, 'UTF-8');
                         break;
                     }
 
@@ -106,10 +106,10 @@ class AiLlmClient
                 }
 
                 // احتفظ بآخر ستة أحرف لاحتمال أن تكون بداية وسم <think>.
-                $safeLength = strlen($pendingText) - 6;
+                $safeLength = mb_strlen($pendingText, 'UTF-8') - 6;
                 if ($safeLength > 0) {
-                    $emitVisible(substr($pendingText, 0, $safeLength));
-                    $pendingText = substr($pendingText, $safeLength);
+                    $emitVisible(mb_substr($pendingText, 0, $safeLength, 'UTF-8'));
+                    $pendingText = mb_substr($pendingText, $safeLength, null, 'UTF-8');
                 }
                 break;
             }
