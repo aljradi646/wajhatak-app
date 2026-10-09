@@ -23,6 +23,7 @@ class AiIntentService
             'bedrooms_min' => ['type' => ['integer', 'null']],
             'bedrooms_max' => ['type' => ['integer', 'null']],
             'bathrooms_min' => ['type' => ['integer', 'null']],
+            'bathrooms_max' => ['type' => ['integer', 'null']],
             'min_price' => ['type' => ['number', 'null']],
             'max_price' => ['type' => ['number', 'null']],
             'min_area' => ['type' => ['number', 'null']],
@@ -160,6 +161,52 @@ class AiIntentService
             }
         }
 
+        // عند ورود نطاق سعر صريح نضبط الحدين قبل البحث؛ الوحدة على طرف واحد
+        // تُورّث للطرف الآخر، وتظل حدود المساحة خارج محلل السعر.
+        $priceRange = $this->extractPriceRangeFilters($text);
+        if ($priceRange !== []) {
+            $filters = array_merge($filters, $priceRange);
+        }
+
+        // المساحة: تمرير الحدود الصريحة إلى البحث بدل تركها في النص فقط.
+        $filters = array_merge($filters, $this->extractAreaFilters($text));
+
+        // الحمامات: الأرقام العربية/الهندية وصيغ شائعة في العربية اليمنية.
+        $bathroomCount = null;
+        if ($this->matches('/(حمامين|حمامان|دورتين\\s*مياه)/u', $text)) {
+            $bathroomCount = 2;
+        } elseif (preg_match(
+            $this->normalize('/([\\d٠-٩]+|واحده?|اثنين|اثنتين|اثنان|ثلاث|ثلاثه|اربع|اربعه|خمس|خمسه)\\s*(?:حمامات|حمامين|حمام|دورات\\s*مياه)/u'),
+            $text,
+            $bathroomMatch,
+        ) === 1) {
+            $bathroomCount = $this->toCount((string) $bathroomMatch[1]);
+        } elseif (preg_match(
+            $this->normalize('/(?:حمام|دورة\\s*مياه)\\s*([\\d٠-٩]+|واحده?|اثنين|اثنتين|اثنان|ثلاث|ثلاثه|اربع|اربعه|خمس|خمسه)/u'),
+            $text,
+            $bathroomMatch,
+        ) === 1) {
+            $bathroomCount = $this->toCount((string) $bathroomMatch[1]);
+        } elseif ($this->matches('/\\bحمام\\b/u', $text)) {
+            $bathroomCount = 1;
+        }
+
+        if ($bathroomCount !== null) {
+            $isMaxBathrooms = $this->matches('/(حتى|حد\\s*اقصى|اقل\\s*من|لا\\s*تزيد\\s*عن|ما\\s*تزيد\\s*عن)/u', $text);
+            $isMinBathrooms = $this->matches('/(على\\s*الاقل|لا\\s*تقل\\s*عن|اكثر\\s*من|فوق)/u', $text);
+            if ($isMaxBathrooms) {
+                $filters['bathrooms_max'] = $this->matches('/اقل\\s*من/u', $text)
+                    ? max(0, $bathroomCount - 1)
+                    : $bathroomCount;
+            } elseif ($isMinBathrooms) {
+                $filters['bathrooms_min'] = $this->matches('/اكثر\\s*من/u', $text)
+                    ? min(20, $bathroomCount + 1)
+                    : $bathroomCount;
+            } else {
+                $filters['bathrooms_min'] = $bathroomCount;
+            }
+        }
+
         // المدن والأحياء المعروفة — مطابقة *بحدود كلمة* لا بالاحتواء النصي.
         // بدون ذلك تُطابَق «إب» داخل «أبحث» و«حدة» داخل «الوحدة»، فيظهر
         // للمستخدم بحث في مدينة لم يذكرها إطلاقًا.
@@ -178,6 +225,128 @@ class AiIntentService
         }
 
         return $filters;
+    }
+
+    /**
+     * استخراج حدود المساحة من العبارات الصريحة فقط.
+     *
+     * @return array<string, float>
+     */
+    private function extractAreaFilters(string $text): array
+    {
+        $rangePattern = $this->normalize('/(?:مساحه\\s*)?(?:من\\s*)?([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)\\s*(?:الي|-|الى)\\s*([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)\\s*(?:متر(?:\\s*مربع)?|م2|م²)/u');
+        if (preg_match($rangePattern, $text, $match) === 1) {
+            $minimum = $this->toNumber((string) $match[1]);
+            $maximum = $this->toNumber((string) $match[2]);
+            if ($minimum !== null && $maximum !== null) {
+                return [
+                    'min_area' => min($minimum, $maximum),
+                    'max_area' => max($minimum, $maximum),
+                ];
+            }
+        }
+
+        $unit = '(?:متر(?:\\s*مربع)?|م2|م²)';
+        $number = '([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)';
+        $patterns = [
+            'min_area' => [
+                '/مساحه\\s*(?:لا\\s*تقل\\s*عن|على\\s*الاقل|اكبر\\s*من|اكثر\\s*من|فوق)\\s*'.$number.'(?:\\s*'.$unit.')?/u',
+                '/(?:لا\\s*تقل\\s*عن|على\\s*الاقل|اكبر\\s*من|اكثر\\s*من|فوق)\\s*'.$number.'\\s*'.$unit.'/u',
+            ],
+            'max_area' => [
+                '/مساحه\\s*(?:اقل\\s*من|حتى|بحد\\s*اقصى|لا\\s*تتجاوز|لا\\s*يزيد\\s*عن)\\s*'.$number.'(?:\\s*'.$unit.')?/u',
+                '/(?:اقل\\s*من|حتى|بحد\\s*اقصى|لا\\s*تتجاوز|لا\\s*يزيد\\s*عن)\\s*'.$number.'\\s*'.$unit.'/u',
+            ],
+        ];
+
+        foreach ($patterns as $key => $alternatives) {
+            foreach ($alternatives as $pattern) {
+                if (preg_match($this->normalize($pattern), $text, $match) !== 1) {
+                    continue;
+                }
+                $area = $this->toNumber((string) $match[1]);
+                if ($area !== null) {
+                    return [$key => $area];
+                }
+            }
+        }
+
+        return [];
+    }
+
+    private function toCount(string $raw): ?int
+    {
+        $number = $this->toNumber($raw);
+        if ($number !== null) {
+            return max(0, min(20, (int) $number));
+        }
+
+        return match ($this->normalize(trim($raw))) {
+            'واحد', 'واحده' => 1,
+            'اثنين', 'اثنتين', 'اثنان' => 2,
+            'ثلاث', 'ثلاثه' => 3,
+            'اربع', 'اربعه' => 4,
+            'خمس', 'خمسه' => 5,
+            default => null,
+        };
+    }
+
+    /**
+     * يلتقط نطاق السعر بوحداته حتى لا يتحول «من 2 إلى 3 مليون» إلى حد أعلى فقط.
+     * يقبل الوحدة على طرف واحد ويطبّقها على الطرف الآخر، دون اعتبار نطاق المساحة سعرًا.
+     *
+     * @return array{min_price: float, max_price: float}|array{}
+     */
+    private function extractPriceRangeFilters(string $text): array
+    {
+        $number = '([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)';
+        $unit = '(مليونين|مليون|الفين|الف|k\\b|m\\b|ك\\b)';
+        $pattern = $this->normalize('/(?:من\\s*)?'.$number.'\\s*'.$unit.'?\\s*(?:إلى|الي|حتى|-)\\s*'.$number.'\\s*'.$unit.'?/u');
+        if (preg_match_all($pattern, $text, $matches, PREG_SET_ORDER) === false) {
+            return [];
+        }
+
+        foreach ($matches as $match) {
+            $minUnit = trim((string) ($match[2] ?? ''));
+            $maxUnit = trim((string) ($match[4] ?? ''));
+            $range = (string) ($match[0] ?? '');
+            $position = mb_strpos($text, $range);
+            $before = $position !== false ? mb_substr($text, max(0, $position - 24), min(24, $position)) : '';
+
+            // لا نفسّر «غرفتين إلى ثلاث» ولا «100 إلى 150 مترًا» على أنها أسعار.
+            // الرقم المجرد يُقبل فقط إذا ارتبطت عبارته القريبة بسياق سعر/ميزانية.
+            if ($minUnit === '' && $maxUnit === ''
+                && ! $this->matches('/(سعر|ميزانيه|قيمه|تكلفه)/u', $before)) {
+                continue;
+            }
+
+            $minNumber = $this->toNumber((string) ($match[1] ?? ''));
+            $maxNumber = $this->toNumber((string) ($match[3] ?? ''));
+            if ($minNumber === null || $maxNumber === null) {
+                continue;
+            }
+
+            $minScale = $this->priceUnitMultiplier($minUnit !== '' ? $minUnit : $maxUnit);
+            $maxScale = $this->priceUnitMultiplier($maxUnit !== '' ? $maxUnit : $minUnit);
+            $minimum = $minNumber * $minScale;
+            $maximum = $maxNumber * $maxScale;
+
+            return [
+                'min_price' => min($minimum, $maximum),
+                'max_price' => max($minimum, $maximum),
+            ];
+        }
+
+        return [];
+    }
+
+    private function priceUnitMultiplier(string $unit): float
+    {
+        return match (true) {
+            str_contains($unit, 'مليون') || strtolower($unit) === 'm' => 1_000_000,
+            str_contains($unit, 'الف') || strtolower($unit) === 'k' || $unit === 'ك' => 1_000,
+            default => 1,
+        };
     }
 
     /** @return list<array{0: float, 1: string}> */
@@ -274,17 +443,15 @@ class AiIntentService
     }
 
     /**
-     * مطابقة اسم مكان بحدود كلمة عربية (مع السماح بأداة التعريف «ال»).
-     * تمنع المطابقات الزائفة مثل «إب» داخل «أبحث» أو «حدة» داخل «الوحدة».
-     *
-     * ملاحظة PCRE: صيغة `ال?` خاطئة — تعني «ا + ل اختياري»؛ الصحيح
-     * `(?:ال)?` كوحدة اختيارية واحدة، والـ lookbehind قبلها لا بعدها.
+     * مطابقة اسم مكان بحدود كلمة مع السماح بأداة التعريف «ال».
+     * نستخدم حدود الحروف والأرقام Unicode بدل Script=Arabic كي لا تعتبر
+     * علامات الترقيم العربية مثل «،» امتدادًا للكلمة فتسقط المدينة من الطلب.
      */
     private function matchesWord(string $pattern, string $normalizedText): bool
     {
         $needle = preg_quote($this->normalize($pattern), '/');
 
-        return preg_match('/(?<!\p{Arabic})(?:ال)?'.$needle.'(?!\p{Arabic})/u', $normalizedText) === 1;
+        return preg_match('/(?<![\p{L}\p{N}])(?:ال)?'.$needle.'(?![\p{L}\p{N}])/u', $normalizedText) === 1;
     }
 
     /** الحقول التي لم تُحدد بعد وتحتاج قرارًا (للمتابعة الذكية). */
@@ -306,7 +473,7 @@ class AiIntentService
     /** تطهير نهائي للمعايير قبل البحث. */
     private function normalizeFilters(array $filters): array
     {
-        foreach (['bedrooms_min', 'bedrooms_max', 'bathrooms_min'] as $key) {
+        foreach (['bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'bathrooms_max'] as $key) {
             if (isset($filters[$key])) {
                 $filters[$key] = max(0, min(20, (int) $filters[$key]));
             }

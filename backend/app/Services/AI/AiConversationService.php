@@ -101,13 +101,18 @@ class AiConversationService
         return is_array($state['active_search'] ?? null) ? $state['active_search'] : [];
     }
 
-    /** آخر مجموعة عقارات مرتبطة برسالة مساعد بعينها، لا حالة عامة. */
+    /**
+     * معرفات العقارات في آخر رد للمساعد فقط.
+     * لا نتجاوز ردًا أحدث غير عقاري، حتى لا يعود سؤال مثل «الأول» إلى نتائج
+     * قديمة بعد أن انتقلت المحادثة إلى المساعدة العامة أو موضوع آخر.
+     *
+     * @return list<int>
+     */
     public function lastRetrievedPropertyIds(AiConversation $conversation): array
     {
         $message = AiMessage::query()
             ->where('ai_conversation_id', $conversation->id)
             ->where('role', AiMessageRole::Assistant->value)
-            ->whereNotNull('property_ids')
             ->orderByDesc('id')
             ->first();
 
@@ -206,15 +211,40 @@ class AiConversationService
         $conversation->update(['status' => 'archived', 'last_message_at' => now()]);
     }
 
-    /** حذف المحادثات القديمة وفق مدة الإبقاء (يُستدعى مجدولًا). */
+    /** حذف رسائل المحادثات المنتهية وأرشفتها على دفعات؛ يُستدعى مجدولًا. */
     public function pruneExpired(): int
     {
-        $days = (int) $this->settings->get('ai_history_retention_days', 30);
+        $days = max(1, (int) $this->settings->get('ai_history_retention_days', 30));
         $cutoff = now()->subDays($days);
+        $pruned = 0;
 
-        return (int) AiConversation::query()
-            ->where('last_message_at', '<', $cutoff)
-            ->each(fn (AiConversation $c) => $c->messages()->delete() || $c->update(['status' => 'archived']))
-            ->count();
+        AiConversation::query()
+            ->where(function ($query) use ($cutoff): void {
+                $query->where('last_message_at', '<', $cutoff)
+                    ->orWhere(function ($query) use ($cutoff): void {
+                        $query->whereNull('last_message_at')
+                            ->where('created_at', '<', $cutoff);
+                    });
+            })
+            ->orderBy('id')
+            ->chunkById(100, function ($conversations) use (&$pruned): void {
+                $ids = $conversations->modelKeys();
+                if ($ids === []) {
+                    return;
+                }
+
+                // افصل الحذف عن الأرشفة: حذف الرسائل لا ينبغي أن يمنع تحديث
+                // حالة المحادثة بسبب short-circuit، كما لا نستدعي count على each().
+                AiMessage::query()->whereIn('ai_conversation_id', $ids)->delete();
+
+                AiConversation::query()->whereIn('id', $ids)->update([
+                    'status' => 'archived',
+                    'context_state' => null,
+                ]);
+
+                $pruned += count($ids);
+            });
+
+        return $pruned;
     }
 }

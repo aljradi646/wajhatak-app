@@ -32,6 +32,16 @@ class AiAssistantController extends Controller
     /** POST /api/v1/ai/chat — رسالة كاملة مع توليد رد ونتائج حقيقية. */
     public function chat(AiChatRequest $request): JsonResponse
     {
+        return $this->processChat($request);
+    }
+
+    /**
+     * تنفيذ دورة المحادثة المشتركة بين JSON وSSE.
+     *
+     * @param callable(string): void|null $onDelta يُستدعى فقط مع نص الرد النهائي الآمن.
+     */
+    private function processChat(AiChatRequest $request, ?callable $onDelta = null): JsonResponse
+    {
         if (! $this->available()) {
             return $this->unavailable();
         }
@@ -105,25 +115,17 @@ class AiAssistantController extends Controller
                 'longitude' => $request->filled('longitude') ? (float) $request->input('longitude') : null,
                 'radius_km' => $request->filled('radius_km') ? (float) $request->input('radius_km') : null,
             ],
+            $onDelta,
         );
 
         return response()->json(['data' => $result]);
     }
 
 
-    /** POST /api/v1/ai/chat/stream — SSE حقيقي على مستوى HTTP؛ التوليد الداخلي يُنفذ مرة واحدة ثم يُرسل الرد على دفعات. */
+    /** POST /api/v1/ai/chat/stream — يبث النص النهائي فور وصوله من مزود النموذج. */
     public function streamChat(AiChatRequest $request)
     {
-        $json = $this->chat($request);
-        if ($json->getStatusCode() >= 400) {
-            return $json;
-        }
-
-        $payload = $json->getData(true);
-        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
-        $reply = (string) ($data['reply'] ?? '');
-
-        return response()->stream(function () use ($data, $reply): void {
+        return response()->stream(function () use ($request): void {
             $send = static function (string $event, array $payload): void {
                 echo 'event: '.$event."\n";
                 echo 'data: '.json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n\n";
@@ -132,15 +134,57 @@ class AiAssistantController extends Controller
             };
 
             $send('start', ['event' => 'start']);
-            if ($reply !== '') {
-                $chunks = preg_split('/(?<=\\s|[،.!؟\\n])/u', $reply, -1, PREG_SPLIT_NO_EMPTY) ?: [$reply];
-                foreach ($chunks as $index => $chunk) {
-                    if (connection_aborted()) return;
-                    $send('delta', ['event' => 'delta', 'id' => $index + 1, 'delta' => $chunk]);
+            $streamedCharacters = 0;
+            $nextId = 1;
+
+            try {
+                $json = $this->processChat($request, function (string $delta) use ($send, &$streamedCharacters, &$nextId): void {
+                    if (connection_aborted() || $delta === '') {
+                        return;
+                    }
+
+                    $streamedCharacters += mb_strlen($delta);
+                    $send('delta', ['event' => 'delta', 'id' => $nextId++, 'delta' => $delta]);
+                });
+
+                if ($json->getStatusCode() >= 400) {
+                    $error = $json->getData(true);
+                    $send('error', [
+                        'event' => 'error',
+                        'message' => (string) ($error['message'] ?? 'تعذر تنفيذ طلب المساعد.'),
+                        'status_code' => $json->getStatusCode(),
+                    ]);
+                    return;
                 }
-            }
-            if (! connection_aborted()) {
-                $send('done', ['event' => 'done', 'id' => 999999, 'data' => $data]);
+
+                $payload = $json->getData(true);
+                $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+                $reply = trim((string) ($data['reply'] ?? ''));
+
+                // الردود الحتمية أو الرجوع الآمن لا تحتاج إلى اتصال نموذج متدفق.
+                // في هذه الحالة نرسل الرد هنا بدل ترك العميل ينتظر حدث done فارغًا.
+                if ($streamedCharacters === 0 && $reply !== '') {
+                    $chunks = preg_split('/(?<=\\s|[،.!؟\\n])/u', $reply, -1, PREG_SPLIT_NO_EMPTY) ?: [$reply];
+                    foreach ($chunks as $chunk) {
+                        if (connection_aborted()) {
+                            return;
+                        }
+                        $send('delta', ['event' => 'delta', 'id' => $nextId++, 'delta' => $chunk]);
+                    }
+                }
+
+                if (! connection_aborted()) {
+                    $send('done', ['event' => 'done', 'id' => $nextId, 'data' => $data]);
+                }
+            } catch (Throwable $e) {
+                report($e);
+                if (! connection_aborted()) {
+                    $send('error', [
+                        'event' => 'error',
+                        'message' => 'تعذر إكمال رد المساعد. حاول مرة أخرى.',
+                        'status_code' => 500,
+                    ]);
+                }
             }
         }, 200, [
             'Content-Type' => 'text/event-stream; charset=utf-8',

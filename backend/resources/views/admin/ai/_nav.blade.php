@@ -3,10 +3,11 @@
     في مكان واحد مرتب، بدل حشرها في صفحة واحدة ضخمة.
 --}}
 @php
-    $currentSection = request()->route('section');
+    $currentSection = request()->route('section') ?? (request()->routeIs('admin.ai.knowledge.*') ? 'knowledge' : null);
 
     $aiNav = [
         ['label' => 'نظرة عامة', 'icon' => 'ai-assistant', 'route' => 'admin.ai.index', 'params' => [], 'section' => null],
+        ['label' => 'قاعدة المعرفة', 'icon' => 'book-open', 'route' => 'admin.ai.knowledge.index', 'params' => [], 'section' => 'knowledge'],
     ];
 
     foreach ($sections as $key => $definition) {

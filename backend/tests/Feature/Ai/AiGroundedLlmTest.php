@@ -11,6 +11,64 @@ class AiGroundedLlmTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_stream_endpoint_forwards_grounded_llm_deltas_and_final_result(): void
+    {
+        config()->set('ai.llm.enabled', true);
+        config()->set('ai.llm.mode', 'grounded');
+        config()->set('ai.llm.base_url', 'http://tiny-llm.test/v1');
+        config()->set('ai.llm.model', 'wajhatak-smollm2-135m-instruct-q8_0');
+        config()->set('ai.allow_rule_fallback', false);
+        config()->set('ai.llm.max_output_tokens', 256);
+
+        $this->seed(\Database\Seeders\RealDataSeeder::class);
+        Property::query()->where('status', 'published')->firstOrFail();
+
+        $event = static fn (string $delta): string => 'data: '.json_encode([
+            'model' => 'wajhatak-smollm2-135m-instruct-q8_0',
+            'choices' => [['index' => 0, 'delta' => ['content' => $delta]]],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n\n";
+
+        Http::fake([
+            'http://tiny-llm.test/v1/chat/completions' => Http::response(
+                $event('وجدت لك ').$event('عقارات حقيقية من بيانات وجهتك.')
+                    .'data: [DONE]'."\n\n",
+                200,
+                ['Content-Type' => 'text/event-stream'],
+            ),
+        ]);
+
+        $response = $this->post('/api/v1/ai/chat/stream', [
+            'message' => 'ابحث عن عقار في صنعاء',
+        ]);
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        $body = $response->streamedContent();
+
+        $this->assertStringContainsString("event: start\n", $body);
+        $this->assertStringContainsString("event: delta\n", $body);
+        $this->assertStringContainsString("event: done\n", $body);
+        $this->assertStringContainsString('"reply":"وجدت لك عقارات حقيقية من بيانات وجهتك."', $body);
+
+        preg_match_all('/^data:\\s*(\\{.*\\})$/m', $body, $matches);
+        $deltas = [];
+        foreach ($matches[1] as $encoded) {
+            $eventData = json_decode($encoded, true);
+            if (($eventData['event'] ?? null) === 'delta') {
+                $deltas[] = (string) ($eventData['delta'] ?? '');
+            }
+        }
+        $this->assertSame('وجدت لك عقارات حقيقية من بيانات وجهتك.', implode('', $deltas));
+
+        Http::assertSent(function ($request): bool {
+            $payload = $request->data();
+
+            return $request->url() === 'http://tiny-llm.test/v1/chat/completions'
+                && ($payload['stream'] ?? false) === true
+                && ! isset($payload['tools']);
+        });
+    }
+
     public function test_tiny_llm_summarizes_real_rule_search_result(): void
     {
         config()->set('ai.llm.enabled', true);
