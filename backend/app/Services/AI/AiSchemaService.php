@@ -25,12 +25,12 @@ use Illuminate\Support\Facades\Schema;
  */
 class AiSchemaService
 {
-    private const CACHE_KEY = 'ai_schema_ready_v1';
+    private const CACHE_KEY = 'ai_schema_ready_v2';
     private const CACHE_TTL = 300;
     /** سقف إعادة بناء الفهرس تلقائيًا (حماية من تنفيذ ثقيل داخل طلب). */
     private const AUTO_INDEX_MAX_PROPERTIES = 5000;
 
-    private const TABLES = ['ai_conversations', 'ai_messages', 'ai_request_logs', 'ai_search_index', 'ai_user_memories', 'ai_message_feedback'];
+    private const TABLES = ['ai_conversations', 'ai_messages', 'ai_request_logs', 'ai_search_index', 'ai_user_memories', 'ai_message_feedback', 'ai_knowledge_entries'];
 
     public function __construct(private readonly AiIndexSyncService $indexer) {}
 
@@ -235,6 +235,21 @@ class AiSchemaService
             $this->ensureFullTextIndex();
         }
 
+        if (! Schema::hasTable('ai_knowledge_entries')) {
+            Schema::create('ai_knowledge_entries', function (Blueprint $table): void {
+                $table->id();
+                $table->string('slug', 80)->unique();
+                $table->string('topic', 160);
+                $table->text('content');
+                $table->json('keywords');
+                $table->string('target_screen', 120)->nullable();
+                $table->json('roles');
+                $table->boolean('is_active')->default(true)->index();
+                $table->timestamps();
+            });
+            $created[] = 'ai_knowledge_entries';
+        }
+
         return $created;
     }
 
@@ -246,6 +261,7 @@ class AiSchemaService
         'ai_user_memories' => ['user_id' => true, 'memory_key' => true, 'memory_value' => true, 'confidence' => true, 'source' => true, 'last_used_at' => true, 'expires_at' => true],
         'ai_message_feedback' => ['ai_message_id' => true, 'user_id' => true, 'feedback' => true, 'note' => true],
         'ai_search_index' => ['property_id' => true, 'title' => true, 'description' => true, 'transaction_type' => true, 'status' => true, 'type_slug' => true, 'type_name_ar' => true, 'city' => true, 'district' => true, 'neighborhood' => true, 'price' => true, 'currency' => true, 'area' => true, 'bedrooms' => true, 'bathrooms' => true, 'is_furnished' => true, 'is_new' => true, 'is_featured' => true, 'published_at' => true, 'latitude' => true, 'longitude' => true, 'search_text' => true, 'content_hash' => true],
+        'ai_knowledge_entries' => ['slug' => true, 'topic' => true, 'content' => true, 'keywords' => true, 'target_screen' => true, 'roles' => true, 'is_active' => true],
     ];
 
     /** @return list<string> الأعمدة التي أُضيفت الآن. */
@@ -321,6 +337,15 @@ class AiSchemaService
                 'longitude' => fn (Blueprint $t) => $t->decimal('longitude', 10, 7)->nullable(),
                 'search_text' => fn (Blueprint $t) => $t->text('search_text')->nullable(),
                 'content_hash' => fn (Blueprint $t) => $t->string('content_hash', 64)->nullable(),
+            ],
+            'ai_knowledge_entries' => [
+                'slug' => fn (Blueprint $t) => $t->string('slug', 80),
+                'topic' => fn (Blueprint $t) => $t->string('topic', 160),
+                'content' => fn (Blueprint $t) => $t->text('content'),
+                'keywords' => fn (Blueprint $t) => $t->json('keywords'),
+                'target_screen' => fn (Blueprint $t) => $t->string('target_screen', 120)->nullable(),
+                'roles' => fn (Blueprint $t) => $t->json('roles'),
+                'is_active' => fn (Blueprint $t) => $t->boolean('is_active')->default(true)->index(),
             ],
         ];
 
