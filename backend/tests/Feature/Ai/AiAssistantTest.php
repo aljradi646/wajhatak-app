@@ -898,10 +898,18 @@ class AiAssistantTest extends TestCase
     public function test_structured_ai_search_supports_nearby_coordinates_radius_and_limit(): void
     {
         $property = Property::query()->where('status', 'published')->firstOrFail();
-        $property->location->update(['latitude' => 15.369445, 'longitude' => 44.191006]);
+        // اجعل المدينة فريدة في بيانات الاختبار حتى لا تتنافس عقارات أخرى مع
+        // الهدف عند طلب limit=1، مع الإبقاء على اختبار الإحداثيات الحقيقية.
+        $nearbyCity = 'مدينة-اختبار-قريبة-'.strtolower(uniqid());
+        $property->location->update([
+            'city' => $nearbyCity,
+            'latitude' => 15.369445,
+            'longitude' => 44.191006,
+        ]);
         $property->update(['is_furnished' => false, 'title' => $property->title.' ']);
 
         $response = $this->postJson('/api/v1/ai/search', [
+            'city' => $nearbyCity,
             'latitude' => 15.369445,
             'longitude' => 44.191006,
             'radius_km' => 5,
