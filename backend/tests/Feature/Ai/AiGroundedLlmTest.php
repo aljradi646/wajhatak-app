@@ -46,10 +46,19 @@ class AiGroundedLlmTest extends TestCase
         $body = $response->streamedContent();
 
         $this->assertStringContainsString("event: start\n", $body);
-        $this->assertStringContainsString('"delta":"وجدت لك "', $body);
-        $this->assertStringContainsString('"delta":"عقارات حقيقية من بيانات وجهتك."', $body);
+        $this->assertStringContainsString("event: delta\n", $body);
         $this->assertStringContainsString("event: done\n", $body);
         $this->assertStringContainsString('"reply":"وجدت لك عقارات حقيقية من بيانات وجهتك."', $body);
+
+        preg_match_all('/^data:\\s*(\\{.*\\})$/m', $body, $matches);
+        $deltas = [];
+        foreach ($matches[1] as $encoded) {
+            $eventData = json_decode($encoded, true);
+            if (($eventData['event'] ?? null) === 'delta') {
+                $deltas[] = (string) ($eventData['delta'] ?? '');
+            }
+        }
+        $this->assertSame('وجدت لك عقارات حقيقية من بيانات وجهتك.', implode('', $deltas));
 
         Http::assertSent(function ($request): bool {
             $payload = $request->data();
