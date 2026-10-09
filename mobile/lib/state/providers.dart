@@ -316,6 +316,103 @@ final propertySearchProvider =
       return ref.read(propertyRepositoryProvider).list(query);
     });
 
+/// نتيجة بحث الاستكشاف مع بيانات الصفحات وحالة تحميل الصفحة الإضافية.
+class ExploreSearchResult {
+  const ExploreSearchResult({
+    required this.items,
+    required this.hasMore,
+    required this.nextPage,
+    this.isLoadingMore = false,
+    this.loadMoreError = false,
+  });
+
+  final List<LuxProperty> items;
+  final bool hasMore;
+  final int nextPage;
+  final bool isLoadingMore;
+  final bool loadMoreError;
+
+  ExploreSearchResult copyWith({
+    List<LuxProperty>? items,
+    bool? hasMore,
+    int? nextPage,
+    bool? isLoadingMore,
+    bool? loadMoreError,
+  }) => ExploreSearchResult(
+    items: items ?? this.items,
+    hasMore: hasMore ?? this.hasMore,
+    nextPage: nextPage ?? this.nextPage,
+    isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    loadMoreError: loadMoreError ?? this.loadMoreError,
+  );
+}
+
+class ExplorePropertySearchController extends AsyncNotifier<ExploreSearchResult> {
+  ExplorePropertySearchController(this._query);
+
+  final PropertyQuery _query;
+  bool _requestInFlight = false;
+
+  @override
+  Future<ExploreSearchResult> build() async {
+    if (AppConfig.isUiPreview) {
+      final items = await (await _preview(ref)).list(_query);
+      return ExploreSearchResult(items: items, hasMore: false, nextPage: 1);
+    }
+
+    ref.watch(sessionProvider);
+    final page = await ref.read(propertyRepositoryProvider).searchPage(_query);
+    return ExploreSearchResult(
+      items: page.items,
+      hasMore: page.hasMore,
+      nextPage: page.nextPage,
+    );
+  }
+
+  /// تحميل وإلحاق الصفحة التالية مع إبقاء النتائج الحالية عند فشل الشبكة.
+  Future<void> loadMore({bool retry = false}) async {
+    final current = state.asData?.value;
+    if (_requestInFlight ||
+        current == null ||
+        !current.hasMore ||
+        current.isLoadingMore ||
+        (current.loadMoreError && !retry)) {
+      return;
+    }
+
+    _requestInFlight = true;
+    state = AsyncData(current.copyWith(isLoadingMore: true, loadMoreError: false));
+    try {
+      final more = await ref
+          .read(propertyRepositoryProvider)
+          .searchPage(_query, page: current.nextPage);
+      final latest = state.asData?.value ?? current;
+      final seenIds = latest.items.map((item) => item.id).toSet();
+      final appended = more.items.where((item) => seenIds.add(item.id));
+      state = AsyncData(latest.copyWith(
+        items: [...latest.items, ...appended],
+        hasMore: more.hasMore,
+        nextPage: more.nextPage,
+        isLoadingMore: false,
+        loadMoreError: false,
+      ));
+    } on Object {
+      final latest = state.asData?.value ?? current;
+      state = AsyncData(latest.copyWith(
+        isLoadingMore: false,
+        loadMoreError: true,
+      ));
+    } finally {
+      _requestInFlight = false;
+    }
+  }
+}
+
+final explorePropertySearchProvider = AsyncNotifierProvider.family<
+    ExplorePropertySearchController, ExploreSearchResult, PropertyQuery>(
+  (query) => ExplorePropertySearchController(query),
+);
+
 final propertyDetailProvider = FutureProvider.family<LuxProperty, int>((
   ref,
   id,

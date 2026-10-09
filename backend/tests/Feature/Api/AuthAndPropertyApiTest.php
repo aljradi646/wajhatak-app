@@ -259,6 +259,70 @@ class AuthAndPropertyApiTest extends TestCase
         $this->assertSame([$c->id, $a->id, $b->id], $idsFor('oldest'));
     }
 
+    public function test_property_search_keeps_combined_filters_across_pages_and_validates_page_size(): void
+    {
+        $city = 'pagination-'.strtolower(uniqid());
+        $first = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 100000, 'area' => 80],
+            ['city' => $city, 'district' => 'حدة'],
+        );
+        $second = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 150000, 'area' => 100],
+            ['city' => $city, 'district' => 'حدة'],
+        );
+        $third = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 200000, 'area' => 120],
+            ['city' => $city, 'district' => 'حدة'],
+        );
+        $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 125000, 'area' => 90],
+            ['city' => $city, 'district' => 'حي مختلف'],
+        );
+
+        $parameters = [
+            'city' => $city,
+            'district' => 'حدة',
+            'min_price' => 90000,
+            'max_price' => 210000,
+            'min_area' => 70,
+            'max_area' => 130,
+            'sort' => 'price_asc',
+            'per_page' => 1,
+        ];
+
+        $pageOne = $this->getJson('/api/v1/properties?'.http_build_query($parameters + ['page' => 1]));
+        $pageOne->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $first->id)
+            ->assertJsonPath('meta.current_page', 1)
+            ->assertJsonPath('meta.per_page', 1)
+            ->assertJsonPath('meta.total', 3)
+            ->assertJsonPath('meta.last_page', 3);
+
+        $pageTwo = $this->getJson('/api/v1/properties?'.http_build_query($parameters + ['page' => 2]));
+        $pageTwo->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $second->id)
+            ->assertJsonPath('meta.current_page', 2);
+
+        $pageThree = $this->getJson('/api/v1/properties?'.http_build_query($parameters + ['page' => 3]));
+        $pageThree->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $third->id)
+            ->assertJsonPath('meta.current_page', 3);
+
+        $this->getJson('/api/v1/properties?per_page=51')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['per_page']);
+        $this->getJson('/api/v1/properties?page=0')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['page']);
+    }
+
     private function createProperty(
         PropertyStatus $status,
         array $attributes = [],

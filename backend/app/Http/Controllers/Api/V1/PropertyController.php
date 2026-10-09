@@ -47,6 +47,8 @@ class PropertyController extends Controller
             'is_new' => ['nullable', 'boolean'],
             'is_featured' => ['nullable', 'boolean'],
             'sort' => ['nullable', 'in:recommended,relevance,newest,oldest,price_asc,price_desc,area_asc,area_desc'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'between:1,50'],
         ]);
 
         $query = Property::query()
@@ -61,7 +63,9 @@ class PropertyController extends Controller
             $query->withExists(['favorites as is_favorited' => fn (Builder $favorite) => $favorite->where('user_id', $userId)]);
         }
 
-        return PropertyResource::collection($query->paginate(15)->withQueryString());
+        return PropertyResource::collection(
+            $query->paginate($request->integer('per_page', 15))->withQueryString(),
+        );
     }
 
     public function show(Request $request, Property $property): PropertyResource

@@ -24,7 +24,9 @@ class ExploreScreen extends ConsumerStatefulWidget {
 
 class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   late final TextEditingController _controller;
+  final ScrollController _resultsScrollController = ScrollController();
   PropertyQuery _filters = const PropertyQuery();
+  late PropertyQuery _activeQuery;
   String _term = '';
   Timer? _searchDebounce;
 
@@ -33,6 +35,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     super.initState();
     _controller = TextEditingController(text: widget.initialSearch ?? '');
     _term = widget.initialSearch ?? '';
+    _activeQuery = PropertyQuery(search: _term);
+    _resultsScrollController.addListener(_onResultsScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final settings = ref.read(appSettingsProvider);
       if (_filters.transactionType == null) {
@@ -47,8 +51,20 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _resultsScrollController
+      ..removeListener(_onResultsScroll)
+      ..dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onResultsScroll() {
+    if (!_resultsScrollController.hasClients ||
+        !_resultsScrollController.position.hasContentDimensions ||
+        _resultsScrollController.position.extentAfter > 480) {
+      return;
+    }
+    unawaited(ref.read(explorePropertySearchProvider(_activeQuery).notifier).loadMore());
   }
 
   void _onSearchChanged(String value) {
@@ -131,10 +147,12 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     });
 
     final query = _filters.copyWith(search: _term);
+    _activeQuery = query;
     final propertyTypes =
         ref.watch(propertyTypesProvider).asData?.value ?? const <TaxonomyItem>[];
-    final results = ref.watch(propertySearchProvider(query));
-    final mappedProperties = results.asData?.value ?? const <LuxProperty>[];
+    final results = ref.watch(explorePropertySearchProvider(query));
+    final mappedProperties =
+        results.asData?.value.items ?? const <LuxProperty>[];
 
     return Scaffold(
       appBar: (ModalRoute.of(context)?.canPop ?? false)
@@ -300,11 +318,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           ),
           Expanded(
-            child: LuxAsyncView<List<LuxProperty>>(
+            child: LuxAsyncView<ExploreSearchResult>(
               value: results,
               loading: const ExploreSkeleton(),
-              errorRetry: () => ref.invalidate(propertySearchProvider(query)),
-              data: (items) => items.isEmpty
+              errorRetry: () => ref.invalidate(explorePropertySearchProvider(query)),
+              data: (page) => page.items.isEmpty
                   ? const EmptyState(
                       title: 'لا توجد نتائج مطابقة',
                       body: 'جرّب تغيير الفرز أو تعديل الفلاتر للوصول إلى نتائج أكثر.',
@@ -312,6 +330,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     )
                   : LayoutBuilder(
                       builder: (_, constraints) => GridView.builder(
+                        controller: _resultsScrollController,
                         padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: Responsive.propertyGridColumns(
@@ -326,19 +345,46 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                                 ),
                           ),
                         ),
-                        itemCount: items.length,
-                        itemBuilder: (_, index) => PropertyCard(
-                          property: items[index],
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => PropertyDetailScreen(
-                                propertyId: items[index].id,
+                        itemCount: page.items.length + (page.hasMore ? 1 : 0),
+                        itemBuilder: (_, index) {
+                          if (index == page.items.length) {
+                            return Center(
+                              child: page.isLoadingMore
+                                  ? const CircularProgressIndicator()
+                                  : TextButton.icon(
+                                      onPressed: () => unawaited(
+                                        ref
+                                            .read(explorePropertySearchProvider(query).notifier)
+                                            .loadMore(retry: page.loadMoreError),
+                                      ),
+                                      icon: Icon(
+                                        page.loadMoreError
+                                            ? Icons.refresh_rounded
+                                            : Icons.expand_more_rounded,
+                                      ),
+                                      label: Text(
+                                        page.loadMoreError
+                                            ? 'إعادة المحاولة'
+                                            : 'تحميل المزيد',
+                                      ),
+                                    ),
+                            );
+                          }
+
+                          final property = page.items[index];
+                          return PropertyCard(
+                            property: property,
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PropertyDetailScreen(
+                                  propertyId: property.id,
+                                ),
                               ),
                             ),
-                          ),
-                          onFavorite: () =>
-                              toggleFavorite(context, ref, items[index]),
-                        ),
+                            onFavorite: () =>
+                                toggleFavorite(context, ref, property),
+                          );
+                        },
                       ),
                     ),
             ),
