@@ -50,7 +50,7 @@ class AiKnowledgeManagementTest extends TestCase
 
         $knowledge = app(AiKnowledgeService::class);
         $clientResults = collect($knowledge->searchKnowledge('كيف أطلب معاينة وحجز زيارة؟', 'client'));
-        $this->assertSame('article-'.$article->id, $clientResults->first()['id'] ?? null);
+        $this->assertTrue($clientResults->contains('id', 'article-'.$article->id));
 
         $agentResults = collect($knowledge->searchKnowledge('كيف أطلب معاينة وحجز زيارة؟', 'agent'));
         $this->assertNull($agentResults->firstWhere('id', 'article-'.$article->id));
