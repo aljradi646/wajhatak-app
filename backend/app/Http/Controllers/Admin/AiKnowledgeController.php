@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AiKnowledgeArticle;
 use App\Models\ActivityLog;
+use App\Services\AI\AiKnowledgeService;
+use App\Services\AI\AiSchemaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -14,8 +16,16 @@ class AiKnowledgeController extends Controller
 {
     private const ROLES = ['client', 'agent', 'admin'];
 
+    public function __construct(
+        private readonly AiKnowledgeService $knowledge,
+        private readonly AiSchemaService $schema,
+    ) {}
+
     public function index(Request $request): View
     {
+        $this->schema->ensure();
+        $this->knowledge->syncBuiltInArticles();
+
         $editing = null;
         if ($request->filled('edit')) {
             $editing = AiKnowledgeArticle::query()->findOrFail($request->integer('edit'));
