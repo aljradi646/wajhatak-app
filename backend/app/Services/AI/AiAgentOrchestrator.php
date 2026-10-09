@@ -108,7 +108,10 @@ class AiAgentOrchestrator
         // المحادثة، وإلا عادت البطاقات القديمة إلى رسائل جديدة.
         $previousPropertyIds = $this->stateService->retrievalPropertyIds($conversation);
 
-        $route = $this->intentRouter->route($message, [], $previousFilters, $previousPropertyIds);
+        // أعطِ الموجّه سجل الرسائل المحدود حتى يحل «الأول/الثاني/نفسه»
+        // من السياق الفعلي، مع بقاء قرار النية سابقًا على أي استدعاء أداة.
+        $history = $this->conversationService->historyFor($conversation);
+        $route = $this->intentRouter->route($message, $history, $previousFilters, $previousPropertyIds);
         $intent = (string) $route['intent'];
 
         $userMessage = $this->conversationService->addUserMessage($conversation, $message, []);
@@ -696,16 +699,16 @@ class AiAgentOrchestrator
         array $filters,
     ): array {
         $mode = strtolower((string) config('ai.llm.mode', 'grounded'));
-        $baseArgs = array_filter([
-            'city' => $filters['city'] ?? null,
-            'district' => $filters['district'] ?? null,
-            'property_type' => $filters['property_type'] ?? null,
-            'transaction_type' => $filters['transaction_type'] ?? null,
-            'bedrooms' => $filters['bedrooms_min'] ?? null,
-            'min_price' => $filters['min_price'] ?? null,
-            'max_price' => $filters['max_price'] ?? null,
-            'furnished' => $filters['furnished'] ?? null,
-        ], fn ($value) => $value !== null && $value !== '');
+        // لا تختزل المعايير المستخرجة إلى مجموعة جزئية: ذلك كان يُسقط
+        // حدود الغرف والحمامات والمساحة والكلمات المفتاحية في مسار البحث الحتمي.
+        $searchFields = [
+            'city', 'district', 'neighborhood', 'property_type', 'transaction_type',
+            'bedrooms', 'bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'bathrooms_max',
+            'min_price', 'max_price', 'min_area', 'max_area', 'furnished', 'is_new',
+            'is_featured', 'sort', 'q', 'keywords', 'limit',
+        ];
+        $baseArgs = array_intersect_key($filters, array_flip($searchFields));
+        $baseArgs = array_filter($baseArgs, fn ($value) => $value !== null && $value !== '');
 
         if ($mode !== 'agent' || ! $this->llm->configured()) {
             $result = $this->executeTool('search_properties', $baseArgs, $user);
@@ -817,19 +820,10 @@ class AiAgentOrchestrator
                     $args = json_decode($raw, true);
                     $args = is_array($args) ? $args : [];
 
-                    // القيود الحالية حتمية وصارمة؛ LLM لا يستطيع استبدال النوع/المدينة/العملية.
-                    foreach (['city','district','property_type','transaction_type'] as $key) {
-                        if (array_key_exists($key, $baseArgs)) {
-                            $args[$key] = $baseArgs[$key];
-                        }
-                    }
-                    if (array_key_exists('bedrooms', $baseArgs)) {
-                        $args['bedrooms'] = $baseArgs['bedrooms'];
-                    }
-                    foreach (['min_price','max_price','furnished'] as $key) {
-                        if (array_key_exists($key, $baseArgs)) {
-                            $args[$key] = $baseArgs[$key];
-                        }
+                    // المعايير الصريحة التي فهمها المحلل هي مصدر الحقيقة؛ نسمح للنموذج
+                    // بتحسين المعايير غير المحسومة فقط، ولا نسمح له بإلغاء قيود المستخدم.
+                    foreach ($baseArgs as $key => $value) {
+                        $args[$key] = $value;
                     }
 
                     $result = $this->executeTool('search_properties', $args, $user);
