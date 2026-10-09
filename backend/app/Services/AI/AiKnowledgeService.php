@@ -2,6 +2,10 @@
 
 namespace App\Services\AI;
 
+use App\Models\AiKnowledgeArticle;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
+
 /**
  * معرفة المنصة المعتمدة.
  *
