@@ -805,23 +805,6 @@ class AiAgentOrchestrator
                 $reply = preg_replace('/<think>.*?<\/think>/us', '', $reply) ?? $reply;
                 $reply = trim($reply);
 
-                // طلب الأدوات يبقى غير متدفق. بعد تنفيذ الأداة، نبث الرد النهائي
-                // بطلب نصي بلا أدوات حتى لا نعرض arguments أو تخطيط النموذج.
-                if ($onDelta !== null && $lastToolCalls !== []) {
-                    array_pop($messages); // إزالة الرد النهائي غير المتدفق من سجل الطلب.
-                    try {
-                        $streamed = $this->llm->chatStream($messages, $onDelta);
-                        $streamedReply = trim((string) data_get($streamed, 'message.content', ''));
-                        if ($streamedReply !== '' && mb_strlen($streamedReply) <= 1200) {
-                            $reply = $streamedReply;
-                        }
-                    } catch (Throwable $e) {
-                        Log::warning('ai.agent_final_stream_failed_using_grounded_reply', [
-                            'exception' => class_basename($e),
-                        ]);
-                    }
-                }
-
                 if ($reply !== '' && mb_strlen($reply) <= 1200) {
                     return $lastResult + [
                         'reply' => $reply,
@@ -866,6 +849,29 @@ class AiAgentOrchestrator
                     'name' => $name,
                     'content' => json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
                 ];
+            }
+
+            // في قناة SSE لا نطلب جوابًا نهائيًا غير متدفق ثم نعيد توليده.
+            // بعدما تُنفذ أداة البحث المسموح بها، نرسل ملخصًا متدفقًا من نتائجها.
+            if ($onDelta !== null && $lastToolCalls !== []) {
+                try {
+                    $streamed = $this->llm->chatStream($messages, $onDelta);
+                    $reply = trim((string) data_get($streamed, 'message.content', ''));
+                    $reply = preg_replace('/<think>.*?<\/think>/us', '', $reply) ?? $reply;
+                    $reply = trim($reply);
+
+                    if ($reply !== '' && mb_strlen($reply) <= 1200) {
+                        return $lastResult + [
+                            'reply' => $reply,
+                            'intent' => 'llm_agent',
+                            'tool_calls' => $lastToolCalls,
+                        ];
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('ai.agent_final_stream_failed_using_grounded_reply', [
+                        'exception' => class_basename($e),
+                    ]);
+                }
             }
         }
 
