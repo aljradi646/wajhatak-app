@@ -108,6 +108,38 @@ class AiConversationContextTest extends TestCase
         $this->assertNull($conversation->fresh()->context_state['pending_action']??null);
     }
 
+    public function test_property_references_do_not_survive_a_newer_non_property_reply(): void
+    {
+        $user = User::factory()->create();
+        $conversation = AiConversation::query()->create([
+            'user_id' => $user->id,
+            'locale' => 'ar',
+            'status' => 'active',
+        ]);
+
+        $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => 'هذه بعض العقارات المطابقة.',
+            'property_ids' => [101, 102],
+            'status' => 'ok',
+            'response_type' => 'property_results',
+        ]);
+
+        $this->assertSame([101, 102], app(\App\Services\AI\AiConversationService::class)
+            ->lastRetrievedPropertyIds($conversation));
+
+        $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => 'أنا مساعد وجهتك، وأساعدك في استخدام المنصة.',
+            'property_ids' => null,
+            'status' => 'ok',
+            'response_type' => 'text',
+        ]);
+
+        $this->assertSame([], app(\App\Services\AI\AiConversationService::class)
+            ->lastRetrievedPropertyIds($conversation));
+    }
+
     public function test_pruning_archives_expired_conversations_and_deletes_their_messages(): void
     {
         $user = User::factory()->create();
