@@ -239,16 +239,27 @@ class AiIntentService
             }
         }
 
+        $unit = '(?:متر(?:\\s*مربع)?|م2|م²)';
+        $number = '([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)';
         $patterns = [
-            'min_area' => '/(?:مساحه\\s*)?(?:لا\\s*تقل\\s*عن|على\\s*الاقل|اكبر\\s*من|اكثر\\s*من|فوق)\\s*([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)\\s*(?:متر(?:\\s*مربع)?|م2|م²)?/u',
-            'max_area' => '/(?:مساحه\\s*)?(?:اقل\\s*من|حتى|بحد\\s*اقصى|لا\\s*تتجاوز|لا\\s*يزيد\\s*عن)\\s*([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)\\s*(?:متر(?:\\s*مربع)?|م2|م²)?/u',
+            'min_area' => [
+                '/مساحه\\s*(?:لا\\s*تقل\\s*عن|على\\s*الاقل|اكبر\\s*من|اكثر\\s*من|فوق)\\s*'.$number.'(?:\\s*'.$unit.')?/u',
+                '/(?:لا\\s*تقل\\s*عن|على\\s*الاقل|اكبر\\s*من|اكثر\\s*من|فوق)\\s*'.$number.'\\s*'.$unit.'/u',
+            ],
+            'max_area' => [
+                '/مساحه\\s*(?:اقل\\s*من|حتى|بحد\\s*اقصى|لا\\s*تتجاوز|لا\\s*يزيد\\s*عن)\\s*'.$number.'(?:\\s*'.$unit.')?/u',
+                '/(?:اقل\\s*من|حتى|بحد\\s*اقصى|لا\\s*تتجاوز|لا\\s*يزيد\\s*عن)\\s*'.$number.'\\s*'.$unit.'/u',
+            ],
         ];
 
-        foreach ($patterns as $key => $pattern) {
-            if (preg_match($this->normalize($pattern), $text, $match) === 1) {
-                $number = $this->toNumber((string) $match[1]);
-                if ($number !== null) {
-                    return [$key => $number];
+        foreach ($patterns as $key => $alternatives) {
+            foreach ($alternatives as $pattern) {
+                if (preg_match($this->normalize($pattern), $text, $match) !== 1) {
+                    continue;
+                }
+                $area = $this->toNumber((string) $match[1]);
+                if ($area !== null) {
+                    return [$key => $area];
                 }
             }
         }
