@@ -105,7 +105,6 @@ class AiKnowledgeController extends Controller
             ->values();
 
         if ($keywords->isEmpty() || $keywords->count() > 20 || $keywords->contains(fn (string $keyword) => mb_strlen($keyword) > 60)) {
-            validator([], [])->errors()->add('keywords_text', 'أدخل من 1 إلى 20 كلمة مفتاحية، بحد أقصى 60 حرفًا للكلمة.');
             $request->validate(['keywords_text' => ['required', function ($attribute, $value, $fail) {
                 $keywords = collect(preg_split('/[,،\r\n]+/u', (string) $value) ?: [])
                     ->map(fn (string $keyword) => trim($keyword))
