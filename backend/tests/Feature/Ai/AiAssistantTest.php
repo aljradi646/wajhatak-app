@@ -549,20 +549,30 @@ class AiAssistantTest extends TestCase
         $this->assertContains('جامعة', $filters['keywords'] ?? []);
     }
 
-    /** ع) حد أسئلة المتابعة: لا يتجاوز سؤالين متتاليين. */
+    /** ع) حد أسئلة المتابعة: لا يتجاوز سؤالين متتاليين داخل الجلسة نفسها. */
     public function test_follow_up_questions_are_capped(): void
     {
-        // ثلاث رسائل قصيرة متتابعة بلا معلومات كافية.
+        // حافظ على معرّف المحادثة ورمز الجلسة اللذين أصدرهما الخادم.
+        // الطلب بلا رمز جلسة يجب ألا يعيد استخدام محادثة زائر آخر.
+        $context = [];
         foreach (['أبحث عن عقار', 'ميزانيتي مرنة', 'اعرض لي كل شيء'] as $message) {
-            $response = $this->postJson('/api/v1/ai/chat', ['message' => $message]);
+            $response = $this->postJson('/api/v1/ai/chat', [
+                'message' => $message,
+                ...$context,
+            ]);
             $response->assertOk();
+
+            $context = [
+                'conversation_id' => (int) $response->json('data.conversation_id'),
+                'session_token' => (string) $response->json('data.session_token'),
+            ];
         }
 
-        // رسائل المساعد الاستفهامية المتتالية في القاعدة ≤ 2.
-        $questions = \App\Models\AiMessage::query()
+        // رسائل المساعد الاستفهامية ضمن محادثة الاختبار ≤ 2.
+        $questions = AiMessage::query()
+            ->where('ai_conversation_id', $context['conversation_id'])
             ->where('role', 'assistant')
             ->where('content', 'like', '%؟%')
-            ->where('created_at', '>=', now()->subMinutes(5))
             ->count();
         $this->assertLessThanOrEqual(2, $questions);
     }
