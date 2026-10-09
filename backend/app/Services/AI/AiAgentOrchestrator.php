@@ -729,10 +729,13 @@ class AiAgentOrchestrator
                         'properties' => $result['properties'] ?? [],
                     ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
 
-                $summary = $this->llm->chat([
+                $summaryMessages = [
                     ['role' => 'system', 'content' => $system],
                     ['role' => 'user', 'content' => $message],
-                ]);
+                ];
+                $summary = $onDelta !== null
+                    ? $this->llm->chatStream($summaryMessages, $onDelta)
+                    : $this->llm->chat($summaryMessages);
 
                 $reply = trim((string) data_get($summary, 'message.content', ''));
                 $reply = preg_replace('/<think>.*?<\/think>/us', '', $reply) ?? $reply;
@@ -800,6 +803,25 @@ class AiAgentOrchestrator
             if ($calls === []) {
                 $reply = trim((string) ($assistant['content'] ?? ''));
                 $reply = preg_replace('/<think>.*?<\/think>/us', '', $reply) ?? $reply;
+                $reply = trim($reply);
+
+                // طلب الأدوات يبقى غير متدفق. بعد تنفيذ الأداة، نبث الرد النهائي
+                // بطلب نصي بلا أدوات حتى لا نعرض arguments أو تخطيط النموذج.
+                if ($onDelta !== null && $lastToolCalls !== []) {
+                    array_pop($messages); // إزالة الرد النهائي غير المتدفق من سجل الطلب.
+                    try {
+                        $streamed = $this->llm->chatStream($messages, $onDelta);
+                        $streamedReply = trim((string) data_get($streamed, 'message.content', ''));
+                        if ($streamedReply !== '' && mb_strlen($streamedReply) <= 1200) {
+                            $reply = $streamedReply;
+                        }
+                    } catch (Throwable $e) {
+                        Log::warning('ai.agent_final_stream_failed_using_grounded_reply', [
+                            'exception' => class_basename($e),
+                        ]);
+                    }
+                }
+
                 if ($reply !== '' && mb_strlen($reply) <= 1200) {
                     return $lastResult + [
                         'reply' => $reply,
