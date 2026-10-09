@@ -90,7 +90,10 @@ class AiKnowledgeController extends Controller
      */
     private function validatedData(Request $request, ?AiKnowledgeArticle $article = null): array
     {
-        $request->merge(['slug' => strtolower(trim((string) $request->input('slug', '')))]);
+        $request->merge([
+            'slug' => strtolower(trim((string) $request->input('slug', ''))),
+        ]);
+
         $slugRules = ['required', 'string', 'max:120', 'alpha_dash'];
         $slugRules[] = $article
             ? Rule::unique('ai_knowledge_articles', 'slug')->ignore($article->id)
@@ -101,13 +104,35 @@ class AiKnowledgeController extends Controller
             'topic' => ['required', 'string', 'max:160'],
             'content' => ['required', 'string', 'min:10', 'max:12000'],
             'keywords_text' => [
-                'required', 'string', 'max:2000',
+                'required',
+                'string',
+                'max:2000',
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     $keywords = collect(preg_split('/[,،\r\n]+/u', (string) $value) ?: [])
                         ->map(fn (string $keyword) => trim($keyword))
                         ->filter(fn (string $keyword) => $keyword !== '')
                         ->unique(fn (string $keyword) => mb_strtolower($keyword));
-                    return [
+
+                    if ($keywords->isEmpty() || $keywords->count() > 20
+                        || $keywords->contains(fn (string $keyword) => mb_strlen($keyword) > 60)) {
+                        $fail('أدخل من 1 إلى 20 كلمة مفتاحية، بحد أقصى 60 حرفًا للكلمة.');
+                    }
+                },
+            ],
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['required', 'string', Rule::in(self::ROLES)],
+            'target_screen' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
+            'priority' => ['nullable', 'integer', 'min:0', 'max:10000'],
+            'is_active' => ['sometimes', 'boolean'],
+        ]);
+
+        $keywords = collect(preg_split('/[,،\r\n]+/u', (string) $validated['keywords_text']) ?: [])
+            ->map(fn (string $keyword) => trim($keyword))
+            ->filter(fn (string $keyword) => $keyword !== '')
+            ->unique(fn (string $keyword) => mb_strtolower($keyword))
+            ->values();
+
+        return [
             'slug' => strtolower((string) $validated['slug']),
             'topic' => trim((string) $validated['topic']),
             'content' => trim((string) $validated['content']),
