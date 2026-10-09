@@ -23,6 +23,7 @@ class AiIntentService
             'bedrooms_min' => ['type' => ['integer', 'null']],
             'bedrooms_max' => ['type' => ['integer', 'null']],
             'bathrooms_min' => ['type' => ['integer', 'null']],
+            'bathrooms_max' => ['type' => ['integer', 'null']],
             'min_price' => ['type' => ['number', 'null']],
             'max_price' => ['type' => ['number', 'null']],
             'min_area' => ['type' => ['number', 'null']],
@@ -160,6 +161,45 @@ class AiIntentService
             }
         }
 
+        // المساحة: تمرير الحدود الصريحة إلى البحث بدل تركها في النص فقط.
+        $filters = array_merge($filters, $this->extractAreaFilters($text));
+
+        // الحمامات: الأرقام العربية/الهندية وصيغ شائعة في العربية اليمنية.
+        $bathroomCount = null;
+        if ($this->matches('/(حمامين|حمامان|دورتين\\s*مياه)/u', $text)) {
+            $bathroomCount = 2;
+        } elseif (preg_match(
+            $this->normalize('/([\\d٠-٩]+|واحده?|اثنين|اثنتين|اثنان|ثلاث|ثلاثه|اربع|اربعه|خمس|خمسه)\\s*(?:حمامات|حمامين|حمام|دورات\\s*مياه)/u'),
+            $text,
+            $bathroomMatch,
+        ) === 1) {
+            $bathroomCount = $this->toCount((string) $bathroomMatch[1]);
+        } elseif (preg_match(
+            $this->normalize('/(?:حمام|دورة\\s*مياه)\\s*([\\d٠-٩]+|واحده?|اثنين|اثنتين|اثنان|ثلاث|ثلاثه|اربع|اربعه|خمس|خمسه)/u'),
+            $text,
+            $bathroomMatch,
+        ) === 1) {
+            $bathroomCount = $this->toCount((string) $bathroomMatch[1]);
+        } elseif ($this->matches('/\\bحمام\\b/u', $text)) {
+            $bathroomCount = 1;
+        }
+
+        if ($bathroomCount !== null) {
+            $isMaxBathrooms = $this->matches('/(حتى|حد\\s*اقصى|اقل\\s*من|لا\\s*تزيد\\s*عن|ما\\s*تزيد\\s*عن)/u', $text);
+            $isMinBathrooms = $this->matches('/(على\\s*الاقل|لا\\s*تقل\\s*عن|اكثر\\s*من|فوق)/u', $text);
+            if ($isMaxBathrooms) {
+                $filters['bathrooms_max'] = $this->matches('/اقل\\s*من/u', $text)
+                    ? max(0, $bathroomCount - 1)
+                    : $bathroomCount;
+            } elseif ($isMinBathrooms) {
+                $filters['bathrooms_min'] = $this->matches('/اكثر\\s*من/u', $text)
+                    ? min(20, $bathroomCount + 1)
+                    : $bathroomCount;
+            } else {
+                $filters['bathrooms_min'] = $bathroomCount;
+            }
+        }
+
         // المدن والأحياء المعروفة — مطابقة *بحدود كلمة* لا بالاحتواء النصي.
         // بدون ذلك تُطابَق «إب» داخل «أبحث» و«حدة» داخل «الوحدة»، فيظهر
         // للمستخدم بحث في مدينة لم يذكرها إطلاقًا.
@@ -178,6 +218,59 @@ class AiIntentService
         }
 
         return $filters;
+    }
+
+    /**
+     * استخراج حدود المساحة من العبارات الصريحة فقط.
+     *
+     * @return array<string, float>
+     */
+    private function extractAreaFilters(string $text): array
+    {
+        $rangePattern = $this->normalize('/(?:مساحه\\s*)?(?:من\\s*)?([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)\\s*(?:الي|-|الى)\\s*([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)\\s*(?:متر(?:\\s*مربع)?|م2|م²)/u');
+        if (preg_match($rangePattern, $text, $match) === 1) {
+            $minimum = $this->toNumber((string) $match[1]);
+            $maximum = $this->toNumber((string) $match[2]);
+            if ($minimum !== null && $maximum !== null) {
+                return [
+                    'min_area' => min($minimum, $maximum),
+                    'max_area' => max($minimum, $maximum),
+                ];
+            }
+        }
+
+        $patterns = [
+            'min_area' => '/(?:مساحه\\s*)?(?:لا\\s*تقل\\s*عن|على\\s*الاقل|اكبر\\s*من|اكثر\\s*من|فوق)\\s*([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)\\s*(?:متر(?:\\s*مربع)?|م2|م²)?/u',
+            'max_area' => '/(?:مساحه\\s*)?(?:اقل\\s*من|حتى|بحد\\s*اقصى|لا\\s*تتجاوز|لا\\s*يزيد\\s*عن)\\s*([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)\\s*(?:متر(?:\\s*مربع)?|م2|م²)?/u',
+        ];
+
+        foreach ($patterns as $key => $pattern) {
+            if (preg_match($this->normalize($pattern), $text, $match) === 1) {
+                $number = $this->toNumber((string) $match[1]);
+                if ($number !== null) {
+                    return [$key => $number];
+                }
+            }
+        }
+
+        return [];
+    }
+
+    private function toCount(string $raw): ?int
+    {
+        $number = $this->toNumber($raw);
+        if ($number !== null) {
+            return max(0, min(20, (int) $number));
+        }
+
+        return match ($this->normalize(trim($raw))) {
+            'واحد', 'واحده' => 1,
+            'اثنين', 'اثنتين', 'اثنان' => 2,
+            'ثلاث', 'ثلاثه' => 3,
+            'اربع', 'اربعه' => 4,
+            'خمس', 'خمسه' => 5,
+            default => null,
+        };
     }
 
     /** @return list<array{0: float, 1: string}> */
@@ -306,7 +399,7 @@ class AiIntentService
     /** تطهير نهائي للمعايير قبل البحث. */
     private function normalizeFilters(array $filters): array
     {
-        foreach (['bedrooms_min', 'bedrooms_max', 'bathrooms_min'] as $key) {
+        foreach (['bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'bathrooms_max'] as $key) {
             if (isset($filters[$key])) {
                 $filters[$key] = max(0, min(20, (int) $filters[$key]));
             }
