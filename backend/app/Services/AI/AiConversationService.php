@@ -101,13 +101,18 @@ class AiConversationService
         return is_array($state['active_search'] ?? null) ? $state['active_search'] : [];
     }
 
-    /** آخر مجموعة عقارات مرتبطة برسالة مساعد بعينها، لا حالة عامة. */
+    /**
+     * معرفات العقارات في آخر رد للمساعد فقط.
+     * لا نتجاوز ردًا أحدث غير عقاري، حتى لا يعود سؤال مثل «الأول» إلى نتائج
+     * قديمة بعد أن انتقلت المحادثة إلى المساعدة العامة أو موضوع آخر.
+     *
+     * @return list<int>
+     */
     public function lastRetrievedPropertyIds(AiConversation $conversation): array
     {
         $message = AiMessage::query()
             ->where('ai_conversation_id', $conversation->id)
             ->where('role', AiMessageRole::Assistant->value)
-            ->whereNotNull('property_ids')
             ->orderByDesc('id')
             ->first();
 
