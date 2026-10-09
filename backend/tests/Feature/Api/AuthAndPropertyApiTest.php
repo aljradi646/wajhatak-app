@@ -225,6 +225,40 @@ class AuthAndPropertyApiTest extends TestCase
             ->assertJsonValidationErrors(['max_area']);
     }
 
+    public function test_property_sort_options_order_price_area_and_publication_date(): void
+    {
+        $city = 'فرز-اختبار-'.strtolower(uniqid());
+        $a = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 300000, 'area' => 75, 'published_at' => now()->subDays(3)],
+            ['city' => $city],
+        );
+        $b = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 100000, 'area' => 180, 'published_at' => now()->subDay()],
+            ['city' => $city],
+        );
+        $c = $this->createProperty(
+            PropertyStatus::Published,
+            ['price' => 200000, 'area' => 120, 'published_at' => now()->subDays(10)],
+            ['city' => $city],
+        );
+
+        $idsFor = fn (string $sort) => array_column(
+            $this->getJson('/api/v1/properties?'.http_build_query([
+                'city' => $city,
+                'sort' => $sort,
+            ]))->assertOk()->json('data'),
+            'id',
+        );
+
+        $this->assertSame([$b->id, $c->id, $a->id], $idsFor('price_asc'));
+        $this->assertSame([$a->id, $c->id, $b->id], $idsFor('price_desc'));
+        $this->assertSame([$a->id, $c->id, $b->id], $idsFor('area_asc'));
+        $this->assertSame([$b->id, $a->id, $c->id], $idsFor('newest'));
+        $this->assertSame([$c->id, $a->id, $b->id], $idsFor('oldest'));
+    }
+
     private function createProperty(
         PropertyStatus $status,
         array $attributes = [],

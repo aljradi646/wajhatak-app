@@ -46,7 +46,7 @@ class PropertyController extends Controller
             'is_furnished' => ['nullable', 'boolean'],
             'is_new' => ['nullable', 'boolean'],
             'is_featured' => ['nullable', 'boolean'],
-            'sort' => ['nullable', 'string', 'max:30'],
+            'sort' => ['nullable', 'in:recommended,newest,oldest,price_asc,price_desc,area_asc,area_desc'],
         ]);
 
         $query = Property::query()
@@ -227,10 +227,13 @@ class PropertyController extends Controller
     private function applySort(Builder $query, string $sort): void
     {
         match ($sort) {
-            'price_asc' => $query->orderBy('price'),
-            'price_desc' => $query->orderByDesc('price'),
-            'area_desc' => $query->orderByDesc('area'),
-            default => $query->orderByDesc('is_featured')->orderByDesc('published_at'),
+            'newest' => $query->orderByDesc('published_at')->orderByDesc('id'),
+            'oldest' => $query->orderBy('published_at')->orderBy('id'),
+            'price_asc' => $query->orderBy('price')->orderByDesc('id'),
+            'price_desc' => $query->orderByDesc('price')->orderByDesc('id'),
+            'area_asc' => $query->orderBy('area')->orderByDesc('id'),
+            'area_desc' => $query->orderByDesc('area')->orderByDesc('id'),
+            default => $query->orderByDesc('is_featured')->orderByDesc('published_at')->orderByDesc('id'),
         };
     }
 
