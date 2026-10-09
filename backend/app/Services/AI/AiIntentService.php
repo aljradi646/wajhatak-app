@@ -147,19 +147,7 @@ class AiIntentService
             $filters['keywords'] = array_keys($keywords);
         }
 
-        // المساحة: افصلها عن السعر حتى لا تتحول «1500 متر» إلى ميزانية.
-        $filters = array_merge($filters, $this->extractAreaFilters($text));
-
-        // الحمامات: دعم الصيغ الرقمية والكلمات الشائعة في العربية.
-        if ($this->matches('/(?:3|ثلاث|ثلاثة)\\s*حمام(?:ات)?/u', $text)) {
-            $filters['bathrooms_min'] = 3;
-        } elseif ($this->matches('/(?:2|اثنين|اثنتين|حمامين|حمامان)\\s*حمام(?:ات)?|حمامين|حمامان/u', $text)) {
-            $filters['bathrooms_min'] = 2;
-        } elseif ($this->matches('/(?:1|واحد|واحدة)\\s*حمام|حمام\\s*واحد/u', $text)) {
-            $filters['bathrooms_min'] = 1;
-        }
-
-        // الأسعار: «أقل من 150 ألف»، «من 50 إلى 100 مليون»، «150K»، والأرقام العربية.
+        // الأسعار: "أقل من 150 ألف"، "من 50 إلى 100 مليون"، "150K"، "٢٠٠٠٠٠".
         $units = $this->extractPriceUnits($text);
         if ($units !== []) {
             foreach ($units as [$amount, $kind]) {
@@ -361,119 +349,39 @@ class AiIntentService
         };
     }
 
-    /**
-     * يلتقط النطاق أولًا؛ وحدة الرقم الثاني تُورَّث للأول إذا كتبها المستخدم مرة واحدة.
-     *
-     * @return list<array{0: float, 1: string}>
-     */
+    /** @return list<array{0: float, 1: string}> */
     private function extractPriceUnits(string $text): array
     {
-        $number = '([\\d٠-٩]+(?:[.,٫][\\d٠-٩]+)?)';
-        $unit = '(مليون(?:ين)?|الفين|الف|ك|k|m)?';
-        $rangePattern = '/(?:^|\\s)(?:من|بين)\\s*'.$number.'\\s*'.$unit.'\\s*(?:إلى|الى|حتى|و)\\s*'.$number.'\\s*'.$unit.'(?=\\s|$|[،,.])/u';
-
-        if (preg_match($rangePattern, $text, $range, PREG_OFFSET_CAPTURE) === 1) {
-            $start = $range[0][1];
-            $whole = $range[0][0];
-            $after = substr($text, $start + strlen($whole));
-            // «من 120 إلى 200 متر» نطاق مساحة وليس نطاق سعر.
-            if (preg_match('/^\\s*(?:متر|مربع|م2|م²|sqm)/u', $after) !== 1) {
-                $left = $this->toNumber($range[1][0]);
-                $leftUnit = (string) ($range[2][0] ?? '');
-                $right = $this->toNumber($range[3][0]);
-                $rightUnit = (string) ($range[4][0] ?? '');
-
-                if ($left !== null && $right !== null) {
-                    $leftUnit = $leftUnit !== '' ? $leftUnit : $rightUnit;
-                    $rightUnit = $rightUnit !== '' ? $rightUnit : $leftUnit;
-                    $from = $this->applyPriceUnit($left, $leftUnit);
-                    $to = $this->applyPriceUnit($right, $rightUnit);
-
-                    if ($from >= 1000 && $to >= 1000 && $to >= $from) {
-                        return [[$from, 'min'], [$to, 'max']];
-                    }
-                }
-            }
-        }
-
         $out = [];
-        $pattern = '/([\\d٠-٩]+(?:[.,٫][\\d٠-٩]+)?)\\s*(مليون(?:ين)?|الفين|الف|ك\\b|k\\b|m\\b)?/u';
-        if (preg_match_all($pattern, $text, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
-            foreach ($matches as $match) {
-                $num = $this->toNumber($match[1][0]);
+        // رقم + وحدة (ألف/مليون/k/m) في سياق سعر.
+        if (preg_match_all('/([\d٠-٩]+(?:[.,][\d٠-٩]+)?)\s*(مليون|مليونين|ألف|الف|الفين|ك\b|k\b|m\b|مليون)?/u', $text, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $m) {
+                $num = $this->toNumber($m[1]);
                 if ($num === null) {
                     continue;
                 }
-
-                $unit = (string) ($match[2][0] ?? '');
-                $value = $this->applyPriceUnit($num, $unit);
+                $unit = $m[2] ?? '';
+                $multiplier = match (true) {
+                    str_contains($unit, 'مليون') => 1_000_000,
+                    str_contains($unit, 'ألف') || str_contains($unit, 'الف') || $unit === 'ك' || strtolower($unit) === 'k' => 1_000,
+                    strtolower($unit) === 'm' => 1_000_000,
+                    default => 1,
+                };
+                $value = $num * $multiplier;
+                // تجاهل أعداد الغرف والمساحات الصغيرة: ليست أسعارًا.
                 if ($value < 1000) {
                     continue;
                 }
-
-                $offset = $match[0][1];
-                $before = substr($text, 0, $offset);
-                $after = substr($text, $offset + strlen($match[0][0]));
-                // يمنع التقاط قياس المساحة على أنه سعر.
-                if (preg_match('/(?:مساحه|متر|مربع|م2|م²|sqm)\\s*$/u', $before) === 1
-                    || preg_match('/^\\s*(?:متر|مربع|م2|م²|sqm)/u', $after) === 1) {
-                    continue;
-                }
-
-                $isMax = preg_match('/(أقل|اقل|حتى|بحدود|ميزانية|دون)/u', $before) === 1;
-                $isMin = preg_match('/(فوق|أكثر|اكثر|بداية|يبدأ|يبدا|لا\\s*تقل\\s*عن)/u', $before) === 1;
+                // تحديد اتجاه السعر من السياق قبل الرقم.
+                $position = mb_strpos($text, $m[0]);
+                $before = $position !== false ? mb_substr($text, 0, $position) : $text;
+                $isMax = (bool) preg_match('/(أقل|اقل|حتى|بحدود|ميزانية|دون)/u', $before);
+                $isMin = (bool) preg_match('/(فوق|أكثر|اكثر|بداية|يبدأ|يبدا)/u', $before);
                 $out[] = [$value, $isMax && ! $isMin ? 'max' : ($isMin ? 'min' : 'max')];
             }
         }
 
         return $out;
-    }
-
-    private function applyPriceUnit(float $number, string $unit): float
-    {
-        return $number * match (true) {
-            str_contains($unit, 'مليون') => 1_000_000,
-            str_contains($unit, 'الف') || str_contains($unit, 'ألف') || $unit === 'ك' || strtolower($unit) === 'k' => 1_000,
-            strtolower($unit) === 'm' => 1_000_000,
-            default => 1,
-        };
-    }
-
-    /**
-     * @return array<string, int|float>
-     */
-    private function extractAreaFilters(string $text): array
-    {
-        $number = '([\\d٠-٩]+(?:[.,٫][\\d٠-٩]+)?)';
-        $unit = '(?:متر(?:\\s*مربع)?|مربع|م2|م²|sqm)';
-        $areaPhrase = 'مساحه\\s*(?:(?:من|بين)\\s*)?';
-
-        $rangePattern = '/'.$areaPhrase.$number.'\\s*'.$unit.'?\\s*(?:إلى|الى|و)\\s*'.$number.'\\s*'.$unit.'/u';
-        if (preg_match($rangePattern, $text, $range) === 1) {
-            $min = $this->toNumber($range[1]);
-            $max = $this->toNumber($range[2]);
-            if ($min !== null && $max !== null && $min > 0 && $max >= $min) {
-                return ['min_area' => $min, 'max_area' => $max];
-            }
-        }
-
-        // يدعم «مساحة لا تقل عن 120 متر» و«مساحة حتى 200 متر».
-        $singlePattern = '/(?:مساحه\\s*(?:(?:لا\\s*تقل\\s*عن|على\\s*الاقل|اكثر\\s*من|فوق|اقل\\s*من|حتى|لا\\s*تزيد\\s*عن|بحد\\s*اقصى)\\s*)?|)'.$number.'\\s*'.$unit.'/u';
-        if (preg_match($singlePattern, $text, $single, PREG_OFFSET_CAPTURE) === 1) {
-            $area = $this->toNumber($single[1][0]);
-            if ($area === null || $area <= 0) {
-                return [];
-            }
-
-            $prefix = substr($text, 0, $single[0][1] + strlen($single[0][0]) - strlen($single[1][0]));
-            if (preg_match('/(?:اقل\\s*من|حتى|لا\\s*تزيد\\s*عن|بحد\\s*اقصى)\\s*$/u', $prefix) === 1) {
-                return ['max_area' => $area];
-            }
-
-            return ['min_area' => $area];
-        }
-
-        return [];
     }
 
     private function toNumber(string $raw): ?float
