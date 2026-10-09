@@ -101,6 +101,46 @@ class AiKnowledgeManagementTest extends TestCase
         );
     }
 
+    public function test_admin_can_edit_and_disable_a_builtin_article_without_falling_back_to_stale_text(): void
+    {
+        $this->actingAs($this->admin())
+            ->get(route('admin.ai.knowledge.index'))
+            ->assertOk();
+
+        $article = AiKnowledgeArticle::query()->where('slug', 'viewing-request')->firstOrFail();
+
+        $this->put(route('admin.ai.knowledge.update', ['article' => $article->id]), [
+            'slug' => 'viewing-request',
+            'topic' => 'إرشادات المعاينة الجديدة',
+            'content' => 'تظهر الإرشادات المعدلة من قاعدة المعرفة بعد حفظها في لوحة الإدارة.',
+            'keywords_text' => 'موعد خاص، معاينة مميزة',
+            'roles' => ['client'],
+            'target_screen' => 'PropertyDetailsScreen',
+            'priority' => 5,
+            'is_active' => '1',
+        ])->assertRedirect(route('admin.ai.knowledge.index', ['edit' => $article->id]));
+
+        $results = collect(app(AiKnowledgeService::class)->searchKnowledge('أريد موعد خاص للمعاينة المميزة', 'client'));
+        $edited = $results->firstWhere('id', 'viewing-request');
+        $this->assertNotNull($edited);
+        $this->assertSame('إرشادات المعاينة الجديدة', $edited['topic']);
+        $this->assertSame('تظهر الإرشادات المعدلة من قاعدة المعرفة بعد حفظها في لوحة الإدارة.', $edited['content']);
+        $this->assertCount(1, $results->where('id', 'viewing-request'));
+
+        $this->patch(route('admin.ai.knowledge.status', ['article' => $article->id]), [
+            'is_active' => '0',
+        ])->assertRedirect(route('admin.ai.knowledge.index'));
+
+        $afterDisable = collect(app(AiKnowledgeService::class)->searchKnowledge('موعد خاص معاينة مميزة', 'client'));
+        $this->assertNull($afterDisable->firstWhere('id', 'viewing-request'));
+        $this->assertDatabaseHas('ai_knowledge_articles', [
+            'id' => $article->id,
+            'slug' => 'viewing-request',
+            'is_active' => 0,
+            'version' => 3,
+        ]);
+    }
+
     public function test_non_admin_cannot_open_knowledge_management(): void
     {
         $this->actingAs(User::factory()->create(['is_active' => true]))
