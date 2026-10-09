@@ -46,7 +46,7 @@ class PropertyController extends Controller
             'is_furnished' => ['nullable', 'boolean'],
             'is_new' => ['nullable', 'boolean'],
             'is_featured' => ['nullable', 'boolean'],
-            'sort' => ['nullable', 'in:recommended,newest,oldest,price_asc,price_desc,area_asc,area_desc'],
+            'sort' => ['nullable', 'in:recommended,relevance,newest,oldest,price_asc,price_desc,area_asc,area_desc'],
         ]);
 
         $query = Property::query()

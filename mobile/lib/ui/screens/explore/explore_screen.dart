@@ -836,7 +836,7 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * .88,
+          height: (MediaQuery.sizeOf(context).height - bottomInset) * .88,
           child: Column(
             children: [
               Padding(

@@ -46,5 +46,5 @@ void main() {
       final bounded = await fixtures.list(PropertyQuery(minArea: minArea, maxArea: maxArea));
       expect(bounded.every((item) => item.area != null && item.area! >= minArea && item.area! <= maxArea), isTrue);
     }
-  );
+  });
 }

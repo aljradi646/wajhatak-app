@@ -103,17 +103,17 @@ class PreviewFixtureRepository {
         case 'price_desc':
           return b.price.compareTo(a.price);
         case 'area_asc':
-          return _compareNullable<double>(a.area, b.area, descending: false);
+          return _compareNullableNumber(a.area, b.area, descending: false);
         case 'area_desc':
-          return _compareNullable<double>(a.area, b.area, descending: true);
+          return _compareNullableNumber(a.area, b.area, descending: true);
         case 'newest':
-          return _compareNullable<DateTime>(
+          return _compareNullableDateTime(
             a.publishedAt,
             b.publishedAt,
             descending: true,
           );
         case 'oldest':
-          return _compareNullable<DateTime>(
+          return _compareNullableDateTime(
             a.publishedAt,
             b.publishedAt,
             descending: false,
@@ -121,7 +121,7 @@ class PreviewFixtureRepository {
         default:
           final featured = (b.isFeatured ? 1 : 0).compareTo(a.isFeatured ? 1 : 0);
           if (featured != 0) return featured;
-          final date = _compareNullable<DateTime>(
+          final date = _compareNullableDateTime(
             a.publishedAt,
             b.publishedAt,
             descending: true,
@@ -133,9 +133,19 @@ class PreviewFixtureRepository {
     return result;
   }
 
-  int _compareNullable<T extends Comparable<T>>(
-    T? a,
-    T? b, {
+  int _compareNullableNumber(
+    double? a,
+    double? b, {
+    required bool descending,
+  }) {
+    if (a == null) return b == null ? 0 : 1;
+    if (b == null) return -1;
+    return descending ? b.compareTo(a) : a.compareTo(b);
+  }
+
+  int _compareNullableDateTime(
+    DateTime? a,
+    DateTime? b, {
     required bool descending,
   }) {
     if (a == null) return b == null ? 0 : 1;
