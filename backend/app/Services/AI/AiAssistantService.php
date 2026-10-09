@@ -41,6 +41,7 @@ class AiAssistantService
         ?AiConversation $conversation = null,
         string $locale = 'ar',
         array $clientContext = [],
+        ?callable $onDelta = null,
     ): array {
         $started = $this->ms();
         $searchMs = 0;
@@ -64,7 +65,7 @@ class AiAssistantService
 
             // 2) تفويض العملية إلى AiAgentOrchestrator
             $stage = 'orchestrator';
-            $orchestratorResult = $this->orchestrator->process($user, $message, $conversation, $locale, $clientContext);
+            $orchestratorResult = $this->orchestrator->process($user, $message, $conversation, $locale, $clientContext, $onDelta);
             $contract = AiResponseContract::normalize($orchestratorResult);
 
             $reply = $contract['reply'] ?? 'تمت معالجة الطلب.';
