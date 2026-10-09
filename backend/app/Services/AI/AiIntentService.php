@@ -161,6 +161,13 @@ class AiIntentService
             }
         }
 
+        // عند ورود نطاق سعر صريح نضبط الحدين قبل البحث؛ الوحدة على طرف واحد
+        // تُورّث للطرف الآخر، وتظل حدود المساحة خارج محلل السعر.
+        $priceRange = $this->extractPriceRangeFilters($text);
+        if ($priceRange !== []) {
+            $filters = array_merge($filters, $priceRange);
+        }
+
         // المساحة: تمرير الحدود الصريحة إلى البحث بدل تركها في النص فقط.
         $filters = array_merge($filters, $this->extractAreaFilters($text));
 
@@ -281,6 +288,64 @@ class AiIntentService
             'اربع', 'اربعه' => 4,
             'خمس', 'خمسه' => 5,
             default => null,
+        };
+    }
+
+    /**
+     * يلتقط نطاق السعر بوحداته حتى لا يتحول «من 2 إلى 3 مليون» إلى حد أعلى فقط.
+     * يقبل الوحدة على طرف واحد ويطبّقها على الطرف الآخر، دون اعتبار نطاق المساحة سعرًا.
+     *
+     * @return array{min_price: float, max_price: float}|array{}
+     */
+    private function extractPriceRangeFilters(string $text): array
+    {
+        $number = '([\\d٠-٩]+(?:[.,][\\d٠-٩]+)?)';
+        $unit = '(مليونين|مليون|الفين|الف|k\\b|m\\b|ك\\b)';
+        $pattern = $this->normalize('/(?:من\\s*)?'.$number.'\\s*'.$unit.'?\\s*(?:إلى|الي|حتى|-)\\s*'.$number.'\\s*'.$unit.'?/u');
+        if (preg_match_all($pattern, $text, $matches, PREG_SET_ORDER) === false) {
+            return [];
+        }
+
+        foreach ($matches as $match) {
+            $minUnit = trim((string) ($match[2] ?? ''));
+            $maxUnit = trim((string) ($match[4] ?? ''));
+            $range = (string) ($match[0] ?? '');
+            $position = mb_strpos($text, $range);
+            $before = $position !== false ? mb_substr($text, max(0, $position - 24), min(24, $position)) : '';
+
+            // لا نفسّر «غرفتين إلى ثلاث» ولا «100 إلى 150 مترًا» على أنها أسعار.
+            // الرقم المجرد يُقبل فقط إذا ارتبطت عبارته القريبة بسياق سعر/ميزانية.
+            if ($minUnit === '' && $maxUnit === ''
+                && ! $this->matches('/(سعر|ميزانيه|قيمه|تكلفه)/u', $before)) {
+                continue;
+            }
+
+            $minNumber = $this->toNumber((string) ($match[1] ?? ''));
+            $maxNumber = $this->toNumber((string) ($match[3] ?? ''));
+            if ($minNumber === null || $maxNumber === null) {
+                continue;
+            }
+
+            $minScale = $this->priceUnitMultiplier($minUnit !== '' ? $minUnit : $maxUnit);
+            $maxScale = $this->priceUnitMultiplier($maxUnit !== '' ? $maxUnit : $minUnit);
+            $minimum = $minNumber * $minScale;
+            $maximum = $maxNumber * $maxScale;
+
+            return [
+                'min_price' => min($minimum, $maximum),
+                'max_price' => max($minimum, $maximum),
+            ];
+        }
+
+        return [];
+    }
+
+    private function priceUnitMultiplier(string $unit): float
+    {
+        return match (true) {
+            str_contains($unit, 'مليون') || strtolower($unit) === 'm' => 1_000_000,
+            str_contains($unit, 'الف') || strtolower($unit) === 'k' || $unit === 'ك' => 1_000,
+            default => 1,
         };
     }
 
