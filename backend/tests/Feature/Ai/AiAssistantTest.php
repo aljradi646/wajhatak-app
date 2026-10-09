@@ -894,4 +894,38 @@ class AiAssistantTest extends TestCase
         );
     }
 
+    /** البحث المنظم يقبل الإحداثيات ونصف القطر والحد الأقصى للنتائج. */
+    public function test_structured_ai_search_supports_nearby_coordinates_radius_and_limit(): void
+    {
+        $property = Property::query()->where('status', 'published')->firstOrFail();
+        $property->location->update(['latitude' => 15.369445, 'longitude' => 44.191006]);
+        $property->update(['is_furnished' => false, 'title' => $property->title.' ']);
+
+        $response = $this->postJson('/api/v1/ai/search', [
+            'latitude' => 15.369445,
+            'longitude' => 44.191006,
+            'radius_km' => 5,
+            'furnished' => false,
+            'limit' => 1,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.status', 'ok')
+            ->assertJsonPath('data.filters.nearby.latitude', 15.369445)
+            ->assertJsonPath('data.filters.nearby.longitude', 44.191006)
+            ->assertJsonPath('data.filters.nearby.radius_km', 5);
+
+        $ids = array_column($response->json('data.properties'), 'property_id');
+        $this->assertContains($property->id, $ids);
+        $this->assertLessThanOrEqual(1, count($ids));
+    }
+
+    public function test_structured_ai_search_requires_both_coordinates_for_nearby_filter(): void
+    {
+        $this->postJson('/api/v1/ai/search', ['latitude' => 15.369445])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['longitude']);
+    }
+
+
 }

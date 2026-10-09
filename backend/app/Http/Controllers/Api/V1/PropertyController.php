@@ -23,6 +23,32 @@ class PropertyController extends Controller
 {
     public function index(Request $request)
     {
+        $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'district' => ['nullable', 'string', 'max:100'],
+            'neighborhood' => ['nullable', 'string', 'max:100'],
+            'property_type' => ['nullable', 'string', 'max:30'],
+            'transaction_type' => ['nullable', 'in:sale,rent'],
+            'min_price' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
+            'max_price' => ['nullable', 'numeric', 'min:0', 'max:999999999999', 'gte:min_price'],
+            'min_area' => ['nullable', 'numeric', 'min:0'],
+            'max_area' => ['nullable', 'numeric', 'min:0', 'gte:min_area'],
+            'bedrooms' => ['nullable', 'integer', 'between:0,20'],
+            'bedrooms_min' => ['nullable', 'integer', 'between:0,20'],
+            'bedrooms_max' => ['nullable', 'integer', 'between:0,20', 'gte:bedrooms_min'],
+            'bathrooms' => ['nullable', 'integer', 'between:0,20'],
+            'bathrooms_min' => ['nullable', 'integer', 'between:0,20'],
+            'bathrooms_max' => ['nullable', 'integer', 'between:0,20', 'gte:bathrooms_min'],
+            'parking_spaces' => ['nullable', 'integer', 'between:0,50'],
+            'parking_spaces_min' => ['nullable', 'integer', 'between:0,50'],
+            'parking_spaces_max' => ['nullable', 'integer', 'between:0,50', 'gte:parking_spaces_min'],
+            'is_furnished' => ['nullable', 'boolean'],
+            'is_new' => ['nullable', 'boolean'],
+            'is_featured' => ['nullable', 'boolean'],
+            'sort' => ['nullable', 'string', 'max:30'],
+        ]);
+
         $query = Property::query()
             ->with(['type', 'location.country', 'location.region', 'location.cityReference', 'location.area', 'agent.user', 'images'])
             ->where('status', PropertyStatus::Published);
@@ -180,17 +206,22 @@ class PropertyController extends Controller
             ->orWhere('description', 'like', '%'.$request->string('q')->toString().'%')))
             ->when($request->filled('city'), fn (Builder $q) => $q->whereHas('location', fn (Builder $location) => $location->where('city', $request->string('city')->toString())))
             ->when($request->filled('district'), fn (Builder $q) => $q->whereHas('location', fn (Builder $location) => $location->where('district', $request->string('district')->toString())))
+            ->when($request->filled('neighborhood'), fn (Builder $q) => $q->whereHas('location', fn (Builder $location) => $location->where('neighborhood', $request->string('neighborhood')->toString())))
             ->when($request->filled('property_type'), fn (Builder $q) => $q->whereHas('type', fn (Builder $type) => $type->where('slug', $request->string('property_type')->toString())))
             ->when($request->filled('transaction_type'), fn (Builder $q) => $q->where('transaction_type', $request->string('transaction_type')->toString()))
             ->when($request->filled('min_price'), fn (Builder $q) => $q->where('price', '>=', $request->float('min_price')))
             ->when($request->filled('max_price'), fn (Builder $q) => $q->where('price', '<=', $request->float('max_price')))
             ->when($request->filled('min_area'), fn (Builder $q) => $q->where('area', '>=', $request->float('min_area')))
-            ->when($request->filled('bedrooms'), fn (Builder $q) => $q->where('bedrooms', '>=', $request->integer('bedrooms')))
-            ->when($request->filled('bathrooms'), fn (Builder $q) => $q->where('bathrooms', '>=', $request->integer('bathrooms')))
-            ->when($request->filled('parking_spaces'), fn (Builder $q) => $q->where('parking_spaces', '>=', $request->integer('parking_spaces')))
-            ->when($request->filled('is_furnished'), fn (Builder $q) => $q->where('is_furnished', $request->boolean('is_furnished')))
-            ->when($request->boolean('is_new'), fn (Builder $q) => $q->where('is_new', true))
-            ->when($request->boolean('is_featured'), fn (Builder $q) => $q->where('is_featured', true));
+            ->when($request->filled('max_area'), fn (Builder $q) => $q->where('area', '<=', $request->float('max_area')))
+            ->when($request->filled('bedrooms_min') || $request->filled('bedrooms'), fn (Builder $q) => $q->where('bedrooms', '>=', $request->filled('bedrooms_min') ? $request->integer('bedrooms_min') : $request->integer('bedrooms')))
+            ->when($request->filled('bedrooms_max'), fn (Builder $q) => $q->where('bedrooms', '<=', $request->integer('bedrooms_max')))
+            ->when($request->filled('bathrooms_min') || $request->filled('bathrooms'), fn (Builder $q) => $q->where('bathrooms', '>=', $request->filled('bathrooms_min') ? $request->integer('bathrooms_min') : $request->integer('bathrooms')))
+            ->when($request->filled('bathrooms_max'), fn (Builder $q) => $q->where('bathrooms', '<=', $request->integer('bathrooms_max')))
+            ->when($request->filled('parking_spaces_min') || $request->filled('parking_spaces'), fn (Builder $q) => $q->where('parking_spaces', '>=', $request->filled('parking_spaces_min') ? $request->integer('parking_spaces_min') : $request->integer('parking_spaces')))
+            ->when($request->filled('parking_spaces_max'), fn (Builder $q) => $q->where('parking_spaces', '<=', $request->integer('parking_spaces_max')))
+            ->when($request->has('is_furnished') && $request->input('is_furnished') !== null, fn (Builder $q) => $q->where('is_furnished', $request->boolean('is_furnished')))
+            ->when($request->has('is_new') && $request->input('is_new') !== null, fn (Builder $q) => $q->where('is_new', $request->boolean('is_new')))
+            ->when($request->has('is_featured') && $request->input('is_featured') !== null, fn (Builder $q) => $q->where('is_featured', $request->boolean('is_featured')));
     }
 
     private function applySort(Builder $query, string $sort): void

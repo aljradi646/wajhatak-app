@@ -169,13 +169,79 @@ class AuthAndPropertyApiTest extends TestCase
         $this->assertDatabaseHas('user_devices', ['user_id' => $user->id, 'platform' => 'android']);
     }
 
-    private function createProperty(PropertyStatus $status): Property
+    public function test_property_filters_support_ranges_and_explicit_false_values(): void
+    {
+        $matching = $this->createProperty(
+            PropertyStatus::Published,
+            [
+                'area' => 120,
+                'bedrooms' => 3,
+                'bathrooms' => 2,
+                'parking_spaces' => 1,
+                'is_furnished' => false,
+                'is_new' => false,
+                'is_featured' => false,
+            ],
+            ['city' => 'صنعاء', 'district' => 'حدة', 'neighborhood' => 'السنينة'],
+        );
+        $this->createProperty(
+            PropertyStatus::Published,
+            [
+                'area' => 220,
+                'bedrooms' => 4,
+                'bathrooms' => 3,
+                'parking_spaces' => 2,
+                'is_furnished' => true,
+                'is_new' => true,
+                'is_featured' => true,
+            ],
+            ['city' => 'صنعاء', 'district' => 'حدة', 'neighborhood' => 'السنينة'],
+        );
+
+        $response = $this->getJson('/api/v1/properties?'.http_build_query([
+            'city' => 'صنعاء',
+            'district' => 'حدة',
+            'neighborhood' => 'السنينة',
+            'min_area' => 100,
+            'max_area' => 150,
+            'bedrooms_min' => 2,
+            'bedrooms_max' => 3,
+            'bathrooms_min' => 1,
+            'bathrooms_max' => 2,
+            'parking_spaces_min' => 1,
+            'parking_spaces_max' => 1,
+            'is_furnished' => 0,
+            'is_new' => 0,
+            'is_featured' => 0,
+        ]));
+
+        $response->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $matching->id);
+    }
+
+    public function test_property_search_rejects_inverted_numeric_ranges(): void
+    {
+        $this->getJson('/api/v1/properties?min_area=150&max_area=90')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['max_area']);
+    }
+
+    private function createProperty(
+        PropertyStatus $status,
+        array $attributes = [],
+        array $locationAttributes = [],
+    ): Property
     {
         $agentUser = User::factory()->create();
         $agentUser->assignRole('agent');
         $agent = Agent::query()->create(['user_id' => $agentUser->id, 'is_active' => true]);
         $type = PropertyType::query()->firstOrCreate(['slug' => 'apartment'], ['name_ar' => 'شقة', 'name_en' => 'Apartment', 'is_active' => true]);
-        $location = PropertyLocation::query()->create(['city' => 'الرياض', 'address' => 'حي العليا', 'latitude' => 24.7136, 'longitude' => 46.6753]);
+        $location = PropertyLocation::query()->create([
+            'city' => 'الرياض',
+            'address' => 'حي العليا',
+            'latitude' => 24.7136,
+            'longitude' => 46.6753,
+            ...$locationAttributes,
+        ]);
 
         return Property::query()->create([
             'agent_id' => $agent->id,
@@ -190,6 +256,7 @@ class AuthAndPropertyApiTest extends TestCase
             'price' => 850000,
             'currency' => 'SAR',
             'published_at' => $status === PropertyStatus::Published ? now() : null,
+            ...$attributes,
         ]);
     }
 }

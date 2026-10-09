@@ -38,12 +38,24 @@ class AiToolRegistry
                     'properties' => [
                         'city' => ['type' => 'string'],
                         'district' => ['type' => 'string'],
+                        'neighborhood' => ['type' => 'string'],
                         'property_type' => ['type' => 'string'],
                         'transaction_type' => ['type' => 'string', 'enum' => ['sale', 'rent']],
                         'bedrooms' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 20],
+                        'bedrooms_min' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 20],
+                        'bedrooms_max' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 20],
+                        'bathrooms_min' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 20],
+                        'bathrooms_max' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 20],
                         'min_price' => ['type' => 'number', 'minimum' => 0],
                         'max_price' => ['type' => 'number', 'minimum' => 0],
+                        'min_area' => ['type' => 'number', 'minimum' => 0],
+                        'max_area' => ['type' => 'number', 'minimum' => 0],
                         'furnished' => ['type' => 'boolean'],
+                        'is_new' => ['type' => 'boolean'],
+                        'is_featured' => ['type' => 'boolean'],
+                        'sort' => ['type' => 'string', 'enum' => ['price_asc', 'price_desc', 'area_desc', 'relevance']],
+                        'q' => ['type' => 'string', 'maxLength' => 100],
+                        'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 20],
                     ],
                 ],
             ],
@@ -208,7 +220,7 @@ class AiToolRegistry
     private function validateArguments(string $toolName, array $args): ?string
     {
         $allowed = match ($toolName) {
-            'search_properties' => ['city','district','property_type','transaction_type','bedrooms','min_price','max_price','furnished'],
+            'search_properties' => ['city','district','neighborhood','property_type','transaction_type','bedrooms','bedrooms_min','bedrooms_max','bathrooms_min','bathrooms_max','min_price','max_price','min_area','max_area','furnished','is_new','is_featured','sort','q','limit'],
             'get_property_details' => ['property_id'],
             'get_property_availability' => ['property_id'],
             'find_similar_properties' => ['property_id','limit'],
@@ -227,10 +239,22 @@ class AiToolRegistry
         }
 
         if (isset($args['property_id']) && (int) $args['property_id'] <= 0) return 'معرف العقار غير صالح.';
-        if (isset($args['bedrooms']) && ((int) $args['bedrooms'] < 0 || (int) $args['bedrooms'] > 20)) return 'عدد الغرف غير صالح.';
+        foreach (['bedrooms', 'bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'bathrooms_max'] as $key) {
+            if (isset($args[$key]) && (! is_numeric($args[$key]) || (int) $args[$key] < 0 || (int) $args[$key] > 20)) {
+                return 'عدد الغرف أو الحمامات غير صالح.';
+            }
+        }
         if (isset($args['transaction_type']) && ! in_array($args['transaction_type'], ['sale','rent'], true)) return 'نوع العملية غير صالح.';
-        if (isset($args['min_price']) && (float) $args['min_price'] < 0) return 'الحد الأدنى للسعر غير صالح.';
-        if (isset($args['max_price']) && (float) $args['max_price'] < 0) return 'الحد الأعلى للسعر غير صالح.';
+        foreach (['min_price', 'max_price', 'min_area', 'max_area'] as $key) {
+            if (isset($args[$key]) && (! is_numeric($args[$key]) || (float) $args[$key] < 0)) {
+                return 'حد السعر أو المساحة غير صالح.';
+            }
+        }
+        if (isset($args['min_price'], $args['max_price']) && (float) $args['max_price'] < (float) $args['min_price']) return 'الحد الأعلى للسعر أقل من الحد الأدنى.';
+        if (isset($args['min_area'], $args['max_area']) && (float) $args['max_area'] < (float) $args['min_area']) return 'الحد الأعلى للمساحة أقل من الحد الأدنى.';
+        if (isset($args['bedrooms_min'], $args['bedrooms_max']) && (int) $args['bedrooms_max'] < (int) $args['bedrooms_min']) return 'نطاق غرف النوم غير صالح.';
+        if (isset($args['bathrooms_min'], $args['bathrooms_max']) && (int) $args['bathrooms_max'] < (int) $args['bathrooms_min']) return 'نطاق الحمامات غير صالح.';
+        if (isset($args['limit']) && ((int) $args['limit'] < 1 || (int) $args['limit'] > 20)) return 'عدد النتائج غير صالح.';
         if ($toolName === 'get_app_knowledge' && mb_strlen((string) ($args['query'] ?? '')) > 200) return 'الاستعلام طويل جدًا.';
         if (isset($args['query']) && mb_strlen((string) $args['query']) > 200) return 'الاستعلام طويل جدًا.';
 
@@ -246,16 +270,27 @@ class AiToolRegistry
     private function executeSearchProperties(array $args): array
     {
         $filters = [];
-        if (!empty($args['city'])) $filters['city'] = (string) $args['city'];
-        if (!empty($args['district'])) $filters['district'] = (string) $args['district'];
-        if (!empty($args['property_type'])) $filters['property_type'] = (string) $args['property_type'];
-        if (!empty($args['transaction_type'])) $filters['transaction_type'] = (string) $args['transaction_type'];
-        if (!empty($args['bedrooms'])) $filters['bedrooms_min'] = (int) $args['bedrooms'];
-        if (!empty($args['min_price'])) $filters['min_price'] = (float) $args['min_price'];
-        if (!empty($args['max_price'])) $filters['max_price'] = (float) $args['max_price'];
-        if (isset($args['furnished'])) $filters['furnished'] = (bool) $args['furnished'];
+        foreach (['city', 'district', 'neighborhood', 'property_type', 'transaction_type', 'sort', 'q'] as $key) {
+            if (isset($args[$key]) && trim((string) $args[$key]) !== '') {
+                $filters[$key] = trim((string) $args[$key]);
+            }
+        }
+        foreach (['bedrooms_min', 'bedrooms_max', 'bathrooms_min', 'bathrooms_max'] as $key) {
+            if (isset($args[$key])) $filters[$key] = (int) $args[$key];
+        }
+        if (isset($args['bedrooms']) && ! isset($filters['bedrooms_min'])) {
+            $filters['bedrooms_min'] = (int) $args['bedrooms'];
+        }
+        foreach (['min_price', 'max_price', 'min_area', 'max_area'] as $key) {
+            if (isset($args[$key])) $filters[$key] = (float) $args[$key];
+        }
+        foreach (['furnished', 'is_new', 'is_featured'] as $key) {
+            if (array_key_exists($key, $args) && $args[$key] !== null) {
+                $filters[$key] = (bool) $args[$key];
+            }
+        }
 
-        $results = $this->searchService->search($filters);
+        $results = $this->searchService->search($filters, isset($args['limit']) ? (int) $args['limit'] : null);
 
         return [
             'success' => ! ($results['degraded'] ?? false),
