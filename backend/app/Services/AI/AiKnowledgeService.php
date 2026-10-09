@@ -186,13 +186,16 @@ class AiKnowledgeService
 
         $results = [];
         foreach ($this->entriesForRole($role) as $item) {
-            $score = 0;
+            // المرادفات العربية قد تتكرر بصيغ إملائية مختلفة (مثل ة/ه).
+            // احتسب الكلمة المعيارية مرة واحدة حتى لا تفوز مادة لمجرد التكرار.
+            $matchedKeywords = [];
             foreach ((array) ($item['keywords'] ?? []) as $keyword) {
                 $needle = $this->normalize((string) $keyword);
                 if ($needle !== '' && str_contains($normalized, $needle)) {
-                    $score++;
+                    $matchedKeywords[$needle] = true;
                 }
             }
+            $score = count($matchedKeywords);
 
             if ($score > 0) {
                 unset($item['slug'], $item['is_active'], $item['is_builtin']);
