@@ -38,6 +38,7 @@ class AiAgentOrchestrator
         AiConversation $conversation,
         string $locale = 'ar',
         array $clientContext = [],
+        ?callable $onDelta = null,
     ): array {
         $guard = $this->guardrails->inspect($message);
         if (! empty($guard['blocked'])) {
@@ -665,6 +666,7 @@ class AiAgentOrchestrator
                 $conversation,
                 $locale,
                 $filters,
+                $onDelta,
             );
 
             return $this->propertyResponse(
@@ -697,6 +699,7 @@ class AiAgentOrchestrator
         AiConversation $conversation,
         string $locale,
         array $filters,
+        ?callable $onDelta = null,
     ): array {
         $mode = strtolower((string) config('ai.llm.mode', 'grounded'));
         // لا تختزل المعايير المستخرجة إلى مجموعة جزئية: ذلك كان يُسقط
