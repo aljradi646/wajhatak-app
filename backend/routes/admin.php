@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AgentController;
 use App\Http\Controllers\Admin\AiAssistantController;
+use App\Http\Controllers\Admin\AiKnowledgeController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmailTemplateController;
@@ -75,6 +76,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // AI Assistant — كل قسم صفحة مستقلة (لا نموذج ضخم واحد).
     Route::get('ai', [AiAssistantController::class, 'index'])->name('ai.index');
+    Route::get('ai/knowledge', [AiKnowledgeController::class, 'index'])->name('ai.knowledge.index');
+    Route::post('ai/knowledge', [AiKnowledgeController::class, 'store'])->name('ai.knowledge.store');
+    Route::put('ai/knowledge/{article}', [AiKnowledgeController::class, 'update'])->name('ai.knowledge.update');
+    Route::patch('ai/knowledge/{article}/status', [AiKnowledgeController::class, 'updateStatus'])->name('ai.knowledge.status');
     Route::get('ai/settings/{section}', [AiAssistantController::class, 'settings'])->name('ai.settings');
     Route::post('ai/settings/{section}', [AiAssistantController::class, 'updateSection'])->name('ai.settings.update');
     Route::get('ai/monitoring', [AiAssistantController::class, 'monitoring'])->name('ai.monitoring');
