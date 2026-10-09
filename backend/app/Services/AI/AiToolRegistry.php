@@ -55,6 +55,7 @@ class AiToolRegistry
                         'is_featured' => ['type' => 'boolean'],
                         'sort' => ['type' => 'string', 'enum' => ['price_asc', 'price_desc', 'area_desc', 'relevance']],
                         'q' => ['type' => 'string', 'maxLength' => 100],
+                        'keywords' => ['type' => 'array', 'maxItems' => 4, 'items' => ['type' => 'string', 'maxLength' => 30]],
                         'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 20],
                     ],
                 ],
@@ -220,7 +221,7 @@ class AiToolRegistry
     private function validateArguments(string $toolName, array $args): ?string
     {
         $allowed = match ($toolName) {
-            'search_properties' => ['city','district','neighborhood','property_type','transaction_type','bedrooms','bedrooms_min','bedrooms_max','bathrooms_min','bathrooms_max','min_price','max_price','min_area','max_area','furnished','is_new','is_featured','sort','q','limit'],
+            'search_properties' => ['city','district','neighborhood','property_type','transaction_type','bedrooms','bedrooms_min','bedrooms_max','bathrooms_min','bathrooms_max','min_price','max_price','min_area','max_area','furnished','is_new','is_featured','sort','q','keywords','limit'],
             'get_property_details' => ['property_id'],
             'get_property_availability' => ['property_id'],
             'find_similar_properties' => ['property_id','limit'],
@@ -255,6 +256,16 @@ class AiToolRegistry
         if (isset($args['bedrooms_min'], $args['bedrooms_max']) && (int) $args['bedrooms_max'] < (int) $args['bedrooms_min']) return 'نطاق غرف النوم غير صالح.';
         if (isset($args['bathrooms_min'], $args['bathrooms_max']) && (int) $args['bathrooms_max'] < (int) $args['bathrooms_min']) return 'نطاق الحمامات غير صالح.';
         if (isset($args['limit']) && ((int) $args['limit'] < 1 || (int) $args['limit'] > 20)) return 'عدد النتائج غير صالح.';
+        if (isset($args['keywords'])) {
+            if (! is_array($args['keywords']) || count($args['keywords']) > 4) {
+                return 'الكلمات المفتاحية غير صالحة.';
+            }
+            foreach ($args['keywords'] as $keyword) {
+                if (! is_string($keyword) || mb_strlen(trim($keyword)) > 30) {
+                    return 'الكلمات المفتاحية غير صالحة.';
+                }
+            }
+        }
         if ($toolName === 'get_app_knowledge' && mb_strlen((string) ($args['query'] ?? '')) > 200) return 'الاستعلام طويل جدًا.';
         if (isset($args['query']) && mb_strlen((string) $args['query']) > 200) return 'الاستعلام طويل جدًا.';
 
@@ -288,6 +299,15 @@ class AiToolRegistry
             if (array_key_exists($key, $args) && $args[$key] !== null) {
                 $filters[$key] = (bool) $args[$key];
             }
+        }
+        if (isset($args['keywords']) && is_array($args['keywords'])) {
+            $filters['keywords'] = array_values(array_slice(array_filter(
+                array_map(
+                    static fn ($keyword): string => mb_substr(trim((string) $keyword), 0, 30),
+                    $args['keywords'],
+                ),
+                static fn (string $keyword): bool => $keyword !== '',
+            ), 0, 4));
         }
 
         $results = $this->searchService->search($filters, isset($args['limit']) ? (int) $args['limit'] : null);
