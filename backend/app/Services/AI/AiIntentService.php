@@ -378,17 +378,15 @@ class AiIntentService
     }
 
     /**
-     * مطابقة اسم مكان بحدود كلمة عربية (مع السماح بأداة التعريف «ال»).
-     * تمنع المطابقات الزائفة مثل «إب» داخل «أبحث» أو «حدة» داخل «الوحدة».
-     *
-     * ملاحظة PCRE: صيغة `ال?` خاطئة — تعني «ا + ل اختياري»؛ الصحيح
-     * `(?:ال)?` كوحدة اختيارية واحدة، والـ lookbehind قبلها لا بعدها.
+     * مطابقة اسم مكان بحدود كلمة مع السماح بأداة التعريف «ال».
+     * نستخدم حدود الحروف والأرقام Unicode بدل Script=Arabic كي لا تعتبر
+     * علامات الترقيم العربية مثل «،» امتدادًا للكلمة فتسقط المدينة من الطلب.
      */
     private function matchesWord(string $pattern, string $normalizedText): bool
     {
         $needle = preg_quote($this->normalize($pattern), '/');
 
-        return preg_match('/(?<!\p{Arabic})(?:ال)?'.$needle.'(?!\p{Arabic})/u', $normalizedText) === 1;
+        return preg_match('/(?<![\p{L}\p{N}])(?:ال)?'.$needle.'(?![\p{L}\p{N}])/u', $normalizedText) === 1;
     }
 
     /** الحقول التي لم تُحدد بعد وتحتاج قرارًا (للمتابعة الذكية). */
