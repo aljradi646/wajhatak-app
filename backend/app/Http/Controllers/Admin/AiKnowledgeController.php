@@ -95,9 +95,14 @@ class AiKnowledgeController extends Controller
         ]);
 
         $slugRules = ['required', 'string', 'max:120', 'alpha_dash'];
-        $slugRules[] = $article
-            ? Rule::unique('ai_knowledge_articles', 'slug')->ignore($article->id)
-            : Rule::unique('ai_knowledge_articles', 'slug');
+        if ($article !== null) {
+            // ثبات المعرّف يضمن أن تحرير مادة افتراضية يحدّثها ولا ينشئ
+            // مادة جديدة ويترك النص القديم ظاهرًا من المصدر المضمّن.
+            $slugRules[] = Rule::in([$article->slug]);
+            $slugRules[] = Rule::unique('ai_knowledge_articles', 'slug')->ignore($article->id);
+        } else {
+            $slugRules[] = Rule::unique('ai_knowledge_articles', 'slug');
+        }
 
         $validated = $request->validate([
             'slug' => $slugRules,
