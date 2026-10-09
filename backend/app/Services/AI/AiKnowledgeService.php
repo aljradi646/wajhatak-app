@@ -271,12 +271,18 @@ class AiKnowledgeService
 
             $builtInSlugs = array_column(self::KNOWLEDGE_BASE, 'id');
 
-            return AiKnowledgeArticle::query()
-                ->where(fn ($query) => $query->whereIn('slug', $builtInSlugs)->orWhere('is_active', true))
+            // لا تسمح لعدد كبير من المقالات المخصصة بإقصاء تعديل سؤال مضمن
+            // من الاسترجاع: حمّل التعديلات التسعة بصورة مستقلة، ثم حدّ المخصصات.
+            $builtIn = AiKnowledgeArticle::query()->whereIn('slug', $builtInSlugs)->get();
+            $custom = AiKnowledgeArticle::query()
+                ->whereNotIn('slug', $builtInSlugs)
+                ->where('is_active', true)
                 ->orderBy('priority')
                 ->orderByDesc('updated_at')
-                ->limit(250)
-                ->get()
+                ->limit(200)
+                ->get();
+
+            return $builtIn->concat($custom)
                 ->map(fn (AiKnowledgeArticle $article) => [
                     'id' => (int) $article->id,
                     'slug' => (string) $article->slug,
