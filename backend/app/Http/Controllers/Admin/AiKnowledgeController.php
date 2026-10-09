@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiKnowledgeArticle;
-use App\Support\ActivityLog;
+use App\Models\ActivityLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -80,6 +80,7 @@ class AiKnowledgeController extends Controller
      */
     private function validatedData(Request $request, ?AiKnowledgeArticle $article = null): array
     {
+        $request->merge(['slug' => strtolower(trim((string) $request->input('slug', '')))]);
         $slugRules = ['required', 'string', 'max:120', 'alpha_dash'];
         $slugRules[] = $article
             ? Rule::unique('ai_knowledge_articles', 'slug')->ignore($article->id)
