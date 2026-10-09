@@ -191,7 +191,18 @@ class AiKnowledgeService
             $matchedKeywords = [];
             foreach ((array) ($item['keywords'] ?? []) as $keyword) {
                 $needle = $this->normalize((string) $keyword);
-                if ($needle !== '' && str_contains($normalized, $needle)) {
+                if ($needle === '') {
+                    continue;
+                }
+
+                // الكلمات المفردة تقبل التصريفات الشائعة جزئيًا، أما العبارات
+                // المركبة فيلزم أن تبدأ وتنتهي عند حدود كلمة حتى لا تتحول
+                // «أطلب معاينة» إلى تطابق زائف مع «طلب معاينة».
+                $matched = str_contains($needle, ' ')
+                    ? preg_match('/(?<![\\p{L}\\p{N}])'.preg_quote($needle, '/').'(?![\\p{L}\\p{N}])/u', $normalized) === 1
+                    : str_contains($normalized, $needle);
+
+                if ($matched) {
                     $matchedKeywords[$needle] = true;
                 }
             }
