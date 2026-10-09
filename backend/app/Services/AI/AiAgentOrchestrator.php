@@ -715,7 +715,10 @@ class AiAgentOrchestrator
 
         if ($mode !== 'agent' || ! $this->llm->configured()) {
             $result = $this->executeTool('search_properties', $baseArgs, $user);
-            if (! $this->llm->configured()) {
+            // لا نستهلك النموذج ولا نبث ملخصًا لعقارات غير موجودة أو عند تعطل المصدر.
+            if (! $this->llm->configured()
+                || ! ($result['success'] ?? false)
+                || empty($result['properties'])) {
                 return $result + ['intent' => 'property_search'];
             }
 
@@ -849,6 +852,12 @@ class AiAgentOrchestrator
                     'name' => $name,
                     'content' => json_encode($result, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
                 ];
+            }
+
+            // إذا لم يُرجع المصدر أي عقار، نترك الطبقة النهائية تصوغ رد عدم التوفر
+            // الموحّد ولا نعرض نصًا مولّدًا لا يضيف معلومة موثوقة.
+            if ($onDelta !== null && $lastToolCalls !== [] && empty($lastResult['properties'])) {
+                return $lastResult + ['intent' => 'property_search', 'tool_calls' => $lastToolCalls];
             }
 
             // في قناة SSE لا نطلب جوابًا نهائيًا غير متدفق ثم نعيد توليده.
