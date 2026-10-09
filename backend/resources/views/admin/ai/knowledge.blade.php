@@ -37,7 +37,7 @@
                     <div>
                         <label for="slug" class="mb-1.5 block text-sm font-bold text-gray-700 dark:text-gray-200">المعرّف التقني</label>
                         <input id="slug" name="slug" dir="ltr" value="{{ old('slug', $editing?->slug) }}"
-                               required maxlength="120" pattern="[A-Za-z0-9_-]+"
+                               required maxlength="120" pattern="[A-Za-z0-9_-]+" @readonly($editing)
                                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-left text-sm dark:border-gray-700 dark:bg-gray-900"
                                placeholder="viewing-request">
                         <p class="mt-1 text-xs text-gray-500">أحرف إنجليزية وأرقام وشرطة فقط، ويجب أن يكون فريدًا.</p>
