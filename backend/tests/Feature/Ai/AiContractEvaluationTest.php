@@ -51,6 +51,10 @@ class AiContractEvaluationTest extends TestCase
 
     public function test_explicit_area_bathroom_and_bedroom_filters_reach_live_search_unchanged(): void
     {
+        // هذا اختبار لمسار القواعد وأدوات قاعدة البيانات؛ لا يعتمد على مزود نموذج خارجي.
+        config()->set('ai.llm.enabled', false);
+        config()->set('ai.llm.mode', 'grounded');
+
         $capturedArguments = null;
         $registry = \Mockery::mock(AiToolRegistry::class);
         $registry->shouldReceive('allowedToolsForIntent')
