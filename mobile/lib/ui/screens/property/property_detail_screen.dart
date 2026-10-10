@@ -25,7 +25,13 @@ class PropertyDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final property = ref.watch(propertyDetailProvider(propertyId));
     final overrides = ref.watch(favoriteOverridesProvider);
-    final currentUserId = ref.watch(sessionProvider).asData?.value?.user.id;
+    final currentUser = ref.watch(sessionProvider).asData?.value?.user;
+    final currentUserId = currentUser?.id;
+    final isKnownOwnedProperty = currentUser?.isAgent == true &&
+        (ref.watch(myListingsProvider).asData?.value.any(
+              (listing) => listing.id == propertyId,
+            ) ??
+            false);
     return Scaffold(
       body: LuxAsyncView<LuxProperty>(
         value: property,
@@ -276,10 +282,16 @@ class PropertyDetailScreen extends ConsumerWidget {
             ),
           );
         },
-        loading: () => SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 380;
+        loading: () {
+          // If this detail route was opened from "عقاراتي", do not even show
+          // action placeholders for a property already known to belong to the
+          // current agent while its detail request is loading.
+          if (isKnownOwnedProperty) return const SizedBox.shrink();
+
+          return SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 380;
               final theme = Theme.of(context);
               return Container(
                 padding: EdgeInsets.symmetric(
@@ -311,9 +323,10 @@ class PropertyDetailScreen extends ConsumerWidget {
                         ],
                       ),
               );
-            },
-          ),
-        ),
+              },
+            ),
+          );
+        },
         orElse: () => const SizedBox.shrink(),
       ),
     );
