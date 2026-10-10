@@ -805,8 +805,6 @@ class AgentReportSkeleton extends StatelessWidget {
             : constraints.maxWidth >= 340
             ? 2
             : 1;
-        final cellWidth =
-            (constraints.maxWidth - (columns - 1) * 10) / columns;
         final ratio = columns == 3
             ? 2.7
             : columns == 2
