@@ -62,15 +62,6 @@ class AgentDashboardScreen extends ConsumerWidget {
               subtitle: 'إدارة عقاراتك وطلباتك',
             )
           : null,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const CreateListingScreen())),
-        backgroundColor: WajhatakColors.emerald,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('إضافة عقار'),
-      ),
       body: AwaitContent<void>(
         value: combined,
         onLoading: const _AgentWorkspaceSkeleton(),
