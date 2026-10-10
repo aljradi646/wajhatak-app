@@ -43,26 +43,35 @@ class ConversationController extends Controller
         $agentUserId = $property->agent->user_id;
         abort_if($agentUserId === $request->user()->id, 422, 'لا يمكن إنشاء محادثة مع عقارك الخاص.');
 
-        // Conversation uniqueness is enforced on (client_id, agent_id): opening a
-        // chat from any property of the same agent reuses the same conversation.
-        try {
-            $conversation = Conversation::query()->create([
-                'client_id' => $request->user()->id,
-                'agent_id' => $agentUserId,
-                'property_id' => $property->id,
-                'last_message_at' => null,
-            ]);
-            $isNew = true;
-        } catch (UniqueConstraintViolationException) {
-            // Concurrent request created it first — reuse the existing row.
-            $conversation = Conversation::query()
-                ->where('client_id', $request->user()->id)
-                ->where('agent_id', $agentUserId)
-                ->firstOrFail();
-            $isNew = false;
+        // Use the participant pair as the lookup key so different listings from the
+        // same agent do not create separate threads during normal sequential use.
+        $conversation = Conversation::query()
+            ->where('client_id', $request->user()->id)
+            ->where('agent_id', $agentUserId)
+            ->first();
+        $isNew = $conversation === null;
+
+        if ($isNew) {
+            try {
+                $conversation = Conversation::query()->create([
+                    'client_id' => $request->user()->id,
+                    'agent_id' => $agentUserId,
+                    'property_id' => $property->id,
+                    'last_message_at' => null,
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                // A concurrent request may have created this exact conversation.
+                $conversation = Conversation::query()
+                    ->where('client_id', $request->user()->id)
+                    ->where('agent_id', $agentUserId)
+                    ->firstOrFail();
+                $isNew = false;
+            }
         }
 
-        return response()->json(['data' => new ConversationResource($conversation->load(['property', 'client', 'agent']))], 201);
+        return response()->json([
+            'data' => new ConversationResource($conversation->load(['property', 'client', 'agent'])),
+        ], $isNew ? 201 : 200);
     }
 
     public function messages(Request $request, Conversation $conversation)
@@ -79,7 +88,12 @@ class ConversationController extends Controller
         $data = $request->validate([
             'body' => ['nullable', 'string', 'max:4000'],
             'message_type' => ['sometimes', 'string', 'in:text,property'],
-            'property_id' => ['required_with:message_type', 'integer', 'exists:properties,id'],
+            'property_id' => [
+                'required_if:message_type,property',
+                'prohibited_unless:message_type,property',
+                'integer',
+                'exists:properties,id',
+            ],
         ]);
 
         $messageType = $data['message_type'] ?? 'text';
