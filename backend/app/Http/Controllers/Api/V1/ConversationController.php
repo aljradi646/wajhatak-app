@@ -22,8 +22,8 @@ class ConversationController extends Controller
         $conversations = Conversation::query()
             ->with([
                 'property',
-                'client',
-                'agent',
+                'client.agentProfile',
+                'agent.agentProfile',
                 'messages' => fn ($query) => $query->latest()->limit(1),
             ])
             ->withCount(['messages as unread_count' => fn ($query) => $query->where('sender_id', '!=', $userId)->whereNull('read_at')])
@@ -70,7 +70,11 @@ class ConversationController extends Controller
         }
 
         return response()->json([
-            'data' => new ConversationResource($conversation->load(['property', 'client', 'agent'])),
+            'data' => new ConversationResource($conversation->load([
+                'property',
+                'client.agentProfile',
+                'agent.agentProfile',
+            ])),
         ], $isNew ? 201 : 200);
     }
 
