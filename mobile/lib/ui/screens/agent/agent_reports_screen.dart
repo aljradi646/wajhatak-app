@@ -133,9 +133,10 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasRouteAppBar = ModalRoute.of(context)?.canPop ?? false;
 
     return Scaffold(
-      appBar: (ModalRoute.of(context)?.canPop ?? false)
+      appBar: hasRouteAppBar
           ? const WajhatakScreenHeader(
               title: 'تقاريري',
               subtitle: 'تقارير عقاراتك وطلباتك',
@@ -147,13 +148,15 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
             children: [
-              Text(
-                'تقاريري',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
+              if (!hasRouteAppBar) ...[
+                Text(
+                  'تقاريري',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
+                const SizedBox(height: 4),
+              ],
               Text(
                 'تقارير مبنية على بياناتك الحقيقية — معاينة، تصدير، وسجل كامل.',
                 style: theme.textTheme.bodySmall,
