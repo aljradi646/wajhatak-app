@@ -31,7 +31,10 @@ class MessagesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     if (session.isLoading) {
-      return _wrap(context, const ConversationListSkeleton());
+      return _wrap(
+        context,
+        ConversationListSkeleton(showTitle: !standalone),
+      );
     }
     if (session.asData?.value == null) {
       return _wrap(
@@ -47,15 +50,16 @@ class MessagesScreen extends ConsumerWidget {
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
-          child: Text(
-            'الرسائل',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+        if (!standalone)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
+            child: Text(
+              'الرسائل',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+            ),
           ),
-        ),
         Expanded(
           child: LuxAsyncView<List<ConversationItem>>(
             value: conversations,
