@@ -439,14 +439,13 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
                   builder: (context, constraints) {
                     final columns = constraints.maxWidth >= 700
                         ? 3
-                        : constraints.maxWidth >= 300
+                        : constraints.maxWidth >= 460
                         ? 2
                         : 1;
-                    final cardRatio = columns == 3
-                        ? 2.7
-                        : columns == 2
-                        ? 2.2
-                        : 3.0;
+                    final cardWidth =
+                        (constraints.maxWidth - (columns - 1) * 10) /
+                        columns;
+                    final cardRatio = cardWidth < 260 ? 2.0 : 2.7;
 
                     return GridView.builder(
                       shrinkWrap: true,
