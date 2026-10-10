@@ -7,6 +7,7 @@ import '../../../data/api_client.dart';
 import '../../../data/models/agent_report.dart';
 import '../../../state/providers.dart';
 import '../../widgets.dart';
+import 'agent_report_preview_screen.dart';
 
 /// تقارير الوكيل داخل التطبيق — أنواع التقارير ومرشحاتها تُقرأ من الـ API
 /// (لا قوائم ثابتة في التطبيق)، والبيانات كلها من قاعدة البيانات.
@@ -213,6 +214,17 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
               onPressed: _loadingReport ? null : _loadReport,
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('عرض التقرير'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _loadingReport || _report == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => AgentReportPreviewScreen(report: _report!),
+                      ),
+                    ),
+              icon: const Icon(Icons.visibility_rounded, size: 18),
+              label: const Text('معاينة داخل التطبيق'),
             ),
             OutlinedButton.icon(
               onPressed: () => _openExport(format: 'csv'),
