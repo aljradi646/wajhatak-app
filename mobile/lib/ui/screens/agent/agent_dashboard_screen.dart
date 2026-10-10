@@ -255,25 +255,42 @@ class _AgentWorkspaceSkeleton extends StatelessWidget {
   const _AgentWorkspaceSkeleton();
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(20),
-    children: [
-      const LuxSkeleton(height: 172, radius: 24),
-      const SizedBox(height: 16),
-      Row(
-        children: const [
-          Expanded(child: LuxSkeleton(height: 82)),
-          SizedBox(width: 10),
-          Expanded(child: LuxSkeleton(height: 82)),
-          SizedBox(width: 10),
-          Expanded(child: LuxSkeleton(height: 82)),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 900
+          ? 4
+          : constraints.maxWidth >= 560
+          ? 3
+          : 2;
+      final cellWidth =
+          (constraints.maxWidth - (columns - 1) * 10) / columns;
+      final cellHeight =
+          (cellWidth * .46).clamp(64.0, 84.0).toDouble();
+
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const LuxSkeleton(height: 172, radius: 24),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 4,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              mainAxisExtent: cellHeight,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemBuilder: (_, _) => const LuxSkeleton(height: 64, radius: 18),
+          ),
+          const SizedBox(height: 28),
+          const LuxSkeleton(width: 110, height: 22),
+          const SizedBox(height: 12),
+          const PropertyGridSkeleton(count: 4),
         ],
-      ),
-      const SizedBox(height: 28),
-      const LuxSkeleton(width: 110, height: 22),
-      const SizedBox(height: 12),
-      const PropertyGridSkeleton(count: 4),
-    ],
+      );
+    },
   );
 }
 
@@ -387,31 +404,64 @@ class _AgentQuickAction extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surface,
-    borderRadius: BorderRadius.circular(18),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
-        decoration: BoxDecoration(
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxWidth < 170;
+      final theme = Theme.of(context);
+      return Material(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Theme.of(context).colorScheme.outline),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: WajhatakColors.emerald),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              vertical: compact ? 7 : 12,
+              horizontal: compact ? 8 : 14,
             ),
-          ],
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: compact
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, color: WajhatakColors.emerald, size: 20),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: WajhatakColors.emerald),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
