@@ -20,12 +20,14 @@ WindowSize windowSizeFromWidth(double width) {
 class Responsive {
   const Responsive._();
 
-  /// عدد أعمدة شبكة العقارات حسب العرض المتاح — هاتف دائمًا عمودان.
+  /// عدد أعمدة شبكة العقارات حسب العرض المتاح.
+  /// نحافظ على عمودين في الهواتف المعتادة، ونستخدم عمودًا واحدًا فقط
+  /// في المساحات الضيقة جدًا حتى لا تصبح بطاقة العقار غير قابلة للقراءة.
   static int propertyGridColumns(double crossAxisExtent) {
     if (crossAxisExtent >= 1240) return 4;
     if (crossAxisExtent >= 900) return 3;
     if (crossAxisExtent >= 600) return 2;
-    return crossAxisExtent >= 340 ? 2 : 1;
+    return crossAxisExtent >= 280 ? 2 : 1;
   }
 
   /// نسبة الارتفاع للبطاقة حسب العرض.
