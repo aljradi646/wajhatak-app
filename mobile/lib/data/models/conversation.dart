@@ -8,6 +8,7 @@ class ConversationItem {
     required this.id,
     required this.title,
     this.agentId,
+    this.clientId,
     this.propertyId,
     this.preview,
     this.previewIsPropertyCard = false,
@@ -21,7 +22,9 @@ class ConversationItem {
 
   final int id;
   final String title;
+  /// User ID of the agent participant (not the Agent profile row ID).
   final int? agentId;
+  final int? clientId;
   final int? propertyId;
   final String? preview;
   final bool previewIsPropertyCard;
@@ -46,6 +49,7 @@ class ConversationItem {
           ? agentName!
           : property?['title'] as String? ?? 'محادثة',
       agentId: agent?['id'] as int?,
+      clientId: client?['id'] as int?,
       propertyId: property?['id'] as int?,
       preview: last?['body'] as String?,
       previewIsPropertyCard: lastType == 'property',
@@ -59,4 +63,25 @@ class ConversationItem {
       unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
     );
   }
+  /// Returns the other conversation participant irrespective of account role.
+  /// Both sides may have agent accounts, so roles cannot identify the counterpart.
+  String otherParticipantNameFor(int? currentUserId) {
+    if (currentUserId != null && currentUserId == agentId) {
+      final name = clientName;
+      return name?.trim().isNotEmpty == true ? name! : title;
+    }
+    if (currentUserId != null && currentUserId == clientId) {
+      final name = agentName;
+      return name?.trim().isNotEmpty == true ? name! : title;
+    }
+    return title;
+  }
+
+  String? otherParticipantAvatarUrlFor(int? currentUserId) {
+    if (currentUserId == null) return null;
+    if (currentUserId == agentId) return clientAvatarUrl;
+    if (currentUserId == clientId) return agentAvatarUrl;
+    return null;
+  }
+
 }
