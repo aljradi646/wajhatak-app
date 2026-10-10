@@ -523,17 +523,24 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                 ),
               )
             else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: images.length,
-                itemBuilder: (context, index) {
-                  final image = images[index];
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 760
+                      ? 4
+                      : constraints.maxWidth >= 480
+                      ? 3
+                      : 2;
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: images.length,
+                    itemBuilder: (context, index) {
+                      final image = images[index];
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: Stack(
@@ -605,6 +612,8 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                         ),
                       ],
                     ),
+                      );
+                    },
                   );
                 },
               ),
