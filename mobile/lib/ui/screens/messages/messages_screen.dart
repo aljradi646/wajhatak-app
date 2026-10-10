@@ -11,23 +11,40 @@ import '../chat/chat_screen.dart';
 
 /// قائمة المحادثات — تعرض الطرف الآخر مهما كان نوع حسابه.
 class MessagesScreen extends ConsumerWidget {
-  const MessagesScreen({super.key});
+  const MessagesScreen({super.key, this.standalone = false});
+
+  /// Use true when this screen is pushed as a route instead of living in AppShell.
+  final bool standalone;
+
+  Widget _wrap(BuildContext context, Widget body) {
+    if (!standalone) return body;
+    return Scaffold(
+      appBar: const WajhatakScreenHeader(
+        title: 'الرسائل',
+        subtitle: 'محادثاتك مع العملاء والوكلاء',
+      ),
+      body: body,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     if (session.isLoading) {
-      return const ConversationListSkeleton();
+      return _wrap(context, const ConversationListSkeleton());
     }
     if (session.asData?.value == null) {
-      return AuthRequiredScreen(
-        title: 'رسائلك الخاصة',
-        body: 'سجّل دخولك لمراسلة الوكلاء وحفظ محادثاتك.',
-        actionLabel: 'تسجيل الدخول',
+      return _wrap(
+        context,
+        AuthRequiredScreen(
+          title: 'رسائلك الخاصة',
+          body: 'سجّل دخولك لمراسلة الوكلاء وحفظ محادثاتك.',
+          actionLabel: 'تسجيل الدخول',
+        ),
       );
     }
     final conversations = ref.watch(conversationsProvider);
-    return Column(
+    final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
@@ -63,6 +80,7 @@ class MessagesScreen extends ConsumerWidget {
         ),
       ],
     );
+    return _wrap(context, body);
   }
 }
 
