@@ -439,7 +439,7 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
                   builder: (context, constraints) {
                     final columns = constraints.maxWidth >= 700
                         ? 3
-                        : constraints.maxWidth >= 340
+                        : constraints.maxWidth >= 300
                         ? 2
                         : 1;
                     final cardRatio = columns == 3
