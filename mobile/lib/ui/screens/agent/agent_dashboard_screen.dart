@@ -278,7 +278,10 @@ class _AgentWorkspaceSkeleton extends StatelessWidget {
           const SizedBox(height: 28),
           const LuxSkeleton(width: 110, height: 22),
           const SizedBox(height: 12),
-          const PropertyGridSkeleton(count: 4),
+          const PropertyGridSkeleton(
+            count: 4,
+            padding: EdgeInsets.zero,
+          ),
         ],
       );
     },
