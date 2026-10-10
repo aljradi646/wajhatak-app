@@ -60,6 +60,40 @@ void main() {
           width,
         );
       });
+
+      testWidgets('shared property grid skeleton fits ' + widthLabel, (
+        tester,
+      ) async {
+        await _expectNoLayoutException(
+          tester,
+          const PropertyGridSkeleton(count: 4),
+          width,
+        );
+      });
+
+      testWidgets('list tile skeleton fits ' + widthLabel, (tester) async {
+        await _expectNoLayoutException(
+          tester,
+          const ListTileSkeleton(trailing: true),
+          width,
+        );
+      });
+
+      testWidgets('account skeleton fits ' + widthLabel, (tester) async {
+        await _expectNoLayoutException(
+          tester,
+          const AccountScreenSkeleton(),
+          width,
+        );
+      });
+
+      testWidgets('list skeleton fits ' + widthLabel, (tester) async {
+        await _expectNoLayoutException(
+          tester,
+          const ListSkeleton(trailing: true),
+          width,
+        );
+      });
     }
   });
 }
