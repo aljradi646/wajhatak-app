@@ -366,12 +366,22 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           padding: EdgeInsets.symmetric(vertical: 10),
                           child: LuxSkeleton(height: 54),
                         ),
-                        error: (_error, _stackTrace) => TextFormField(
-                          initialValue: _currency,
-                          decoration: const InputDecoration(
-                            labelText: 'العملة',
-                          ),
-                          onSaved: (value) => _currency = value ?? 'YER',
+                        error: (_error, _stackTrace) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'تعذر تحميل العملات',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => ref.invalidate(currenciesProvider),
+                              child: const Text('إعادة المحاولة'),
+                            ),
+                          ],
                         ),
                       ),
                     ),
