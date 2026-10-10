@@ -200,6 +200,18 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $this->assertSame($conversationId, $notificationData['conversation_id']);
     }
 
+    public function test_property_resource_exposes_agent_owner_user_id(): void
+    {
+        [$agentUser, $agent] = $this->makeActiveAgent();
+        $property = $this->createPublishedProperty($agent);
+        Sanctum::actingAs($agentUser);
+
+        $this->getJson('/api/v1/properties/'.$property->id)
+            ->assertOk()
+            ->assertJsonPath('data.agent.id', $agent->id)
+            ->assertJsonPath('data.agent.user_id', $agentUser->id);
+    }
+
     public function test_conversation_response_uses_agent_name_and_profile_photo(): void
     {
         [$agentUser, $agent] = $this->makeActiveAgent();
