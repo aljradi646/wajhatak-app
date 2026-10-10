@@ -1008,7 +1008,7 @@ class PropertyCardSkeleton extends StatelessWidget {
       final veryCompact =
           constraints.maxWidth < 120 || constraints.maxHeight < 170;
       final compact =
-          veryCompact || constraints.maxWidth < 160 || constraints.maxHeight < 225;
+          veryCompact || constraints.maxWidth < 180 || constraints.maxHeight < 250;
       final priceWidth = compact
           ? (constraints.maxWidth - (veryCompact ? 12 : 16))
                 .clamp(veryCompact ? 50.0 : 60.0, veryCompact ? 72.0 : 88.0)
