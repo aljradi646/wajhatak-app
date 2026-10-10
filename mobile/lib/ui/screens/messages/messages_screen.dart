@@ -9,7 +9,7 @@ import '../../widgets.dart';
 import '../auth/auth_screen.dart';
 import '../chat/chat_screen.dart';
 
-/// قائمة المحادثات — عنوان كل محادثة هو اسم الوكيل (وليس اسم العقار).
+/// قائمة المحادثات — تعرض الطرف الآخر مهما كان نوع حسابه.
 class MessagesScreen extends ConsumerWidget {
   const MessagesScreen({super.key});
 
@@ -74,15 +74,9 @@ class _ConversationTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isAgentView =
-        ref.watch(sessionProvider).asData?.value?.user.isAgent == true;
-    // الاسم المعروض: الطرف الآخر في المحادثة.
-    final displayName =
-        (isAgentView ? item.clientName : item.agentName) ?? item.title;
-    // صورة الطرف الآخر الحقيقية (الوكيل للعميل / العميل للوكيل).
-    final otherAvatarUrl = isAgentView
-        ? item.clientAvatarUrl
-        : item.agentAvatarUrl;
+    final currentUser = ref.watch(sessionProvider).asData?.value?.user;
+    final displayName = item.otherParticipantNameFor(currentUser?.id);
+    final otherAvatarUrl = item.otherParticipantAvatarUrlFor(currentUser?.id);
     final hasRecentActivity =
         item.lastMessageAt != null &&
         DateTime.now().difference(item.lastMessageAt!).inHours < 24;
@@ -164,7 +158,9 @@ class _ConversationTile extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             item.previewIsPropertyCard
-                                ? 'عرض تفاصيل العقار'
+                                ? (item.preview?.trim().isNotEmpty == true
+                                      ? item.preview!
+                                      : 'عرض تفاصيل العقار')
                                 : (item.preview?.isNotEmpty == true
                                       ? item.preview!
                                       : 'ابدأ المحادثة الآن'),
