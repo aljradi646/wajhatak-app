@@ -13,6 +13,7 @@ import '../../../state/ai_assistant_controller.dart';
 import '../../../state/providers.dart';
 import '../property/property_detail_screen.dart';
 import '../shared/toggle_favorite.dart';
+import '../../widgets/skeleton/lux_skeleton.dart';
 
 /// نافذة المساعد الذكي — Bottom Sheet على الجوال، ولوحة عائمة متمركزة على
 /// الشاشات الكبيرة. تصميم متوافق مع هوية وجهتك (زمردي + كهرماني + Cairo).
