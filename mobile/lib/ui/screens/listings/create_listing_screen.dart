@@ -244,9 +244,9 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                     padding: EdgeInsets.symmetric(vertical: 10),
                     child: LuxSkeleton(height: 54),
                   ),
-                  error: (error, _) => const Text(
-                    'تعذر تحميل أنواع العقارات. تحقق من اتصالك بالشبكة ثم أعد المحاولة.',
-                    style: TextStyle(color: Colors.red),
+                  error: (error, _) => ErrorState(
+                    message: 'تعذر تحميل أنواع العقارات.',
+                    onRetry: () => ref.invalidate(propertyTypesProvider),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -457,7 +457,10 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                     padding: EdgeInsets.symmetric(vertical: 10),
                     child: LuxSkeleton(height: 54),
                   ),
-                  error: (_error, _stackTrace) => const SizedBox.shrink(),
+                  error: (_error, _stackTrace) => ErrorState(
+                    message: 'تعذر تحميل الدول.',
+                    onRetry: () => ref.invalidate(countriesProvider),
+                  ),
                 ),
                 if (_country != null) ...[
                   const SizedBox(height: 12),
@@ -481,7 +484,12 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           padding: EdgeInsets.symmetric(vertical: 10),
                           child: LuxSkeleton(height: 54),
                         ),
-                        error: (_error, _stackTrace) => const SizedBox.shrink(),
+                        error: (_error, _stackTrace) => ErrorState(
+                          message: 'تعذر تحميل المحافظات والمناطق.',
+                          onRetry: () => ref.invalidate(
+                            regionsProvider(_country!.id),
+                          ),
+                        ),
                       ),
                 ],
                 if (_region != null) ...[
@@ -505,7 +513,12 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           padding: EdgeInsets.symmetric(vertical: 10),
                           child: LuxSkeleton(height: 54),
                         ),
-                        error: (_error, _stackTrace) => const SizedBox.shrink(),
+                        error: (_error, _stackTrace) => ErrorState(
+                          message: 'تعذر تحميل المدن.',
+                          onRetry: () => ref.invalidate(
+                            citiesProvider(_region!.id),
+                          ),
+                        ),
                       ),
                 ],
                 if (_city != null) ...[
@@ -521,8 +534,16 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           onChanged: (value) =>
                               setState(() => _areaLocation = value),
                         ),
-                        loading: () => const SizedBox.shrink(),
-                        error: (_error, _stackTrace) => const SizedBox.shrink(),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: LuxSkeleton(height: 54),
+                        ),
+                        error: (_error, _stackTrace) => ErrorState(
+                          message: 'تعذر تحميل الأحياء.',
+                          onRetry: () => ref.invalidate(
+                            areasProvider(_city!.id),
+                          ),
+                        ),
                       ),
                 ],
                 const SizedBox(height: 12),
@@ -624,7 +645,10 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                       LuxSkeleton(width: 92, height: 34, radius: 18),
                     ],
                   ),
-                  error: (error, stackTrace) => const SizedBox.shrink(),
+                  error: (error, stackTrace) => ErrorState(
+                    message: 'تعذر تحميل مزايا العقارات.',
+                    onRetry: () => ref.invalidate(featuresProvider),
+                  ),
                 ),
               ],
             ),
