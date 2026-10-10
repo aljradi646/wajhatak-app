@@ -401,56 +401,78 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _area,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'المساحة م²',
-                          prefixIcon: Icon(Icons.square_foot_rounded),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth < 320 ? 1 : 2;
+                    final fieldWidth =
+                        (constraints.maxWidth - (columns - 1) * 10) /
+                        columns;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextFormField(
+                            controller: _area,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'المساحة م²',
+                              prefixIcon: Icon(Icons.square_foot_rounded),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _bedrooms,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'غرف النوم',
-                          prefixIcon: Icon(Icons.bed_rounded),
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextFormField(
+                            controller: _bedrooms,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'غرف النوم',
+                              prefixIcon: Icon(Icons.bed_rounded),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _bathrooms,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'الحمامات',
-                          prefixIcon: Icon(Icons.bathtub_rounded),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth < 320 ? 1 : 2;
+                    final fieldWidth =
+                        (constraints.maxWidth - (columns - 1) * 10) /
+                        columns;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextFormField(
+                            controller: _bathrooms,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'الحمامات',
+                              prefixIcon: Icon(Icons.bathtub_rounded),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _parkingSpaces,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'المواقف',
-                          prefixIcon: Icon(Icons.directions_car_rounded),
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextFormField(
+                            controller: _parkingSpaces,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'المواقف',
+                              prefixIcon: Icon(Icons.directions_car_rounded),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
