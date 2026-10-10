@@ -86,8 +86,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final messages = ref.watch(messagesProvider(widget.conversation.id));
     final currentUser = ref.watch(sessionProvider).asData?.value?.user;
     // Resolve by participant IDs, not roles: an agent can message another agent.
-    final displayName = widget.conversation.otherParticipantNameFor(currentUser?.id);
-    final otherAvatarUrl = widget.conversation.otherParticipantAvatarUrlFor(currentUser?.id);
+    final displayName = widget.conversation
+        .otherParticipantNameFor(currentUser?.id);
+    final otherAvatarUrl = widget.conversation
+        .otherParticipantAvatarUrlFor(currentUser?.id);
 
     return Scaffold(
       appBar: WajhatakScreenHeader(
