@@ -29,7 +29,8 @@ class MessageReceived extends Notification implements ShouldQueue
             'kind' => 'message_received',
             'title' => 'رسالة جديدة',
             'conversation_id' => $this->message->conversation_id,
-            'property_id' => $this->message->conversation->property_id,
+            // A property attachment may differ from the conversation's original listing.
+            'property_id' => $this->message->property_id ?? $this->message->conversation->property_id,
             'actor_id' => $sender?->id,
             'actor_name' => $sender?->name ?? 'مستخدم',
             'actor_avatar_url' => $sender?->avatar_path
