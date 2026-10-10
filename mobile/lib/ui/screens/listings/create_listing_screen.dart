@@ -317,75 +317,88 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
               title: 'السعر والمساحة',
               children: [
                 // [ حقل السعر ] [ قائمة العملة ▼ ]
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: TextFormField(
-                        controller: _price,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    Widget priceField() => TextFormField(
+                      controller: _price,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'السعر',
+                        prefixIcon: Icon(Icons.attach_money_rounded),
+                      ),
+                      validator: (value) =>
+                          double.tryParse((value ?? '').trim()) != null
+                          ? null
+                          : 'أدخل سعرًا صحيحًا.',
+                    );
+
+                    Widget currencyField() => currencies.when(
+                      data: (list) => DropdownButtonFormField<String>(
+                        initialValue: _currency,
+                        isExpanded: true,
+                        menuMaxHeight: 300,
                         decoration: const InputDecoration(
-                          labelText: 'السعر',
-                          prefixIcon: Icon(Icons.attach_money_rounded),
+                          labelText: 'العملة',
+                          prefixIcon: Icon(Icons.currency_exchange_rounded),
                         ),
-                        validator: (value) =>
-                            double.tryParse((value ?? '').trim()) != null
-                            ? null
-                            : 'أدخل سعرًا صحيحًا.',
+                        items: [
+                          for (final currency in list)
+                            DropdownMenuItem(
+                              value: currency.code,
+                              child: Text(
+                                '${currency.flag} ${currency.symbolAr}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _currency = value ?? 'YER'),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: currencies.when(
-                        data: (list) => DropdownButtonFormField<String>(
-                          initialValue: _currency,
-                          isExpanded: true,
-                          menuMaxHeight: 300,
-                          decoration: const InputDecoration(
-                            labelText: 'العملة',
-                            prefixIcon: Icon(Icons.currency_exchange_rounded),
+                      loading: () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: LuxSkeleton(height: 54),
+                      ),
+                      error: (_error, _stackTrace) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'تعذر تحميل العملات',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                            ),
                           ),
-                          items: [
-                            for (final currency in list)
-                              DropdownMenuItem(
-                                value: currency.code,
-                                child: Text(
-                                  '${currency.flag} ${currency.symbolAr}',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                          ],
-                          onChanged: (value) =>
-                              setState(() => _currency = value ?? 'YER'),
-                        ),
-                        loading: () => const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 10),
-                          child: LuxSkeleton(height: 54),
-                        ),
-                        error: (_error, _stackTrace) => Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'تعذر تحميل العملات',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                                fontSize: 12,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () => ref.invalidate(currenciesProvider),
-                              child: const Text('إعادة المحاولة'),
-                            ),
-                          ],
-                        ),
+                          TextButton(
+                            onPressed: () => ref.invalidate(currenciesProvider),
+                            child: const Text('إعادة المحاولة'),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    );
+
+                    if (constraints.maxWidth < 320) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          priceField(),
+                          const SizedBox(height: 10),
+                          currencyField(),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: priceField()),
+                        const SizedBox(width: 10),
+                        Expanded(flex: 2, child: currencyField()),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 Row(
