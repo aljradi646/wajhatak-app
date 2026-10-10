@@ -14,7 +14,7 @@ import '../../../state/providers.dart';
 import '../../widgets.dart';
 import '../property/property_detail_screen.dart';
 
-/// شاشة المحادثة — العنوان اسم الوكيل، مع بطاقات عقارات سياقية.
+/// شاشة المحادثة — تعرض بيانات الطرف الآخر الفعلية وبطاقات العقارات السياقية.
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({
     super.key,
@@ -85,16 +85,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final messages = ref.watch(messagesProvider(widget.conversation.id));
     final currentUser = ref.watch(sessionProvider).asData?.value?.user;
-    // اسم المحادثة = اسم الوكيل (أو العميل للوكيل) وليس اسم العقار.
-    final otherName = currentUser?.isAgent == true
-        ? widget.conversation.clientName
-        : widget.conversation.agentName;
-    final displayName = otherName?.isNotEmpty == true
-        ? otherName!
-        : widget.conversation.title;
-    final otherAvatarUrl = currentUser?.isAgent == true
-        ? widget.conversation.clientAvatarUrl
-        : widget.conversation.agentAvatarUrl;
+    // Resolve by participant IDs, not roles: an agent can message another agent.
+    final displayName = widget.conversation.otherParticipantNameFor(currentUser?.id);
+    final otherAvatarUrl = widget.conversation.otherParticipantAvatarUrlFor(currentUser?.id);
 
     return Scaffold(
       appBar: WajhatakScreenHeader(
@@ -135,9 +128,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         final item = data[index];
                         final mine = item.senderId == currentUser?.id;
                         if (item.isPropertyCard) {
-                          return _PropertyCardMessage(
-                            property: item.property!,
-                            isMine: mine,
+                          // A single property-type message can contain both a
+                          // note and an attached listing. Render both parts.
+                          return Column(
+                            crossAxisAlignment: mine
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              if (item.body.trim().isNotEmpty)
+                                _TextMessage(
+                                  body: item.body,
+                                  createdAt: item.createdAt,
+                                  isMine: mine,
+                                  readAt: item.readAt,
+                                ),
+                              _PropertyCardMessage(
+                                property: item.property!,
+                                isMine: mine,
+                              ),
+                            ],
                           );
                         }
                         return _TextMessage(
