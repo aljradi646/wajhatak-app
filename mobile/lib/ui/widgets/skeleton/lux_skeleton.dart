@@ -900,20 +900,27 @@ class LuxContentSkeleton extends StatelessWidget {
 /// ===============================================================
 
 class PropertyGridSkeleton extends StatelessWidget {
-  const PropertyGridSkeleton({super.key, this.count = 6, this.columns});
+  const PropertyGridSkeleton({
+    super.key,
+    this.count = 6,
+    this.columns,
+    this.padding = const EdgeInsets.all(20),
+  });
 
   final int count;
 
   /// Optional override for callers with a specific grid design.
   /// When omitted, columns follow the actual content width.
   final int? columns;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     return _LuxShimmer(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final contentWidth = (constraints.maxWidth - 40)
+          final resolvedPadding = padding.resolve(Directionality.of(context));
+          final contentWidth = (constraints.maxWidth - resolvedPadding.horizontal)
               .clamp(0.0, constraints.maxWidth)
               .toDouble();
           final safeColumns = (columns ??
@@ -926,7 +933,7 @@ class PropertyGridSkeleton extends StatelessWidget {
           return GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
+            padding: resolvedPadding,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: safeColumns,
               childAspectRatio: Responsive.propertyCardAspectRatio(cardWidth),
