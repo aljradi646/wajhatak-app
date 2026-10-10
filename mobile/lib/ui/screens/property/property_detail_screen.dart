@@ -296,6 +296,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                 ),
                 child: compact
                     ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: const [
                           LuxSkeleton(height: 48, radius: 14),
                           SizedBox(height: 8),
