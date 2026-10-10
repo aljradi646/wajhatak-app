@@ -432,21 +432,33 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
                   ),
                 ],
                 const SizedBox(height: 10),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: report.summary.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: MediaQuery.sizeOf(context).width >= 700
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth >= 700
                         ? 3
-                        : 2,
-                    childAspectRatio: MediaQuery.sizeOf(context).width >= 700
+                        : constraints.maxWidth >= 340
+                        ? 2
+                        : 1;
+                    final cardWidth =
+                        (constraints.maxWidth - (columns - 1) * 10) /
+                        columns;
+                    final cardRatio = columns == 3
                         ? 2.7
-                        : 2.2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                  ),
-                  itemBuilder: (_, index) {
+                        : columns == 2
+                        ? 2.2
+                        : 3.0;
+
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: report.summary.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        childAspectRatio: cardRatio,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                      ),
+                      itemBuilder: (_, index) {
                     final item = report.summary[index];
                     return Card(
                       elevation: 0,
@@ -475,6 +487,8 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
                           ],
                         ),
                       ),
+                    );
+                      },
                     );
                   },
                 ),
