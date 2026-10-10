@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\PropertyStatus;
 use App\Models\Property;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -22,6 +23,7 @@ class UpdatePropertyRequest extends FormRequest
             'description' => ['sometimes', 'string', 'max:10000'],
             'property_type_id' => ['sometimes', 'integer', 'exists:property_types,id'],
             'transaction_type' => ['sometimes', 'in:sale,rent'],
+            'status' => ['sometimes', Rule::in([PropertyStatus::Draft->value, PropertyStatus::Pending->value])],
             'price' => ['sometimes', 'numeric', 'min:0'],
             'currency' => ['sometimes', 'string', 'size:3', Rule::in(array_keys(config('currencies.supported', [])))],
             'area' => ['nullable', 'numeric', 'min:0'],
@@ -54,6 +56,7 @@ class UpdatePropertyRequest extends FormRequest
             'property_type_id.integer' => 'نوع العقار غير صحيح.',
             'property_type_id.exists' => 'نوع العقار غير موجود.',
             'transaction_type.in' => 'نوع المعاملة يجب أن يكون بيع أو إيجار.',
+            'status.in' => 'يمكن إيقاف النشر أو إرسال العقار للمراجعة فقط؛ اعتماد النشر من صلاحية الإدارة.',
             'price.numeric' => 'السعر يجب أن يكون رقمًا.',
             'price.min' => 'السعر يجب أن يكون أكبر من أو يساوي صفر.',
             'area.numeric' => 'المساحة يجب أن تكون رقمًا.',
