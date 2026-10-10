@@ -27,11 +27,7 @@ class PropertyDetailScreen extends ConsumerWidget {
     final overrides = ref.watch(favoriteOverridesProvider);
     final currentUser = ref.watch(sessionProvider).asData?.value?.user;
     final currentUserId = currentUser?.id;
-    final isKnownOwnedProperty = currentUser?.isAgent == true &&
-        (ref.watch(myListingsProvider).asData?.value.any(
-              (listing) => listing.id == propertyId,
-            ) ??
-            false);
+    final isAgentAccount = currentUser?.isAgent == true;
     return Scaffold(
       body: LuxAsyncView<LuxProperty>(
         value: property,
@@ -283,10 +279,10 @@ class PropertyDetailScreen extends ConsumerWidget {
           );
         },
         loading: () {
-          // If this detail route was opened from "عقاراتي", do not even show
-          // action placeholders for a property already known to belong to the
-          // current agent while its detail request is loading.
-          if (isKnownOwnedProperty) return const SizedBox.shrink();
+          // Ownership is not known until the detail response arrives.
+          // Avoid showing misleading action placeholders to agent accounts
+          // while loading; the real action bar is decided by agent.user_id below.
+          if (isAgentAccount) return const SizedBox.shrink();
 
           return SafeArea(
             child: LayoutBuilder(
