@@ -293,9 +293,9 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                 padding: EdgeInsets.symmetric(vertical: 10),
                 child: LuxSkeleton(height: 54),
               ),
-              error: (error, _) => const Text(
-                'تعذر تحميل أنواع العقارات. تحقق من اتصالك بالشبكة ثم أعد المحاولة.',
-                style: TextStyle(color: Colors.red),
+              error: (error, _) => ErrorState(
+                message: 'تعذر تحميل أنواع العقارات.',
+                onRetry: () => ref.invalidate(propertyTypesProvider),
               ),
             ),
             const SizedBox(height: 12),
@@ -467,7 +467,10 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                   LuxSkeleton(width: 92, height: 34, radius: 18),
                 ],
               ),
-              error: (error, _) => const SizedBox.shrink(),
+              error: (error, _) => ErrorState(
+                message: 'تعذر تحميل مزايا العقارات.',
+                onRetry: () => ref.invalidate(featuresProvider),
+              ),
             ),
             const SizedBox(height: 24),
             Row(
