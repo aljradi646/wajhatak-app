@@ -117,7 +117,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
 
   void _navigateToExplore() {
-    final isAgent = ref.read(sessionProvider).asData?.value?.user.isAgent == true;
+    final isAgent =
+        ref.read(sessionProvider).asData?.value?.user.isAgent == true;
     if (isAgent) {
       // The agent's index 1 is the dashboard, not ExploreScreen.
       _push(const ExploreScreen());
