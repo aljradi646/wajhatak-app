@@ -611,8 +611,24 @@ class ExploreSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final columns = constraints.maxWidth >= 700 ? 3 : 2;
-      return PropertyGridSkeleton(count: 6, columns: columns);
+      final columns = Responsive.propertyGridColumns(constraints.maxWidth);
+      final cardWidth =
+          (constraints.maxWidth - (columns - 1) * 14) / columns;
+
+      return _LuxShimmer(
+        child: GridView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          physics: const AlwaysScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: Responsive.propertyCardAspectRatio(cardWidth),
+          ),
+          itemCount: 6,
+          itemBuilder: (_, _) => const PropertyCardSkeleton(),
+        ),
+      );
     },
   );
 }
