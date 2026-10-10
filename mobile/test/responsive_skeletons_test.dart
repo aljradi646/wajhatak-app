@@ -29,9 +29,7 @@ void main() {
     for (final width in <double>[280, 320, 360]) {
       final widthLabel = width.toInt().toString() + 'px';
 
-      testWidgets('agent profile skeleton fits ' + widthLabel, (
-        tester,
-      ) async {
+      testWidgets('agent profile skeleton fits ' + widthLabel, (tester) async {
         await _expectNoLayoutException(
           tester,
           const AgentProfileSkeleton(),
@@ -47,9 +45,7 @@ void main() {
         );
       });
 
-      testWidgets('property details skeleton fits ' + widthLabel, (
-        tester,
-      ) async {
+      testWidgets('property details skeleton fits ' + widthLabel, (tester) async {
         await _expectNoLayoutException(
           tester,
           const PropertyDetailsSkeleton(),
@@ -57,9 +53,7 @@ void main() {
         );
       });
 
-      testWidgets('saved screen skeleton fits ' + widthLabel, (
-        tester,
-      ) async {
+      testWidgets('saved screen skeleton fits ' + widthLabel, (tester) async {
         await _expectNoLayoutException(
           tester,
           const SavedScreenSkeleton(),
