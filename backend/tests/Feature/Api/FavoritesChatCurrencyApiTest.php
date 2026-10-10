@@ -210,7 +210,7 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $this->postJson('/api/v1/conversations', ['property_id' => $property->id])->assertStatus(422);
     }
 
-    public function test_message_with_property_card_includes_property_payload(): void
+    public function test_text_message_accepts_explicit_text_type_without_property_id(): void
     {
         [$agentUser, $agent] = $this->makeActiveAgent();
         $property = $this->createPublishedProperty($agent);
@@ -225,6 +225,14 @@ class FavoritesChatCurrencyApiTest extends TestCase
         ]);
 
         Sanctum::actingAs($client);
+
+        // An attachment message must still require an actual property id.
+        $this->postJson("/api/v1/conversations/{$conversation->id}/messages", [
+            'body' => 'رسالة مع عقار بلا معرّف',
+            'message_type' => 'property',
+        ])->assertUnprocessable()->assertJsonValidationErrors('property_id');
+
+        // Explicit "text" must not trigger property_id validation.
         $response = $this->postJson("/api/v1/conversations/{$conversation->id}/messages", [
             'body' => 'السلام عليكم، هل العقار ما زال متاحًا؟',
             'message_type' => 'text',
