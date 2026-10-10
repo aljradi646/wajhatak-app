@@ -200,9 +200,12 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $this->assertSame($conversationId, $notificationData['conversation_id']);
     }
 
-    public function test_conversation_response_uses_agent_name_as_title(): void
+    public function test_conversation_response_uses_agent_name_and_profile_photo(): void
     {
         [$agentUser, $agent] = $this->makeActiveAgent();
+        $profilePhoto = "agents/{$agent->id}/profile.jpg";
+        $agentUser->forceFill(['avatar_path' => null])->save();
+        $agent->forceFill(['photo_path' => $profilePhoto])->save();
         $property = $this->createPublishedProperty($agent);
         $client = User::factory()->create();
         $client->assignRole('user');
@@ -212,6 +215,7 @@ class FavoritesChatCurrencyApiTest extends TestCase
 
         $response->assertJsonPath('data.agent.id', $agentUser->id)
             ->assertJsonPath('data.agent.name', $agentUser->name)
+            ->assertJsonPath('data.agent.avatar_url', asset('storage/'.$profilePhoto))
             ->assertJsonPath('data.client.id', $client->id);
     }
 
