@@ -116,9 +116,19 @@ class _AppShellState extends ConsumerState<AppShell> {
   void _push(Widget page) =>
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
 
+  void _navigateToExplore() {
+    final isAgent = ref.read(sessionProvider).asData?.value?.user.isAgent == true;
+    if (isAgent) {
+      // The agent's index 1 is the dashboard, not ExploreScreen.
+      _push(const ExploreScreen());
+      return;
+    }
+    setState(() => _index = 1);
+  }
+
   void _handleSearchFromHome(String term) {
     ref.read(exploreSearchProvider.notifier).setSearch(term);
-    setState(() => _index = 1);
+    _navigateToExplore();
   }
 
   @override
@@ -138,7 +148,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final pages = isAgent
         ? [
             HomeScreen(
-              onExplore: () => setState(() => _index = 1),
+              onExplore: _navigateToExplore,
               onSearchSubmit: _handleSearchFromHome,
             ),
             const AgentDashboardScreen(),
@@ -148,7 +158,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           ]
         : [
             HomeScreen(
-              onExplore: () => setState(() => _index = 1),
+              onExplore: _navigateToExplore,
               onSearchSubmit: _handleSearchFromHome,
             ),
             const ExploreScreen(),
