@@ -16,7 +16,12 @@ class SavedScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     if (session.isLoading) {
-      return const Center(child: PropertyGridSkeleton());
+      return Scaffold(
+        appBar: (ModalRoute.of(context)?.canPop ?? false)
+            ? WajhatakScreenHeader(title: 'مفضلاتك')
+            : null,
+        body: const SavedScreenSkeleton(),
+      );
     }
     final signedIn = session.asData?.value != null;
     if (!signedIn) {
