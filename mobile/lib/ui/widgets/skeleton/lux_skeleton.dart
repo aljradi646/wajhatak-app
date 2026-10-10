@@ -900,29 +900,42 @@ class LuxContentSkeleton extends StatelessWidget {
 /// ===============================================================
 
 class PropertyGridSkeleton extends StatelessWidget {
-  const PropertyGridSkeleton({super.key, this.count = 6, this.columns = 2});
+  const PropertyGridSkeleton({super.key, this.count = 6, this.columns});
 
   final int count;
-  final int columns;
+
+  /// Optional override for callers with a specific grid design.
+  /// When omitted, columns follow the actual content width.
+  final int? columns;
 
   @override
   Widget build(BuildContext context) {
-    final safeColumns = columns.clamp(1, 6);
-
     return _LuxShimmer(
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: safeColumns,
-          childAspectRatio: 0.70,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 14,
-        ),
-        itemCount: count,
-        itemBuilder: (context, index) {
-          return const PropertyCardSkeleton();
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final contentWidth = (constraints.maxWidth - 40)
+              .clamp(0.0, constraints.maxWidth)
+              .toDouble();
+          final safeColumns = (columns ??
+                  Responsive.propertyGridColumns(contentWidth))
+              .clamp(1, 6)
+              .toInt();
+          final cardWidth =
+              (contentWidth - (safeColumns - 1) * 14) / safeColumns;
+
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: safeColumns,
+              childAspectRatio: Responsive.propertyCardAspectRatio(cardWidth),
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+            ),
+            itemCount: count,
+            itemBuilder: (context, index) => const PropertyCardSkeleton(),
+          );
         },
       ),
     );
