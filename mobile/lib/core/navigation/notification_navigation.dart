@@ -58,10 +58,7 @@ Future<void> _openNotificationSource(
     // المحادثة غير متاحة — نكفي بفتح صفحة الرسائل.
     await navigator.push(
       MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('الرسائل')),
-          body: const MessagesScreen(),
-        ),
+        builder: (_) => const MessagesScreen(standalone: true),
       ),
     );
     return;
