@@ -1042,7 +1042,11 @@ class PropertyCardSkeleton extends StatelessWidget {
                   Positioned(
                     top: 12,
                     left: 12,
-                    child: LuxSkeleton(width: 76, height: 26, radius: 13),
+                    child: LuxSkeleton(
+                      width: compact ? 60 : 76,
+                      height: 26,
+                      radius: 13,
+                    ),
                   ),
                   Positioned(
                     left: 12,
