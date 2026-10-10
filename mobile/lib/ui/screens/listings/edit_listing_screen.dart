@@ -330,32 +330,53 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
               onChanged: (value) => setState(() => _currency = value),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _area,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'المساحة م²'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextFormField(
-                    controller: _bedrooms,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'غرف النوم'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextFormField(
-                    controller: _bathrooms,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'الحمامات'),
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 520
+                    ? 3
+                    : constraints.maxWidth >= 320
+                    ? 2
+                    : 1;
+                final fieldWidth =
+                    (constraints.maxWidth - (columns - 1) * 10) / columns;
+
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                      width: fieldWidth,
+                      child: TextFormField(
+                        controller: _area,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'المساحة م²',
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: fieldWidth,
+                      child: TextFormField(
+                        controller: _bedrooms,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'غرف النوم',
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: fieldWidth,
+                      child: TextFormField(
+                        controller: _bathrooms,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'الحمامات',
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 12),
             TextFormField(
