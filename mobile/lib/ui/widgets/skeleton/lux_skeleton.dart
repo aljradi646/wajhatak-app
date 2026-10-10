@@ -428,8 +428,8 @@ class PropertyDetailsSkeleton extends StatelessWidget {
                 child: LuxSkeleton(width: 40, height: 40, radius: 20),
               ),
             ],
-            flexibleSpace: const FlexibleSpaceBar(
-              background: LuxSkeleton(height: 460, radius: 0),
+            flexibleSpace: FlexibleSpaceBar(
+              background: LuxSkeleton(height: expandedHeight, radius: 0),
             ),
           ),
           SliverPadding(
