@@ -19,7 +19,8 @@ String buildAiWelcomeMessage(String? fullName, {DateTime? now}) {
         'أنا مساعد وجهتك الذكي. أخبرني عمّا تبحث عنه، وسأساعدك في العثور على العقار المناسب.';
   }
   if (hour >= 12 && hour < 17) {
-    return 'أهلًا$suffix، أتمنى لك يومًا طيبًا 🌿\n'
+    final greeting = firstName.isEmpty ? 'أهلًا بك' : 'أهلًا، $firstName';
+    return '$greeting، أتمنى لك يومًا طيبًا 🌿\n'
         'ما نوع العقار الذي تبحث عنه اليوم؟ يمكنني مساعدتك في تضييق الخيارات.';
   }
   return 'مساء الخير$suffix 🌙\n'
@@ -62,7 +63,6 @@ class AiConversationState {
 
   bool get isEmpty => messages.isEmpty;
   bool get canSend =>
-      phase == AiSendPhase.bootstrapping ||
       phase == AiSendPhase.ready ||
       phase == AiSendPhase.completed ||
       phase == AiSendPhase.failed ||

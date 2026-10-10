@@ -824,7 +824,7 @@ class _AgentPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isOwner ? 'عقارك العقاري' : 'وكيل العقار',
+                      isOwner ? 'إعلانك العقاري' : 'وكيل العقار',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w700,

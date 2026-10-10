@@ -351,7 +351,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
     return SizedBox(width: double.infinity, child: Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (widget.isWelcome) _WelcomeMessage(content: content)
+        if (widget.isWelcome) GestureDetector(onTap: _toggleCopy, onLongPress: _copy, child: _WelcomeMessage(content: content))
         else Align(
           alignment: user ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
           child: ConstrainedBox(
