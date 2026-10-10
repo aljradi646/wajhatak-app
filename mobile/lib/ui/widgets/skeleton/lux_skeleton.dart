@@ -1167,7 +1167,11 @@ class ListTileSkeleton extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const LuxSkeleton(width: 135, height: 15, radius: 7),
+                FractionallySizedBox(
+                  widthFactor: trailing ? .72 : .85,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: const LuxSkeleton(height: 15, radius: 7),
+                ),
                 const SizedBox(height: 8),
                 const LuxSkeleton(
                   width: double.infinity,
@@ -1175,10 +1179,11 @@ class ListTileSkeleton extends StatelessWidget {
                   radius: 7,
                 ),
                 const SizedBox(height: 9),
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
                     LuxSkeleton(width: 48, height: 18, radius: 9),
-                    const SizedBox(width: 6),
                     LuxSkeleton(width: 56, height: 18, radius: 9),
                   ],
                 ),
@@ -1257,12 +1262,24 @@ class AccountScreenSkeleton extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      LuxSkeleton(width: 155, height: 18, radius: 8),
-                      SizedBox(height: 9),
-                      LuxSkeleton(width: 180, height: 13, radius: 7),
-                      SizedBox(height: 11),
-                      LuxSkeleton(width: 100, height: 24, radius: 12),
+                    children: [
+                      FractionallySizedBox(
+                        widthFactor: .8,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: const LuxSkeleton(height: 18, radius: 8),
+                      ),
+                      const SizedBox(height: 9),
+                      FractionallySizedBox(
+                        widthFactor: .95,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: const LuxSkeleton(height: 13, radius: 7),
+                      ),
+                      const SizedBox(height: 11),
+                      FractionallySizedBox(
+                        widthFactor: .58,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: const LuxSkeleton(height: 24, radius: 12),
+                      ),
                     ],
                   ),
                 ),
@@ -1307,10 +1324,18 @@ class _AccountTileSkeleton extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                LuxSkeleton(width: 140, height: 15, radius: 7),
-                SizedBox(height: 8),
-                LuxSkeleton(width: 100, height: 12, radius: 6),
+              children: [
+                FractionallySizedBox(
+                  widthFactor: .8,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: const LuxSkeleton(height: 15, radius: 7),
+                ),
+                const SizedBox(height: 8),
+                FractionallySizedBox(
+                  widthFactor: .62,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: const LuxSkeleton(height: 12, radius: 6),
+                ),
               ],
             ),
           ),
