@@ -530,6 +530,7 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                       : constraints.maxWidth >= 480
                       ? 3
                       : 2;
+
                   return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -541,77 +542,78 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                     itemCount: images.length,
                     itemBuilder: (context, index) {
                       final image = images[index];
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(image.url, fit: BoxFit.cover),
-                        if (image.isCover)
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'غلاف',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
+
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(image.url, fit: BoxFit.cover),
+                            if (image.isCover)
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'غلاف',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                    ),
+                                  ),
                                 ),
+                              ),
+                            Positioned(
+                              top: 2,
+                              left: 2,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (!image.isCover)
+                                    GestureDetector(
+                                      onTap: () => _setCover(image),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black54,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.star_border,
+                                          color: Colors.white,
+                                          size: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () => _deleteImage(image),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                        Positioned(
-                          top: 2,
-                          left: 2,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!image.isCover)
-                                GestureDetector(
-                                  onTap: () => _setCover(image),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.black54,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.star_border,
-                                      color: Colors.white,
-                                      size: 14,
-                                    ),
-                                  ),
-                                ),
-                              const SizedBox(width: 4),
-                              GestureDetector(
-                                onTap: () => _deleteImage(image),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black54,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                    size: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
                       );
                     },
                   );
