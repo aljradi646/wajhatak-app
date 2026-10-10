@@ -1005,10 +1005,14 @@ class PropertyCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      final veryCompact =
+          constraints.maxWidth < 120 || constraints.maxHeight < 170;
       final compact =
-          constraints.maxWidth < 160 || constraints.maxHeight < 225;
+          veryCompact || constraints.maxWidth < 160 || constraints.maxHeight < 225;
       final priceWidth = compact
-          ? (constraints.maxWidth - 16).clamp(60.0, 88.0).toDouble()
+          ? (constraints.maxWidth - (veryCompact ? 12 : 16))
+                .clamp(veryCompact ? 50.0 : 60.0, veryCompact ? 72.0 : 88.0)
+                .toDouble()
           : 104.0;
 
       return Card(
@@ -1035,28 +1039,36 @@ class PropertyCardSkeleton extends StatelessWidget {
                     radius: 0,
                   ),
                   Positioned(
-                    top: 12,
-                    right: 12,
+                    top: compact ? 8 : 12,
+                    right: compact ? 8 : 12,
                     child: LuxSkeleton(width: 38, height: 38, radius: 19),
                   ),
                   Positioned(
-                    top: 12,
-                    left: 12,
+                    top: compact ? 8 : 12,
+                    left: compact ? 8 : 12,
                     child: LuxSkeleton(
-                      width: compact ? 60 : 76,
+                      width: veryCompact ? 48 : (compact ? 60 : 76),
                       height: 26,
                       radius: 13,
                     ),
                   ),
                   Positioned(
-                    left: 12,
-                    right: 12,
-                    bottom: 12,
+                    left: compact ? 8 : 12,
+                    right: compact ? 8 : 12,
+                    bottom: compact ? 8 : 12,
                     child: Row(
                       children: [
-                        LuxSkeleton(width: 54, height: 20, radius: 10),
+                        LuxSkeleton(
+                          width: veryCompact ? 28 : (compact ? 36 : 54),
+                          height: 20,
+                          radius: 10,
+                        ),
                         const Spacer(),
-                        LuxSkeleton(width: 30, height: 20, radius: 10),
+                        LuxSkeleton(
+                          width: veryCompact ? 20 : (compact ? 24 : 30),
+                          height: 20,
+                          radius: 10,
+                        ),
                       ],
                     ),
                   ),
@@ -1067,9 +1079,9 @@ class PropertyCardSkeleton extends StatelessWidget {
               flex: compact ? 5 : 8,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  compact ? 8 : 13,
+                  veryCompact ? 6 : (compact ? 8 : 13),
                   compact ? 6 : 10,
-                  compact ? 8 : 13,
+                  veryCompact ? 6 : (compact ? 8 : 13),
                   compact ? 6 : 10,
                 ),
                 child: Column(
@@ -1105,7 +1117,7 @@ class PropertyCardSkeleton extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ] else ...[
+                    ] else if (!veryCompact) ...[
                       const SizedBox(height: 6),
                       Row(
                         children: [
