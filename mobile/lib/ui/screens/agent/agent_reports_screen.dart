@@ -459,35 +459,35 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
                         crossAxisSpacing: 10,
                       ),
                       itemBuilder: (_, index) {
-                    final item = report.summary[index];
-                    return Card(
-                      elevation: 0,
-                      color: theme.colorScheme.surfaceContainerHighest
-                          .withValues(alpha: .55),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall,
+                        final item = report.summary[index];
+                        return Card(
+                          elevation: 0,
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: .55),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.label,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall,
+                                ),
+                                const Spacer(),
+                                Text(
+                                  item.value,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const Spacer(),
-                            Text(
-                              item.value,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                          ),
+                        );
                       },
                     );
                   },
