@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/notice.dart' as util;
+import '../../../core/utils/responsive.dart';
 import '../../../data/api_client.dart';
 import '../../../data/models/models.dart';
 import '../../../state/providers.dart';
@@ -109,10 +110,20 @@ class AgentDashboardScreen extends ConsumerWidget {
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverToBoxAdapter(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _AgentQuickAction(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columns = constraints.maxWidth >= 900
+                          ? 4
+                          : constraints.maxWidth >= 560
+                          ? 3
+                          : 2;
+                      final cellWidth =
+                          (constraints.maxWidth - (columns - 1) * 10) /
+                          columns;
+                      final cellHeight =
+                          (cellWidth * .46).clamp(64.0, 84.0).toDouble();
+                      final actions = <Widget>[
+                        _AgentQuickAction(
                           icon: Icons.calendar_month_outlined,
                           label: 'الطلبات',
                           onTap: () => Navigator.of(context).push(
@@ -121,46 +132,51 @@ class AgentDashboardScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _AgentQuickAction(
+                        _AgentQuickAction(
                           icon: Icons.chat_bubble_outline,
                           label: 'الرسائل',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const MessagesScreen(),
+                              builder: (_) =>
+                                  const MessagesScreen(standalone: true),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _AgentQuickAction(
+                        _AgentQuickAction(
                           icon: Icons.add_home_outlined,
-                          label: 'إضافة',
+                          label: 'إضافة عقار',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => const CreateListingScreen(),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverToBoxAdapter(
-                  child: _AgentQuickAction(
-                    icon: Icons.assessment_outlined,
-                    label: 'التقارير',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AgentReportsScreen(),
-                      ),
-                    ),
+                        _AgentQuickAction(
+                          icon: Icons.assessment_outlined,
+                          label: 'التقارير',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AgentReportsScreen(),
+                            ),
+                          ),
+                        ),
+                      ];
+
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        itemCount: actions.length,
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: columns,
+                              mainAxisExtent: cellHeight,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                            ),
+                        itemBuilder: (context, index) => actions[index],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -183,11 +199,19 @@ class AgentDashboardScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                   sliver: SliverLayoutBuilder(
                     builder: (context, constraints) {
-                      final columns = constraints.crossAxisExtent > 700 ? 3 : 2;
+                      final columns = Responsive.propertyGridColumns(
+                        constraints.crossAxisExtent,
+                      );
+                      final cardWidth =
+                          (constraints.crossAxisExtent -
+                              (columns - 1) * 12) /
+                          columns;
                       return SliverGrid.builder(
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: columns,
-                          childAspectRatio: .72,
+                          childAspectRatio: Responsive.propertyCardAspectRatio(
+                            cardWidth,
+                          ),
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
