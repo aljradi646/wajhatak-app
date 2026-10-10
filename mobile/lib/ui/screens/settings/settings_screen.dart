@@ -9,6 +9,7 @@ import '../../../state/app_settings_controller.dart';
 import '../../../state/appearance_controller.dart';
 import '../../../state/providers.dart';
 import '../../widgets.dart';
+import '../agent/agent_dashboard_screen.dart';
 import '../profile/profile_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -181,6 +182,19 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                 ),
                 const Divider(height: 1),
+                if (session?.user.isAgent == true) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(Icons.apartment_rounded, color: theme.colorScheme.primary),
+                    title: const Text('عقاراتي'),
+                    subtitle: const Text('إدارة العقارات وتعديلها ومتابعة حالاتها'),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => const AgentDashboardScreen(),
+                    )),
+                  ),
+                  const Divider(height: 1),
+                ],
                 ListTile(
                   leading: const Icon(Icons.privacy_tip_outlined),
                   title: const Text('الخصوصية والبيانات'),

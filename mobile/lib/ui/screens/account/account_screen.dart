@@ -147,8 +147,8 @@ class AccountScreen extends ConsumerWidget {
           _AccountTile(
             icon: Icons.apartment_rounded,
             tone: AccentTone.indigo,
-            title: 'لوحة الوكيل وعقاراتي',
-            subtitle: 'إدارة عقاراتك وطلبات المعاينة',
+            title: 'عقاراتي',
+            subtitle: 'إدارة العقارات وحالاتها وطلبات المعاينة',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const AgentDashboardScreen()),
             ),

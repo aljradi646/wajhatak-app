@@ -222,7 +222,7 @@ class AppDrawer extends ConsumerWidget {
                       _DrawerEntry(
                         icon: Icons.real_estate_agent_rounded,
                         tone: AccentTone.indigo,
-                        label: 'مساحة الوكيل وعقاراتي',
+                        label: 'عقاراتي',
                         onTap: () => _closeThen(context, onAgentWorkspace),
                       ),
                     if (user.isAgent)

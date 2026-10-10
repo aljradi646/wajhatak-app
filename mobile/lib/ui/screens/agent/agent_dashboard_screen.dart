@@ -58,10 +58,20 @@ class AgentDashboardScreen extends ConsumerWidget {
     return Scaffold(
       appBar: (ModalRoute.of(context)?.canPop ?? false)
           ? WajhatakScreenHeader(
-              title: 'لوحة الوكيل',
-              subtitle: 'إدارة عقاراتك وطلباتك',
+              title: 'عقاراتي',
+              subtitle: 'إدارة العقارات وحالاتها وطلبات المعاينة',
             )
           : null,
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'agent_workspace_add_property',
+        tooltip: 'إضافة عقار جديد',
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const CreateListingScreen()),
+        ),
+        icon: const Icon(Icons.add_home_work_rounded),
+        label: const Text('إضافة عقار'),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: AwaitContent<void>(
         value: combined,
         onLoading: const _AgentWorkspaceSkeleton(),
