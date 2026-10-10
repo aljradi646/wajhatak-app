@@ -86,7 +86,9 @@ class PropertyDetailScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     // 2) السعر + العملة
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -110,7 +112,6 @@ class PropertyDetailScreen extends ConsumerWidget {
                                 ),
                           ),
                         ),
-                        const SizedBox(width: 8),
                         if (item.typeName != null)
                           FactChip(
                             icon: Icons.category_rounded,
