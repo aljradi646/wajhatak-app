@@ -13,6 +13,7 @@ use App\Models\PropertyLocation;
 use App\Models\PropertyType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -174,16 +175,29 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $this->postJson("/api/v1/conversations/{$conversationId}/messages", [
             'body' => 'أرغب في معرفة المزيد',
             'message_type' => 'property',
-            'property_id' => $propertyA->id,
+            'property_id' => $propertyB->id,
         ])->assertCreated();
 
         $this->assertDatabaseHas('messages', [
             'conversation_id' => $conversationId,
             'message_type' => 'property',
-            'property_id' => $propertyA->id,
+            'property_id' => $propertyB->id,
             'sender_id' => $client->id,
             'body' => 'أرغب في معرفة المزيد',
         ]);
+
+        // Notification deep-link metadata must use the attachment actually sent,
+        // not the conversation's original listing (property A).
+        $notification = DB::table('notifications')
+            ->where('notifiable_type', User::class)
+            ->where('notifiable_id', $agentUser->id)
+            ->orderByDesc('created_at')
+            ->first();
+
+        $this->assertNotNull($notification);
+        $notificationData = json_decode($notification->data, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame($propertyB->id, $notificationData['property_id']);
+        $this->assertSame($conversationId, $notificationData['conversation_id']);
     }
 
     public function test_conversation_response_uses_agent_name_as_title(): void
