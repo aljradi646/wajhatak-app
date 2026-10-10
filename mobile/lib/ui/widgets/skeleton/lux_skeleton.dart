@@ -1003,112 +1003,127 @@ class PropertyCardSkeleton extends StatelessWidget {
   const PropertyCardSkeleton({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact =
+          constraints.maxWidth < 160 || constraints.maxHeight < 225;
+      final priceWidth = compact
+          ? (constraints.maxWidth - 16).clamp(60.0, 88.0).toDouble()
+          : 104.0;
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          /// =====================================================
-          /// Image / Hero area
-          /// =====================================================
-          Expanded(
-            flex: 10,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                const LuxSkeleton(
-                  width: double.infinity,
-                  height: double.infinity,
-                  radius: 0,
-                ),
-
-                /// top favorite
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: LuxSkeleton(width: 38, height: 38, radius: 19),
-                ),
-
-                /// status badge
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: LuxSkeleton(width: 76, height: 26, radius: 13),
-                ),
-
-                /// bottom media controls
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: 12,
-                  child: Row(
-                    children: [
-                      LuxSkeleton(width: 54, height: 20, radius: 10),
-                      const Spacer(),
-                      LuxSkeleton(width: 30, height: 20, radius: 10),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+      return Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
-
-          /// =====================================================
-          /// Property information
-          /// =====================================================
-          Expanded(
-            flex: 7,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(13, 10, 13, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: compact ? 8 : 10,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  /// price
-                  const LuxSkeleton(width: 104, height: 19, radius: 8),
-
-                  const SizedBox(height: 8),
-
-                  /// title
                   const LuxSkeleton(
                     width: double.infinity,
-                    height: 15,
-                    radius: 7,
+                    height: double.infinity,
+                    radius: 0,
                   ),
-
-                  const SizedBox(height: 6),
-
-                  /// second title line
-                  const LuxSkeleton(width: 155, height: 13, radius: 7),
-
-                  const Spacer(),
-
-                  /// metadata
-                  Row(
-                    children: [
-                      Expanded(child: LuxSkeleton(height: 22, radius: 11)),
-                      const SizedBox(width: 7),
-                      Expanded(child: LuxSkeleton(height: 22, radius: 11)),
-                      const SizedBox(width: 7),
-                      Expanded(child: LuxSkeleton(height: 22, radius: 11)),
-                    ],
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: LuxSkeleton(width: 38, height: 38, radius: 19),
+                  ),
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: LuxSkeleton(width: 76, height: 26, radius: 13),
+                  ),
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: 12,
+                    child: Row(
+                      children: [
+                        LuxSkeleton(width: 54, height: 20, radius: 10),
+                        const Spacer(),
+                        LuxSkeleton(width: 30, height: 20, radius: 10),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            Expanded(
+              flex: compact ? 5 : 8,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  compact ? 8 : 13,
+                  compact ? 6 : 10,
+                  compact ? 8 : 13,
+                  compact ? 6 : 10,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LuxSkeleton(
+                      width: priceWidth,
+                      height: compact ? 15 : 19,
+                      radius: 8,
+                    ),
+                    SizedBox(height: compact ? 4 : 8),
+                    LuxSkeleton(
+                      width: double.infinity,
+                      height: compact ? 12 : 15,
+                      radius: 7,
+                    ),
+                    if (!compact) ...[
+                      const SizedBox(height: 6),
+                      const LuxSkeleton(width: 155, height: 13, radius: 7),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: LuxSkeleton(height: 22, radius: 11),
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: LuxSkeleton(height: 22, radius: 11),
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: LuxSkeleton(height: 22, radius: 11),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: LuxSkeleton(height: 17, radius: 9),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: LuxSkeleton(height: 17, radius: 9),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 /// ===============================================================
