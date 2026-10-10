@@ -818,14 +818,12 @@ class AgentReportSkeleton extends StatelessWidget {
       builder: (context, constraints) {
         final columns = constraints.maxWidth >= 700
             ? 3
-            : constraints.maxWidth >= 300
+            : constraints.maxWidth >= 460
             ? 2
             : 1;
-        final ratio = columns == 3
-            ? 2.7
-            : columns == 2
-            ? 2.2
-            : 3.0;
+        final cardWidth =
+            (constraints.maxWidth - (columns - 1) * 10) / columns;
+        final ratio = cardWidth < 260 ? 2.0 : 2.7;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
