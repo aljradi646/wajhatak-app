@@ -933,18 +933,16 @@ class SliverPropertyGridSkeleton extends StatelessWidget {
           builder: (context, constraints) {
             final width = constraints.crossAxisExtent;
 
-            final columns = width >= 1100
-                ? 4
-                : width >= 700
-                ? 3
-                : 2;
+            final columns = Responsive.propertyGridColumns(width);
 
             return SliverGrid.builder(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
-                childAspectRatio: 0.70,
+                childAspectRatio: Responsive.propertyCardAspectRatio(
+                  (width - (columns - 1) * 14) / columns,
+                ),
               ),
               itemCount: count,
               itemBuilder: (context, index) {
@@ -956,6 +954,31 @@ class SliverPropertyGridSkeleton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Skeleton لقائمة المفضلة: عنوان وعدّاد ثم شبكة البطاقات الفعلية.
+class SavedScreenSkeleton extends StatelessWidget {
+  const SavedScreenSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => _LuxShimmer(
+    child: CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: const [
+                Expanded(child: LuxSkeleton(width: 150, height: 28, radius: 9)),
+                LuxSkeleton(width: 48, height: 30, radius: 15),
+              ],
+            ),
+          ),
+        ),
+        const SliverPropertyGridSkeleton(count: 6),
+      ],
+    ),
+  );
 }
 
 /// ===============================================================
