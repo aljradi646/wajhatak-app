@@ -816,13 +816,16 @@ class AgentReportSkeleton extends StatelessWidget {
   Widget build(BuildContext context) => _LuxShimmer(
     child: LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 700
+        // The real KPI grid sits inside a Card with 14px padding per side.
+        final contentWidth =
+            (constraints.maxWidth - 28).clamp(0.0, constraints.maxWidth).toDouble();
+        final columns = contentWidth >= 700
             ? 3
-            : constraints.maxWidth >= 460
+            : contentWidth >= 460
             ? 2
             : 1;
         final cardWidth =
-            (constraints.maxWidth - (columns - 1) * 10) / columns;
+            (contentWidth - (columns - 1) * 10) / columns;
         final cardRatio = cardWidth < 260 ? 2.0 : 2.7;
 
         return Column(
@@ -931,7 +934,7 @@ class AgentReportSkeleton extends StatelessWidget {
                     ),
                     Container(
                       height: 1,
-                      width: 448,
+                      width: 472,
                       color: Theme.of(context).colorScheme.outlineVariant,
                     ),
                     for (var row = 0; row < 4; row++) ...[
@@ -957,7 +960,7 @@ class AgentReportSkeleton extends StatelessWidget {
                       ),
                       Container(
                         height: 1,
-                        width: 448,
+                        width: 472,
                         color: Theme.of(context)
                             .colorScheme
                             .outlineVariant
