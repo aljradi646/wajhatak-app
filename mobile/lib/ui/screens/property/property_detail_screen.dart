@@ -25,6 +25,7 @@ class PropertyDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final property = ref.watch(propertyDetailProvider(propertyId));
     final overrides = ref.watch(favoriteOverridesProvider);
+    final currentUserId = ref.watch(sessionProvider).asData?.value?.user.id;
     return Scaffold(
       body: LuxAsyncView<LuxProperty>(
         value: property,
@@ -201,44 +202,79 @@ class PropertyDetailScreen extends ConsumerWidget {
         },
       ),
       bottomNavigationBar: property.maybeWhen(
-        data: (item) => SafeArea(
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => startConversation(
-                      context,
-                      ref,
-                      item.id,
-                      agentId: item.agent?.id,
-                      pendingProperty: item,
+        data: (item) {
+          // AgentResource.id is the agent profile id; ownership must be checked
+          // against AgentResource.user_id, which is the authenticated user id.
+          if (item.agent?.belongsToUser(currentUserId) ?? false) {
+            return const SizedBox.shrink();
+          }
+
+          return SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 380;
+                final theme = Theme.of(context);
+
+                Widget messageButton() => OutlinedButton.icon(
+                  onPressed: () => startConversation(
+                    context,
+                    ref,
+                    item.id,
+                    agentId: item.agent?.id,
+                    pendingProperty: item,
+                  ),
+                  icon: const Icon(Icons.chat_bubble_rounded, size: 19),
+                  label: const Text(
+                    'مراسلة الوكيل',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+
+                Widget viewingButton() => FilledButton.icon(
+                  onPressed: () => showViewingSheet(context, ref, item.id),
+                  icon: const Icon(Icons.event_available_rounded, size: 19),
+                  label: const Text(
+                    'طلب معاينة',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+
+                return Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: constraints.maxWidth < 340 ? 12 : 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(
+                      top: BorderSide(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
-                    icon: const Icon(Icons.chat_bubble_rounded, size: 19),
-                    label: const Text('مراسلة الوكيل'),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => showViewingSheet(context, ref, item.id),
-                    icon: const Icon(Icons.event_available_rounded, size: 19),
-                    label: const Text('طلب معاينة'),
-                  ),
-                ),
-              ],
+                  child: compact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            messageButton(),
+                            const SizedBox(height: 8),
+                            viewingButton(),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(child: messageButton()),
+                            const SizedBox(width: 10),
+                            Expanded(child: viewingButton()),
+                          ],
+                        ),
+                );
+              },
             ),
-          ),
-        ),
+          );
+        },
         orElse: () => const SizedBox.shrink(),
       ),
     );
