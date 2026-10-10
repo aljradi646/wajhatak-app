@@ -439,9 +439,6 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
                         : constraints.maxWidth >= 340
                         ? 2
                         : 1;
-                    final cardWidth =
-                        (constraints.maxWidth - (columns - 1) * 10) /
-                        columns;
                     final cardRatio = columns == 3
                         ? 2.7
                         : columns == 2
