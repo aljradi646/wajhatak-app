@@ -409,6 +409,7 @@ class PropertyDetailsSkeleton extends StatelessWidget {
         : width >= 600
         ? 400.0
         : 330.0;
+    final contentWidth = (width - 40).clamp(0.0, width).toDouble();
 
     return _LuxShimmer(
       child: CustomScrollView(
@@ -432,16 +433,29 @@ class PropertyDetailsSkeleton extends StatelessWidget {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 150),
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
             sliver: SliverList.list(
               children: [
-                const LuxSkeleton(width: 260, height: 30, radius: 9),
+                LuxSkeleton(
+                  width: contentWidth * .92,
+                  height: 30,
+                  radius: 9,
+                ),
                 const SizedBox(height: 10),
-                Row(
-                  children: const [
-                    LuxSkeleton(width: 150, height: 38, radius: 14),
-                    SizedBox(width: 8),
-                    LuxSkeleton(width: 100, height: 30, radius: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    LuxSkeleton(
+                      width: contentWidth >= 260 ? 150 : contentWidth * .58,
+                      height: 38,
+                      radius: 14,
+                    ),
+                    LuxSkeleton(
+                      width: contentWidth >= 260 ? 100 : contentWidth * .34,
+                      height: 30,
+                      radius: 14,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
