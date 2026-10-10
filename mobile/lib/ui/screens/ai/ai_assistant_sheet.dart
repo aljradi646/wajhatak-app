@@ -511,10 +511,10 @@ class _AiPropertyMiniCard extends StatelessWidget {
                       ? CachedNetworkImage(
                           imageUrl: property.imageUrl!,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            alignment: Alignment.center,
-                            child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)),
+                          placeholder: (context, url) => const LuxSkeleton(
+                            width: double.infinity,
+                            height: double.infinity,
+                            radius: 0,
                           ),
                           errorWidget: (context, url, error) => _imageFallback(theme),
                         )
