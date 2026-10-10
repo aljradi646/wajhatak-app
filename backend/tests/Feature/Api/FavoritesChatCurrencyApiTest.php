@@ -158,7 +158,7 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $conversationId = $first->json('data.id');
 
         // Opening a chat from another property of the SAME agent returns the same conversation.
-        $second = $this->postJson('/api/v1/conversations', ['property_id' => $propertyB->id])->assertCreated();
+        $second = $this->postJson('/api/v1/conversations', ['property_id' => $propertyB->id])->assertOk();
         $this->assertSame($conversationId, $second->json('data.id'));
         $this->assertSame(1, Conversation::query()->where('client_id', $client->id)->count());
 
@@ -227,6 +227,7 @@ class FavoritesChatCurrencyApiTest extends TestCase
         Sanctum::actingAs($client);
         $response = $this->postJson("/api/v1/conversations/{$conversation->id}/messages", [
             'body' => 'السلام عليكم، هل العقار ما زال متاحًا؟',
+            'message_type' => 'text',
         ])->assertCreated();
 
         $response->assertJsonPath('data.body', 'السلام عليكم، هل العقار ما زال متاحًا؟')
