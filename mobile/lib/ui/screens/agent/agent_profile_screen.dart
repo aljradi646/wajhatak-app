@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/format_money.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/utils/notice.dart';
 import '../../../data/models/models.dart';
 import '../../../state/providers.dart';
@@ -96,20 +97,34 @@ class _AgentProfileScreenState extends ConsumerState<AgentProfileScreen> {
         else ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 0.64,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _AgentGridTile(
-                  property: data.properties[index],
-                  onTap: () => _openProperty(data.properties[index].id),
-                ),
-                childCount: data.properties.length,
-              ),
+            sliver: SliverLayoutBuilder(
+              builder: (context, constraints) {
+                final columns = Responsive.propertyGridColumns(
+                  constraints.crossAxisExtent,
+                );
+                final cardWidth =
+                    (constraints.crossAxisExtent -
+                        (columns - 1) * 10) /
+                    columns;
+
+                return SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: Responsive.propertyCardAspectRatio(
+                      cardWidth,
+                    ),
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _AgentGridTile(
+                      property: data.properties[index],
+                      onTap: () => _openProperty(data.properties[index].id),
+                    ),
+                    childCount: data.properties.length,
+                  ),
+                );
+              },
             ),
           ),
           if (data.hasMore)
