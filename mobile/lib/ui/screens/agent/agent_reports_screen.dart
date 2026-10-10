@@ -202,26 +202,24 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
           ...type.filters.map(_buildFilterRow),
           const SizedBox(height: 8),
         ],
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: _loadingReport ? null : _loadReport,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('عرض التقرير'),
-              ),
+            FilledButton.icon(
+              onPressed: _loadingReport ? null : _loadReport,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('عرض التقرير'),
             ),
-            const SizedBox(width: 8),
             OutlinedButton.icon(
               onPressed: () => _openExport(format: 'csv'),
               icon: const Icon(Icons.grid_on_rounded, size: 18),
-              label: const Text('CSV'),
+              label: const Text('تصدير CSV'),
             ),
-            const SizedBox(width: 8),
             OutlinedButton.icon(
               onPressed: () => _openExport(format: 'pdf'),
               icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
-              label: const Text('PDF'),
+              label: const Text('تصدير PDF'),
             ),
           ],
         ),
@@ -289,36 +287,52 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _pickDate(from: true),
-                icon: const Icon(Icons.date_range_rounded, size: 17),
-                label: Text(_dateFrom ?? 'من تاريخ'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _pickDate(from: false),
-                icon: const Icon(Icons.event_rounded, size: 17),
-                label: Text(_dateTo ?? 'إلى تاريخ'),
-              ),
-            ),
-            if (_dateFrom != null || _dateTo != null)
-              IconButton(
-                tooltip: 'مسح الفترة',
-                onPressed: () {
-                  setState(() {
-                    _dateFrom = null;
-                    _dateTo = null;
-                  });
-                  _loadReport();
-                },
-                icon: const Icon(Icons.close_rounded),
-              ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final buttonWidth = (constraints.maxWidth - 8) / 2;
+            return Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                SizedBox(
+                  width: buttonWidth,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickDate(from: true),
+                    icon: const Icon(Icons.date_range_rounded, size: 17),
+                    label: Text(
+                      _dateFrom ?? 'من تاريخ',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: buttonWidth,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickDate(from: false),
+                    icon: const Icon(Icons.event_rounded, size: 17),
+                    label: Text(
+                      _dateTo ?? 'إلى تاريخ',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                if (_dateFrom != null || _dateTo != null)
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _dateFrom = null;
+                        _dateTo = null;
+                      });
+                      _loadReport();
+                    },
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('مسح الفترة'),
+                  ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 10),
       ],
