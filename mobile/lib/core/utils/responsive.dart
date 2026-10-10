@@ -27,7 +27,8 @@ class Responsive {
     if (crossAxisExtent >= 1240) return 4;
     if (crossAxisExtent >= 900) return 3;
     if (crossAxisExtent >= 600) return 2;
-    return crossAxisExtent >= 280 ? 2 : 1;
+    if (crossAxisExtent < 340) return 1;
+    return 2;
   }
 
   /// نسبة الارتفاع للبطاقة حسب العرض.
