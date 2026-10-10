@@ -381,6 +381,8 @@ class _AgentMetric extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 11,
             color: Theme.of(
