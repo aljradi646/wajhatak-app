@@ -67,8 +67,16 @@ void main() {
       final conversation = ConversationItem.fromJson({
         'id': 7,
         'property': {'id': 3, 'title': 'فيلا فاخرة في صنعاء'},
-        'client': {'id': 2, 'name': 'أحمد العميل'},
-        'agent': {'id': 5, 'name': 'عبدالله العقاري'},
+        'client': {
+          'id': 2,
+          'name': 'أحمد العميل',
+          'avatar_url': 'https://example.com/client.png',
+        },
+        'agent': {
+          'id': 5,
+          'name': 'عبدالله العقاري',
+          'avatar_url': 'https://example.com/agent.png',
+        },
         'last_message_at': '2026-08-28T10:30:00.000000Z',
         'last_message': {'body': 'مرحبًا', 'message_type': 'text'},
       });
@@ -76,7 +84,18 @@ void main() {
       expect(conversation.title, 'عبدالله العقاري');
       expect(conversation.agentName, 'عبدالله العقاري');
       expect(conversation.agentId, 5);
+      expect(conversation.clientId, 2);
       expect(conversation.clientName, 'أحمد العميل');
+      expect(conversation.otherParticipantNameFor(5), 'أحمد العميل');
+      expect(conversation.otherParticipantNameFor(2), 'عبدالله العقاري');
+      expect(
+        conversation.otherParticipantAvatarUrlFor(5),
+        'https://example.com/client.png',
+      );
+      expect(
+        conversation.otherParticipantAvatarUrlFor(2),
+        'https://example.com/agent.png',
+      );
     });
 
     test('falls back to property title when agent is missing', () {
@@ -101,7 +120,7 @@ void main() {
     test('parses property message with embedded property payload', () {
       final message = ChatMessage.fromJson({
         'id': 12,
-        'body': '',
+        'body': 'السلام عليكم، هل العقار متاح؟',
         'sender_id': 2,
         'message_type': 'property',
         'property_id': 15,
@@ -122,6 +141,7 @@ void main() {
       });
 
       expect(message.isPropertyCard, isTrue);
+      expect(message.body, 'السلام عليكم، هل العقار متاح؟');
       expect(message.property!.title, 'برج تجاري — العليا');
       expect(message.property!.currency, 'USD');
       expect(message.property!.city, 'صنعاء');
