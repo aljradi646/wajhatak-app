@@ -62,6 +62,22 @@ void main() {
     });
   });
 
+  group('PropertyAgent ownership', () {
+    test('distinguishes the agent profile id from the owning user id', () {
+      final agent = PropertyAgent.fromJson({
+        'id': 41,
+        'user_id': 12,
+        'name': 'وكيل تجريبي',
+      });
+
+      expect(agent.id, 41);
+      expect(agent.userId, 12);
+      expect(agent.belongsToUser(12), isTrue);
+      expect(agent.belongsToUser(41), isFalse);
+      expect(agent.belongsToUser(null), isFalse);
+    });
+  });
+
   group('Conversation model (client + agent uniqueness)', () {
     test('title is the agent name, not the property title', () {
       final conversation = ConversationItem.fromJson({
