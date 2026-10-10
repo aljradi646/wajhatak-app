@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +8,23 @@ import '../data/api_client.dart';
 import '../data/models/ai_assistant.dart';
 import '../data/repositories/repositories.dart';
 import 'providers.dart';
+
+String buildAiWelcomeMessage(String? fullName, {DateTime? now}) {
+  final full = (fullName ?? '').trim();
+  final firstName = full.isEmpty ? '' : full.split(RegExp(r'\s+')).first;
+  final suffix = firstName.isEmpty ? '' : '، $firstName';
+  final hour = (now ?? DateTime.now()).hour;
+  if (hour >= 5 && hour < 12) {
+    return 'صباح الخير$suffix 👋\n'
+        'أنا مساعد وجهتك الذكي. أخبرني عمّا تبحث عنه، وسأساعدك في العثور على العقار المناسب.';
+  }
+  if (hour >= 12 && hour < 17) {
+    return 'أهلًا$suffix، أتمنى لك يومًا طيبًا 🌿\n'
+        'ما نوع العقار الذي تبحث عنه اليوم؟ يمكنني مساعدتك في تضييق الخيارات.';
+  }
+  return 'مساء الخير$suffix 🌙\n'
+      'أنا هنا لمساعدتك في العثور على عقار يناسب احتياجك وميزانيتك.';
+}
 
 final aiAssistantRepositoryProvider = Provider<AiAssistantRepository>(
   (ref) => AiAssistantRepository(ref.watch(apiClientProvider)),
@@ -43,6 +62,7 @@ class AiConversationState {
 
   bool get isEmpty => messages.isEmpty;
   bool get canSend =>
+      phase == AiSendPhase.bootstrapping ||
       phase == AiSendPhase.ready ||
       phase == AiSendPhase.completed ||
       phase == AiSendPhase.failed ||
@@ -76,35 +96,29 @@ class AiConversationController extends Notifier<AiConversationState> {
 
   Future<void> ensureReady() async {
     if (state.phase != AiSendPhase.bootstrapping) return;
+    final generation = _generation;
+    if (state.messages.isEmpty) {
+      final user = ref.read(sessionProvider).asData?.value?.user;
+      state = state.copyWith(
+        messages: [AiChatMessage.local(isUser: false, content: buildAiWelcomeMessage(user?.name))],
+        loading: false,
+        clearError: true,
+      );
+    }
     try {
       final bootstrap = await ref.read(aiBootstrapProvider.future);
-      if (!bootstrap.enabled) {
-        state = state.copyWith(loading: false, phase: AiSendPhase.disabled);
-        return;
-      }
+      if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
       state = state.copyWith(
-        messages: [
-          AiChatMessage.local(
-            isUser: false,
-            content: bootstrap.welcomeMessage,
-          ),
-        ],
         loading: false,
-        phase: AiSendPhase.ready,
+        phase: bootstrap.enabled ? AiSendPhase.ready : AiSendPhase.disabled,
         clearError: true,
       );
     } on ApiFailure catch (error) {
-      state = state.copyWith(
-        loading: false,
-        phase: AiSendPhase.failed,
-        error: error.message,
-      );
+      if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
+      state = state.copyWith(loading: false, phase: AiSendPhase.failed, error: error.message);
     } on Object {
-      state = state.copyWith(
-        loading: false,
-        phase: AiSendPhase.failed,
-        error: 'bootstrap_failed',
-      );
+      if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
+      state = state.copyWith(loading: false, phase: AiSendPhase.failed, error: 'bootstrap_failed');
     }
   }
 
@@ -293,38 +307,36 @@ class AiConversationController extends Notifier<AiConversationState> {
 
   Future<void> newConversation() async {
     cancel();
-    int? conversationId;
-    final session = ref.read(sessionProvider).asData?.value;
-    if (session != null) {
-      try {
-        conversationId = await ref
-            .read(aiAssistantRepositoryProvider)
-            .createConversation();
-      } on Object {
-        conversationId = null;
-      }
-    }
+    final user = ref.read(sessionProvider).asData?.value?.user;
     state = AiConversationState(
-      conversationId: conversationId,
+      messages: [AiChatMessage.local(isUser: false, content: buildAiWelcomeMessage(user?.name))],
       phase: AiSendPhase.bootstrapping,
     );
-    await ensureReady();
+    // Do not wait for a network round-trip; the first streamed message creates
+    // the saved conversation and returns its authoritative server ID.
+    unawaited(ensureReady());
   }
 
   Future<void> clear() async {
-    cancel();
     final id = state.conversationId;
-    final session = ref.read(sessionProvider).asData?.value;
-    if (id != null && session != null) {
-      try {
-        await ref.read(aiAssistantRepositoryProvider).clearConversation(id);
-      } on Object catch (_) {
-        // Local state reset must continue even if the server-side delete fails.
-      }
-    }
+    final signedIn = ref.read(sessionProvider).asData?.value != null;
+    cancel();
     ref.invalidate(aiBootstrapProvider);
-    state = const AiConversationState();
+    final user = ref.read(sessionProvider).asData?.value?.user;
+    state = AiConversationState(
+      messages: [AiChatMessage.local(isUser: false, content: buildAiWelcomeMessage(user?.name))],
+      phase: AiSendPhase.bootstrapping,
+    );
+    if (id != null && signedIn) unawaited(_clearConversationSilently(id));
     await ensureReady();
+  }
+
+  Future<void> _clearConversationSilently(int id) async {
+    try {
+      await ref.read(aiAssistantRepositoryProvider).clearConversation(id);
+    } on Object {
+      // Local reset remains available if remote cleanup fails.
+    }
   }
 
   Future<void> loadConversation(int conversationId) async {

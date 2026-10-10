@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -92,6 +95,13 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
     final bootstrap = ref.watch(aiBootstrapProvider).asData?.value;
     final lastFailed =
         state.messages.isNotEmpty && state.messages.last.status == 'error';
+    final showTyping = state.loading &&
+        (state.messages.isEmpty ||
+            state.messages.last.isUser ||
+            state.messages.last.status != 'streaming');
+    final pristineConversation = state.conversationId == null &&
+        state.messages.length == 1 &&
+        !state.messages.first.isUser;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -140,18 +150,12 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
           IconButton(
             tooltip: 'محادثة جديدة',
             icon: const Icon(Icons.add_comment_rounded),
-            onPressed: state.loading
-                ? null
-                : () => ref
-                      .read(aiConversationProvider.notifier)
-                      .newConversation(),
+            onPressed: () => ref.read(aiConversationProvider.notifier).newConversation(),
           ),
           IconButton(
             tooltip: 'مسح المحادثة',
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: state.loading
-                ? null
-                : () => ref.read(aiConversationProvider.notifier).clear(),
+            icon: const Icon(Icons.delete_sweep_rounded),
+            onPressed: () => ref.read(aiConversationProvider.notifier).clear(),
           ),
           IconButton(
             tooltip: 'إغلاق',
@@ -165,33 +169,40 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
         child: Column(
           children: [
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                  horizontal: 14,
-                ),
-                itemCount: state.messages.length + (state.loading ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (state.loading && index == state.messages.length) {
-                    return const _TypingIndicator();
-                  }
-                  final message = state.messages[index];
-                  return _MessageBubble(
-                    message: message,
-                    onPropertyTap: (propertyId) => _openProperty(propertyId),
-                    onFavoriteTap: _canFavorite
-                        ? (property) => _favorite(property)
-                        : null,
-                  );
-                },
-              ),
+              child: state.isEmpty && state.phase == AiSendPhase.bootstrapping
+                  ? const _AiAssistantSkeleton()
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 22),
+                      itemCount: state.messages.length + (showTyping ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (showTyping && index == state.messages.length) {
+                          return const _TypingIndicator();
+                        }
+                        final message = state.messages[index];
+                        final welcome = index == 0 &&
+                            state.messages.length == 1 &&
+                            !message.isUser &&
+                            state.conversationId == null &&
+                            message.status == 'ok';
+                        return _MessageBubble(
+                          message: message,
+                          isWelcome: welcome,
+                          onPropertyTap: _openProperty,
+                          onFavoriteTap: _canFavorite ? (property) => _favorite(property) : null,
+                        );
+                      },
+                    ),
             ),
-            if (state.isEmpty && bootstrap?.suggestions.isNotEmpty == true)
+            if (pristineConversation &&
+                state.phase != AiSendPhase.disabled &&
+                bootstrap?.enabled == true &&
+                bootstrap?.suggestions.isNotEmpty == true)
               _SuggestionsBar(
                 suggestions: bootstrap!.suggestions,
                 onSelected: (value) {
                   ref.read(aiConversationProvider.notifier).send(value);
+                  _scrollToBottom();
                 },
               ),
             if (lastFailed)
@@ -268,101 +279,155 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
 // الفقاعة — رسالة مستخدم/مساعد + بطاقات العقارات الحقيقية
 // ---------------------------------------------------------------------------
 
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({
-    required this.message,
-    required this.onPropertyTap,
-    this.onFavoriteTap,
-  });
+class _AiAssistantSkeleton extends StatelessWidget {
+  const _AiAssistantSkeleton();
+  @override
+  Widget build(BuildContext context) {
+    final shade = Theme.of(context).colorScheme.surfaceContainerHighest;
+    Widget bar(double width, double height) => Container(
+      width: width, height: height,
+      decoration: BoxDecoration(color: shade, borderRadius: BorderRadius.circular(10)),
+    );
+    return ListView(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 24), children: [
+      Row(children: [bar(44, 44), const SizedBox(width: 12), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [bar(170, 16), const SizedBox(height: 9), bar(220, 11)])]),
+      const SizedBox(height: 30),
+      Align(alignment: AlignmentDirectional.centerEnd, child: bar(205, 54)),
+      const SizedBox(height: 20),
+      Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(22)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          bar(160, 18), const SizedBox(height: 15), bar(double.infinity, 12), const SizedBox(height: 9), bar(245, 12), const SizedBox(height: 22),
+          Row(children: [Expanded(child: bar(double.infinity, 108)), const SizedBox(width: 10), Expanded(child: bar(double.infinity, 108))]),
+        ]),
+      ),
+    ]);
+  }
+}
 
+class _MessageBubble extends StatefulWidget {
+  const _MessageBubble({required this.message, required this.onPropertyTap, this.onFavoriteTap, this.isWelcome = false});
   final AiChatMessage message;
   final ValueChanged<int> onPropertyTap;
   final ValueChanged<AiPropertyResult>? onFavoriteTap;
+  final bool isWelcome;
+  @override
+  State<_MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends State<_MessageBubble> {
+  bool _showCopy = false;
+  Timer? _timer;
+
+  @override
+  void dispose() { _timer?.cancel(); super.dispose(); }
+
+  void _toggleCopy() {
+    _timer?.cancel();
+    setState(() => _showCopy = !_showCopy);
+    if (_showCopy) {
+      _timer = Timer(const Duration(milliseconds: 2400), () {
+        if (mounted) setState(() => _showCopy = false);
+      });
+    }
+  }
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.message.content));
+    if (!mounted) return;
+    _timer?.cancel();
+    setState(() => _showCopy = false);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('تم نسخ الرسالة'), duration: Duration(milliseconds: 850),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isUser = message.isUser;
-
-    return Align(
-      alignment: isUser ? Alignment.centerLeft : Alignment.centerRight,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-        ),
-        child: Column(
-          crossAxisAlignment: isUser
-              ? CrossAxisAlignment.start
-              : CrossAxisAlignment.end,
-          children: [
-            GestureDetector(
-              onLongPress: () {
-                Clipboard.setData(ClipboardData(text: message.content));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('تم نسخ النص'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: isUser
-                      ? theme.colorScheme.surfaceContainerHigh
-                      : theme.colorScheme.primaryContainer.withValues(
-                          alpha: .45,
-                        ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(18),
-                    topRight: const Radius.circular(18),
-                    bottomLeft: Radius.circular(isUser ? 6 : 18),
-                    bottomRight: Radius.circular(isUser ? 18 : 6),
-                  ),
-                ),
-                child: SelectableText(
-                  message.content,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    height: 1.55,
-                    fontWeight: FontWeight.w600,
-                  ),
+    final user = widget.message.isUser;
+    final items = widget.message.properties;
+    final content = widget.message.content.trim();
+    return SizedBox(width: double.infinity, child: Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (widget.isWelcome) _WelcomeMessage(content: content)
+        else Align(
+          alignment: user ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .88),
+            child: Material(
+              color: user ? theme.colorScheme.surfaceContainerHigh : theme.colorScheme.primaryContainer.withValues(alpha: .38),
+              borderRadius: BorderRadiusDirectional.only(
+                topStart: const Radius.circular(19), topEnd: const Radius.circular(19),
+                bottomStart: Radius.circular(user ? 5 : 19), bottomEnd: Radius.circular(user ? 19 : 5),
+              ),
+              child: InkWell(
+                onTap: _toggleCopy, onLongPress: _copy,
+                borderRadius: BorderRadius.circular(19),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Text(widget.message.content, style: theme.textTheme.bodyLarge?.copyWith(height: 1.72, fontSize: 15.5, fontWeight: FontWeight.w500)),
                 ),
               ),
             ),
-            if (!isUser && message.content.trim().isNotEmpty)
-              _CopyMessageButton(text: message.content),
-            if (message.properties.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: SizedBox(
-                  height: 350,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: message.properties.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (_, index) {
-                      final property = message.properties[index];
-                      return SizedBox(
-                        width: 220,
-                        child: _AiPropertyMiniCard(
-                          property: property,
-                          onTap: () => onPropertyTap(property.propertyId),
-                          onFavorite: onFavoriteTap != null
-                              ? () => onFavoriteTap!(property)
-                              : null,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-          ],
+          ),
         ),
-      ),
+        AnimatedSize(duration: const Duration(milliseconds: 160), child:
+          _showCopy && !user && content.isNotEmpty
+            ? Align(alignment: AlignmentDirectional.centerEnd, child: IconButton.filledTonal(
+                tooltip: 'نسخ الرد', visualDensity: VisualDensity.compact,
+                iconSize: 17, onPressed: _copy, icon: const Icon(Icons.copy_rounded),
+              ))
+            : const SizedBox.shrink(),
+        ),
+        if (items.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          LayoutBuilder(builder: (context, box) {
+            final columns = box.maxWidth >= 860 ? 3 : box.maxWidth >= 520 ? 2 : 1;
+            const gap = 10.0;
+            final cardWidth = (box.maxWidth - gap * (columns - 1)) / columns;
+            return Wrap(spacing: gap, runSpacing: gap, children: items.map((property) => SizedBox(
+              width: cardWidth, height: 318,
+              child: _AiPropertyMiniCard(
+                property: property, onTap: () => widget.onPropertyTap(property.propertyId),
+                onFavorite: widget.onFavoriteTap == null ? null : () => widget.onFavoriteTap!(property),
+              ),
+            )).toList(growable: false));
+          }),
+        ],
+      ]),
+    ));
+  }
+}
+
+class _WelcomeMessage extends StatelessWidget {
+  const _WelcomeMessage({required this.content});
+  final String content;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lines = content.split('\n');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Align(alignment: AlignmentDirectional.centerStart, child: Container(
+          width: 46, height: 46,
+          decoration: BoxDecoration(
+            gradient: WajhatakColors.amberGradient, borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: WajhatakColors.amber.withValues(alpha: .20), blurRadius: 16, offset: const Offset(0, 5))],
+          ),
+          child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 23),
+        )),
+        const SizedBox(height: 22),
+        Text(lines.isEmpty ? content : lines.first, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, height: 1.45)),
+        if (lines.length > 1) ...[
+          const SizedBox(height: 9),
+          Text(lines.skip(1).join('\n'), style: theme.textTheme.bodyLarge?.copyWith(height: 1.85, fontSize: 15.5, color: theme.colorScheme.onSurfaceVariant)),
+        ],
+        const SizedBox(height: 20),
+        Divider(color: theme.colorScheme.outlineVariant.withValues(alpha: .8)),
+      ]),
     );
   }
 }
@@ -443,11 +508,15 @@ class _AiPropertyMiniCard extends StatelessWidget {
                   height: 96,
                   child:
                       property.imageUrl != null && property.imageUrl!.isNotEmpty
-                      ? Image.network(
-                          property.imageUrl!,
+                      ? CachedNetworkImage(
+                          imageUrl: property.imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _imageFallback(theme),
+                          placeholder: (context, url) => Container(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            alignment: Alignment.center,
+                            child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)),
+                          ),
+                          errorWidget: (context, url, error) => _imageFallback(theme),
                         )
                       : _imageFallback(theme),
                 ),
@@ -813,7 +882,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Align(
-      alignment: Alignment.centerRight,
+      alignment: AlignmentDirectional.centerEnd,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
