@@ -276,6 +276,43 @@ class PropertyDetailScreen extends ConsumerWidget {
             ),
           );
         },
+        loading: () => SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 380;
+              final theme = Theme.of(context);
+              return Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: constraints.maxWidth < 340 ? 12 : 20,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  border: Border(
+                    top: BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                ),
+                child: compact
+                    ? Column(
+                        children: const [
+                          LuxSkeleton(height: 48, radius: 14),
+                          SizedBox(height: 8),
+                          LuxSkeleton(height: 48, radius: 14),
+                        ],
+                      )
+                    : Row(
+                        children: const [
+                          Expanded(child: LuxSkeleton(height: 52, radius: 14)),
+                          SizedBox(width: 10),
+                          Expanded(child: LuxSkeleton(height: 52, radius: 14)),
+                        ],
+                      ),
+              );
+            },
+          ),
+        ),
         orElse: () => const SizedBox.shrink(),
       ),
     );
