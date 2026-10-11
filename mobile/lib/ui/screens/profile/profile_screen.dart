@@ -302,7 +302,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
 
           // توثيق البريد الإلكتروني — رمز حقيقي إلى الصندوق الفعلي.
-          if (widget.user.emailVerified != true) ...[
+          if (widget.user.emailVerificationEnabled && widget.user.emailVerified != true) ...[
             const SizedBox(height: 12),
             _ActionTile(
               icon: Icons.mark_email_unread_rounded,
@@ -318,7 +318,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 );
               },
             ),
-          ] else ...[
+          ] else if (widget.user.emailVerificationEnabled) ...[
             const SizedBox(height: 12),
             _FieldTile(
               icon: Icons.verified_rounded,
