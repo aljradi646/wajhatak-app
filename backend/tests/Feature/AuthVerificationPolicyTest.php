@@ -68,6 +68,29 @@ final class AuthVerificationPolicyTest extends TestCase
             ->assertJsonPath('data.email_verification_required', true);
     }
 
+    public function test_newly_registered_session_can_access_me_without_verifying_email(): void
+    {
+        Setting::put('email_verification_enabled', true, 'boolean');
+
+        $response = $this->postJson('/api/v1/auth/register', [
+            'name' => 'Fresh Client',
+            'email' => 'fresh-client@example.test',
+            'password' => 'SecretPass123',
+            'password_confirmation' => 'SecretPass123',
+            'account_type' => 'client',
+        ])->assertCreated();
+
+        $token = $response->json('data.token');
+        $this->assertIsString($token);
+        $this->assertNotSame('', $token);
+
+        $this->withToken($token)
+            ->getJson('/api/v1/me')
+            ->assertOk()
+            ->assertJsonPath('data.email_verified', false)
+            ->assertJsonPath('data.email_verification_enabled', true);
+    }
+
     public function test_registration_does_not_require_email_verification_when_disabled(): void
     {
         Setting::put('email_verification_enabled', false, 'boolean');
