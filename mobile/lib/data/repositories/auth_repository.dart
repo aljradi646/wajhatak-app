@@ -103,12 +103,25 @@ class AuthRepository {
     return _saveSession(json);
   }
 
-  Future<void> logout() async {
-    try {
-      await _api.post('/auth/logout');
-    } finally {
-      await _tokenStore.clear();
-    }
+  Future<void> logout({String? accessToken}) async {
+    final token = accessToken ?? await _tokenStore.read();
+    // Delete local credentials before attempting the network request so a
+    // slow/offline server cannot keep the user signed in on this device.
+    await _tokenStore.clear();
+    if (token == null || token.isEmpty) return;
+
+    await _api.post(
+      '/auth/logout',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+          'X-Auth-Token': token,
+        },
+        connectTimeout: const Duration(seconds: 4),
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      ),
+    );
   }
 
   Future<SessionData> updateProfile({
