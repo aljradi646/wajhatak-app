@@ -63,6 +63,31 @@
             </form>
         </x-admin.card>
 
+        @php($emailVerificationEnabled = (bool) \\App\\Models\\Setting::get('email_verification_enabled', true))
+        <x-admin.card title="سياسة توثيق البريد الإلكتروني" description="تحكّم في ظهور توثيق البريد داخل التطبيق دون منع العميل أو الوكيل من تسجيل الدخول.">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0">
+                    <div class="mb-2">
+                        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {{ $emailVerificationEnabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' }}">
+                            {{ $emailVerificationEnabled ? 'توثيق البريد مفعّل' : 'توثيق البريد معطّل' }}
+                        </span>
+                    </div>
+                    <p class="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                        {{ $emailVerificationEnabled ? 'تظهر واجهة التوثيق بعد إنشاء حساب جديد، ويظل تسجيل الدخول متاحًا حتى قبل توثيق البريد.' : 'تُخفى واجهة التوثيق من التطبيق، ويمكن للعملاء والوكلاء التسجيل وتسجيل الدخول دون طلب الرمز.' }}
+                    </p>
+                </div>
+                <form method="POST" action="{{ route('admin.settings.quick') }}" class="shrink-0">
+                    @csrf
+                    <input type="hidden" name="key" value="email_verification_enabled">
+                    <input type="hidden" name="type" value="boolean">
+                    <button type="submit" name="value" value="{{ $emailVerificationEnabled ? '0' : '1' }}"
+                        class="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-bold text-white transition {{ $emailVerificationEnabled ? 'bg-rose-600 hover:bg-rose-700' : 'bg-wajhatak-600 hover:bg-wajhatak-700' }}">
+                        {{ $emailVerificationEnabled ? 'إيقاف توثيق البريد' : 'تفعيل توثيق البريد' }}
+                    </button>
+                </form>
+            </div>
+        </x-admin.card>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {{-- ====================== Settings list ====================== --}}
         <div class="lg:col-span-2">
