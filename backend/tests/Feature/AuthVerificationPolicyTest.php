@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 final class AuthVerificationPolicyTest extends TestCase
@@ -37,6 +38,7 @@ final class AuthVerificationPolicyTest extends TestCase
             'email' => 'unverified-agent@example.test',
             'password' => 'SecretPass123',
         ]);
+        Role::findOrCreate('agent');
         $user->assignRole('agent');
 
         $this->postJson('/api/v1/auth/login', [
