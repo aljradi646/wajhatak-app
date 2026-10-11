@@ -277,14 +277,13 @@ Future<T> _readForSession<T>(
   try {
     return await request();
   } on ApiFailure catch (error) {
-    // 401/403: مسح الجلسة بعد إنهاء الطلب الحالي. لا نستدعي `ref` بعد
-    // فجوة async — فالـ provider قد يُعاد بناؤه فحُرّف الـ ref — لذلك
-    // نلتقط notifier الجلسة قبل أي await، ولا نُبطل providers تعتمد
-    // على الجلسة وهي قيد البناء (Prev CircularDependencyError).
+    // 401 invalidates the session. A 403 is a feature-level permission denial:
+    // show the provider fallback, but preserve the authenticated session.
     if (_isUnauthorized(error)) {
       unawaited(ref.read(sessionProvider.notifier).clearExpiredSession());
       return fallback;
     }
+    if (error.statusCode == 403) return fallback;
     rethrow;
   }
 }
