@@ -299,7 +299,7 @@ class AgentReportRecords extends StatelessWidget {
     final details = report.columns
         .where((column) => column.key != primary.key && column.key != status?.key)
         .toList(growable: false);
-    final detailWidth = (width - 44).clamp(110.0, 260.0).toDouble() / 2;
+    final detailWidth = ((width - 44) / 2).clamp(100.0, 260.0).toDouble();
     return Column(
       children: List<Widget>.generate(report.rows.length, (index) {
         final row = report.rows[index];
