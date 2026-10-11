@@ -265,8 +265,7 @@ final sessionProvider = AsyncNotifierProvider<SessionController, SessionData?>(
 Future<PreviewFixtureRepository> _preview(Ref ref) =>
     ref.read(previewFixtureRepositoryProvider.future);
 
-bool _isUnauthorized(ApiFailure error) =>
-    error.statusCode == 401 || error.statusCode == 403;
+bool _isUnauthorized(ApiFailure error) => error.statusCode == 401;
 
 Future<T> _readForSession<T>(
   Ref ref,
