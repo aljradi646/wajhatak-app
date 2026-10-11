@@ -109,7 +109,8 @@ class _EmailVerificationScreenState
     } on ApiFailure catch (error) {
       if (error.statusCode == 409 && mounted) {
         util.notice(context, error.message);
-        Navigator.of(context).pop(false);
+        await ref.read(sessionProvider.notifier).restoreSessionAfterVerification();
+        if (mounted) Navigator.of(context).pop(false);
       }
       // لا نعتمد على ساعة الجهاز عند فشل مزامنة الخادم.
     }
