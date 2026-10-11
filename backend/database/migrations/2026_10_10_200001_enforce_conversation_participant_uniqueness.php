@@ -97,17 +97,34 @@ return new class extends Migration
             }
         });
 
-        Schema::table('conversations', function (Blueprint $table): void {
-            $table->dropUnique('conversations_property_id_client_id_agent_id_unique');
-            $table->unique(['client_id', 'agent_id']);
-        });
+        // Some installations may already have a differently named/removed
+        // legacy index. Only drop it when it actually exists.
+        if (Schema::hasIndex('conversations', 'conversations_property_id_client_id_agent_id_unique')) {
+            Schema::table('conversations', function (Blueprint $table): void {
+                $table->dropUnique('conversations_property_id_client_id_agent_id_unique');
+            });
+        }
+
+        // Also tolerate a retry after a partial DDL operation.
+        if (! Schema::hasIndex('conversations', ['client_id', 'agent_id'], 'unique')) {
+            Schema::table('conversations', function (Blueprint $table): void {
+                $table->unique(['client_id', 'agent_id']);
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('conversations', function (Blueprint $table): void {
-            $table->dropUnique('conversations_client_id_agent_id_unique');
-            $table->unique(['property_id', 'client_id', 'agent_id']);
-        });
+        if (Schema::hasIndex('conversations', 'conversations_client_id_agent_id_unique')) {
+            Schema::table('conversations', function (Blueprint $table): void {
+                $table->dropUnique('conversations_client_id_agent_id_unique');
+            });
+        }
+
+        if (! Schema::hasIndex('conversations', ['property_id', 'client_id', 'agent_id'], 'unique')) {
+            Schema::table('conversations', function (Blueprint $table): void {
+                $table->unique(['property_id', 'client_id', 'agent_id']);
+            });
+        }
     }
 };
