@@ -180,8 +180,14 @@ class LuxApiClient {
         onError: (error, handler) async {
           final statusCode = error.response?.statusCode;
 
-          // مهما كانت الحالة، سجّل الفشل لتغذية قاطع الدارة قبل المحاولة.
-          _recordFailure();
+          // Count only transient transport/server failures toward the breaker.
+          // Expected client errors (401/403/404/409/422/429) must not lock
+          // unrelated API calls behind a 20-second cooldown.
+          if (statusCode == null || statusCode >= 500) {
+            _recordFailure();
+          } else {
+            _recordSuccess();
+          }
 
           // تخفيف الاستضافة (429) — لا نعيد المحاولة إطلاقًا ونورد خطأً واضحًا.
           if (statusCode == 429) {
@@ -217,7 +223,9 @@ class LuxApiClient {
             }
           }
 
-          if (statusCode == 401 || statusCode == 403) {
+          // 403 means the session may be valid but lacks permission.
+          // Only 401 represents an unauthenticated/expired-token response.
+          if (statusCode == 401) {
             unawaited(_tokenStore.clear());
           }
           final payload = error.response?.data;
