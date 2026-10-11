@@ -74,6 +74,13 @@ class UserController extends Controller
             $user->syncRoles($data['roles']);
         }
 
+        if ($user->hasRole('agent')) {
+            Agent::query()->firstOrCreate(
+                ['user_id' => $user->id],
+                ['is_active' => false, 'verification_status' => 'pending']
+            );
+        }
+
         ActivityLog::record('user', "تم إنشاء المستخدم «{$user->name}»", $user);
 
         return redirect()->route('admin.users.index')->with('status', 'تم إنشاء المستخدم بنجاح.');
