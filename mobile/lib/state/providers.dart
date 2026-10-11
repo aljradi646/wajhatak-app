@@ -160,27 +160,21 @@ class SessionController extends AsyncNotifier<SessionData?> {
   /// تسجيل الخروج: API → حذف الرمز → مسح كل الحالة المرتبطة بالمستخدم →
   /// إعادة الواجهة لشاشة الدخول. كل ذلك فور نجاح العملية دون إعادة تشغيل.
   Future<void> logout() async {
-    Object? logoutError;
-    StackTrace? logoutStackTrace;
-    try {
-      if (AppConfig.isUiPreview) {
-        await ref.read(previewFixtureRepositoryProvider.future);
-      } else {
-        await ref.read(authRepositoryProvider).logout();
-      }
-    } catch (error, stackTrace) {
-      logoutError = error;
-      logoutStackTrace = stackTrace;
-    } finally {
-      await _clearAuthenticatedState();
+    // Update app state immediately; remote token revocation is best-effort and
+    // must never hold the user on a signed-in screen.
+    state = const AsyncData(null);
+    _afterSessionChanged();
+
+    if (AppConfig.isUiPreview) {
+      await ref.read(previewFixtureRepositoryProvider.future);
+      return;
     }
 
-    if (logoutError != null) {
-      Error.throwWithStackTrace(
-        logoutError,
-        logoutStackTrace ?? StackTrace.current,
-      );
-    }
+    final token = await ref.read(tokenStoreProvider).read();
+    await ref.read(tokenStoreProvider).clear();
+    if (token == null || token.isEmpty) return;
+
+    await ref.read(authRepositoryProvider).logout(accessToken: token);
   }
 
   Future<void> clearExpiredSession() => _clearAuthenticatedState();
