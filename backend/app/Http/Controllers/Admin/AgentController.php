@@ -239,8 +239,12 @@ class AgentController extends Controller
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
+        $previousUser = $agent->user;
+        $nextUser = User::query()->findOrFail($data['user_id']);
+        Role::findOrCreate('agent');
+
         $agent->update([
-            'user_id' => $data['user_id'],
+            'user_id' => $nextUser->id,
             'license_number' => $data['license_number'] ?? null,
             'bio' => $data['bio'] ?? null,
             'rating' => $data['rating'],
@@ -248,9 +252,20 @@ class AgentController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
-        Role::findOrCreate('agent');
-        $agent->refresh()->user->assignRole('agent');
+        // Keep role/profile mapping correct if the profile is reassigned. This
+        // changes neither favorites nor messages nor any other user-owned data.
+        $nextUser->assignRole('agent');
+        if ($previousUser && $previousUser->id !== $nextUser->id) {
+            $hasAnotherProfile = Agent::query()
+                ->where('user_id', $previousUser->id)
+                ->where('id', '!=', $agent->id)
+                ->exists();
+            if (! $hasAnotherProfile) {
+                $previousUser->removeRole('agent');
+            }
+        }
 
+        $agent->load('user');
         ActivityLog::record('agent', "تم تحديث وكيل «{$agent->user->name}»", $agent);
 
         return redirect()->route('admin.agents.index')->with('status', 'تم تحديث الوكيل بنجاح.');

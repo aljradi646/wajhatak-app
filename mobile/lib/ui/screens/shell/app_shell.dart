@@ -111,6 +111,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     LuxNotification notification,
     AppSettings settings,
   ) => switch (notification.kind) {
+    'support_ticket_reply' => true,
     'message_received' ||
     'message' ||
     'message_sent' => settings.messageNotifications,

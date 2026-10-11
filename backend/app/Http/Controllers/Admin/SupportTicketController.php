@@ -28,7 +28,7 @@ class SupportTicketController extends Controller {
     }
     public function reply(Request $r,SupportTicket $ticket): RedirectResponse {
         $d=$r->validate(['message'=>['required','string','min:2','max:10000'],'status'=>['nullable','in:in_progress,waiting_user,resolved,closed'],'send_email'=>['nullable','boolean']]);
-        $sendEmail=$r->boolean('send_email',true);
+        $sendEmail=$r->boolean('send_email');
         $message=DB::transaction(function()use($r,$ticket,$d,$sendEmail){
             $m=$ticket->messages()->create(['user_id'=>$r->user()->id,'sender_role'=>'admin','body'=>trim($d['message']),'email_status'=>$sendEmail?'pending':'not_requested']);
             $status=$d['status']??'waiting_user';
