@@ -119,7 +119,7 @@
                             المستخدمون
                         </x-admin.nav-link>
 
-                        <x-admin.nav-link href="{{ route('admin.support-tickets.index') }}" :active="request()->routeIs('admin.support-tickets.*')">
+                        <x-admin.nav-link href="{{ route('admin.support-tickets.index') }}" :active="request()->routeIs('admin.support-tickets.*')" :badge="$openSupportTicketsCount">
                             <x-slot name="icon"><x-admin.icon name="messages" /></x-slot>
                             البلاغات والدعم
                         </x-admin.nav-link>
