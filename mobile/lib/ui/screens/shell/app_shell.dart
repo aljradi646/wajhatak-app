@@ -50,6 +50,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     service.onNotificationResponse = _openFromSystemNotification;
     unawaited(service.initialize());
     unawaited(_handleLaunchNotification());
+    final push = ref.read(firebasePushMessagingServiceProvider);
+    push.onNotificationOpened = _openFromSystemNotification;
+    unawaited(push.initializeAndRegister());
     // Polling محسوب للإشعارات والمحادثات — 25 ثانية، فقط عند وجود جلسة.
     _notificationTimer = Timer.periodic(const Duration(seconds: 25), (_) {
       if (ref.read(sessionProvider).asData?.value != null) {
@@ -152,6 +155,14 @@ class _AppShellState extends ConsumerState<AppShell> {
       notificationsProvider,
       (_, next) =>
           next.whenData((items) => _handleNotifications(items, settings)),
+    );
+    ref.listen<AsyncValue<SessionData?>>(
+      sessionProvider,
+      (_, next) {
+        if (next.asData?.value != null) {
+          unawaited(ref.read(firebasePushMessagingServiceProvider).initializeAndRegister());
+        }
+      },
     );
     final isAgent = user?.isAgent ?? false;
     final pages = isAgent
