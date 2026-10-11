@@ -5,6 +5,7 @@ use App\Models\ActivityLog;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
 use App\Services\Mail\UnifiedMailService;
+use App\Services\Notifications\FirebasePushNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,17 +30,21 @@ class SupportTicketController extends Controller {
     public function reply(Request $r,SupportTicket $ticket): RedirectResponse {
         $d=$r->validate(['message'=>['required','string','min:2','max:10000'],'status'=>['nullable','in:in_progress,waiting_user,resolved,closed'],'send_email'=>['nullable','boolean']]);
         $sendEmail=$r->boolean('send_email');
-        $message=DB::transaction(function()use($r,$ticket,$d,$sendEmail){
+        $databaseNotification=null;
+        $message=DB::transaction(function()use($r,$ticket,$d,$sendEmail,&$databaseNotification){
             $m=$ticket->messages()->create(['user_id'=>$r->user()->id,'sender_role'=>'admin','body'=>trim($d['message']),'email_status'=>$sendEmail?'pending':'not_requested']);
             $status=$d['status']??'waiting_user';
             $ticket->forceFill(['status'=>$status,'last_reply_at'=>now(),'closed_at'=>in_array($status,['resolved','closed'],true)?now():null])->save();
-            $ticket->user->notifications()->create([
+            $databaseNotification=$ticket->user->notifications()->create([
                 'id'=>(string)Str::uuid(),'type'=>'support_ticket_reply',
                 'data'=>['kind'=>'support_ticket_reply','title'=>'رد الإدارة على البلاغ '.$ticket->reference,
                 'message'=>trim($d['message']),'support_ticket_id'=>$ticket->id,'ticket_reference'=>$ticket->reference,'ticket_subject'=>$ticket->subject],
             ]);
             return $m;
         });
+        if ($databaseNotification !== null) {
+            app(FirebasePushNotificationService::class)->sendDatabaseNotification($ticket->user, $databaseNotification);
+        }
         $mailState=null;
         if($sendEmail){
             try{
