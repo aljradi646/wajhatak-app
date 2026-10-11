@@ -84,6 +84,20 @@ final class AuthVerificationPolicyTest extends TestCase
             ->assertJsonPath('data.email_verification_required', false);
     }
 
+    public function test_logout_revokes_the_current_access_token(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('auth-policy-test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson('/api/v1/auth/logout')
+            ->assertNoContent();
+
+        $this->withToken($token)
+            ->getJson('/api/v1/me')
+            ->assertUnauthorized();
+    }
+
     public function test_verification_endpoints_stop_when_platform_policy_is_disabled(): void
     {
         Setting::put('email_verification_enabled', false, 'boolean');
