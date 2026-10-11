@@ -25,6 +25,7 @@ class TokenStore {
   static const _tokenKey = 'lux_access_token';
   static const _loginTimeKey = 'lux_login_time';
   static const _userKey = 'lux_cached_user';
+  static const _deviceIdKey = 'lux_device_id';
   static const _sessionDuration = Duration(days: 30);
   final FlutterSecureStorage _storage;
 
@@ -80,6 +81,21 @@ class TokenStore {
       );
     } on Object catch (_) {
       // فشل التخزين المحلي اختياري ولا يمنع استمرار العملية.
+    }
+  }
+
+  /// Keeps the installation identifier across sign-outs so the matching
+  /// push-token registration can be removed from the current user's account.
+  Future<String> readOrCreateDeviceId() async {
+    try {
+      final current = await _storage.read(key: _deviceIdKey);
+      if (current != null && current.isNotEmpty) return current;
+      final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
+      final value = 'wajhatak-$stamp';
+      await _storage.write(key: _deviceIdKey, value: value);
+      return value;
+    } on Object {
+      return 'wajhatak-' + DateTime.now().microsecondsSinceEpoch.toRadixString(16);
     }
   }
 
