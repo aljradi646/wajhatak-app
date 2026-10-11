@@ -184,7 +184,7 @@ class AgentReportSummaryGrid extends StatelessWidget {
                 : constraints.maxWidth >= 240
                     ? 2
                     : 1;
-        final ratio = constraints.maxWidth < 390 ? 1.18 : 1.55;
+        final ratio = constraints.maxWidth < 270 ? 1.0 : constraints.maxWidth < 390 ? 1.18 : 1.55;
         return GridView.builder(
           itemCount: report.summary.length,
           shrinkWrap: true,
