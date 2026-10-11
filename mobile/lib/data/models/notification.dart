@@ -13,6 +13,7 @@ class LuxNotification {
     this.conversationId,
     this.viewingRequestId,
     this.propertyId,
+    this.supportTicketId,
     this.actorName,
     this.actorAvatarUrl,
   });
@@ -26,11 +27,14 @@ class LuxNotification {
   final int? conversationId;
   final int? viewingRequestId;
   final int? propertyId;
+  final int? supportTicketId;
   final String? actorName;
   final String? actorAvatarUrl;
 
   bool get isMessage =>
       kind == 'message_received' || kind == 'message' || kind == 'message_sent';
+
+  bool get isSupportTicketReply => kind == 'support_ticket_reply' || supportTicketId != null;
 
   bool get isViewingRequest =>
       kind == 'viewing_request_created' ||
@@ -51,6 +55,7 @@ class LuxNotification {
       conversationId: (data['conversation_id'] as num?)?.toInt(),
       viewingRequestId: (data['viewing_request_id'] as num?)?.toInt(),
       propertyId: (data['property_id'] as num?)?.toInt(),
+      supportTicketId: (data['support_ticket_id'] as num?)?.toInt(),
       actorName: data['actor_name'] as String?,
       actorAvatarUrl: data['actor_avatar_url'] as String?,
     );

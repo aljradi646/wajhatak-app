@@ -51,6 +51,10 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => NotificationRepository(ref.watch(apiClientProvider)),
 );
 
+final supportTicketRepositoryProvider = Provider<SupportTicketRepository>(
+  (ref) => SupportTicketRepository(ref.watch(apiClientProvider)),
+);
+
 final taxonomyRepositoryProvider = Provider<TaxonomyRepository>(
   (ref) => TaxonomyRepository(ref.watch(apiClientProvider)),
 );
@@ -69,6 +73,31 @@ final previewFixtureRepositoryProvider =
 // ---------------------------------------------------------------------------
 
 class SessionController extends AsyncNotifier<SessionData?> {
+  bool _refreshingCurrentUser = false;
+
+  Future<void> refreshCurrentUser() async {
+    final current = state.asData?.value;
+    if (current == null || AppConfig.isUiPreview || _refreshingCurrentUser) return;
+    _refreshingCurrentUser = true;
+    try {
+      final user = await ref.read(authRepositoryProvider).refreshCurrentUser();
+      final latest = state.asData?.value;
+      if (latest != null && latest.user.id == current.user.id) {
+        state = AsyncData(latest.copyWith(user: user));
+      }
+    } on ApiFailure catch (error) {
+      if (error.statusCode == 401) {
+        await ref.read(tokenStoreProvider).clear();
+        state = const AsyncData(null);
+        _afterSessionChanged();
+      }
+    } catch (_) {
+      // Keep the current session during a transient network failure.
+    } finally {
+      _refreshingCurrentUser = false;
+    }
+  }
+
   @override
   Future<SessionData?> build() async {
     if (AppConfig.isUiPreview) {
@@ -660,6 +689,15 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
     unawaited(refresh());
   }
 }
+
+// ---------------------------------------------------------------------------
+// البلاغات والدعم
+// ---------------------------------------------------------------------------
+final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
+  if (!AppConfig.isUiPreview && ref.watch(sessionProvider).asData?.value == null) return const [];
+  if (AppConfig.isUiPreview) return const [];
+  return ref.watch(supportTicketRepositoryProvider).list();
+});
 
 // ---------------------------------------------------------------------------
 // الإشعارات

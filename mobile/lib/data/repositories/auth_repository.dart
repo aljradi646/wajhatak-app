@@ -40,6 +40,13 @@ class AuthRepository {
     }
   }
 
+  Future<LuxUser> refreshCurrentUser() async {
+    final json = await _api.get('/me');
+    final user = LuxUser.fromJson(json['data'] as Map<String, dynamic>);
+    await _tokenStore.saveUser(user);
+    return user;
+  }
+
   Future<SessionData> login({
     required String email,
     required String password,

@@ -10,3 +10,4 @@ export 'notification_repository.dart';
 export 'property_repository.dart';
 export 'taxonomy_repository.dart';
 export 'viewing_request_repository.dart';
+export 'support_ticket_repository.dart';

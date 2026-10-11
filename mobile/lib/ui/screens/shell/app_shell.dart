@@ -36,6 +36,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   final _shellKey = GlobalKey<ScaffoldState>();
   final Set<String> _observedNotificationIds = <String>{};
   Timer? _notificationTimer;
+  Timer? _sessionRefreshTimer;
   bool _notificationsPrimed = false;
 
   void _openDrawer() => _shellKey.currentState?.openDrawer();
@@ -56,11 +57,17 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref.invalidate(conversationsProvider);
       }
     });
+    _sessionRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && ref.read(sessionProvider).asData?.value != null) {
+        unawaited(ref.read(sessionProvider.notifier).refreshCurrentUser());
+      }
+    });
   }
 
   @override
   void dispose() {
     _notificationTimer?.cancel();
+    _sessionRefreshTimer?.cancel();
     super.dispose();
   }
 
