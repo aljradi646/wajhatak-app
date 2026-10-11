@@ -209,6 +209,14 @@ class SessionController extends AsyncNotifier<SessionData?> {
       return;
     }
 
+    try {
+      await ref.read(firebasePushMessagingServiceProvider)
+          .unregisterCurrentDevice()
+          .timeout(const Duration(seconds: 2));
+    } on Object {
+      // Do not delay sign-out if FCM or the network is unavailable.
+    }
+
     final token = await ref.read(tokenStoreProvider).read();
     await ref.read(tokenStoreProvider).clear();
     if (token == null || token.isEmpty) return;
