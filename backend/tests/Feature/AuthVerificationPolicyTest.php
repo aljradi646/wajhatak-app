@@ -30,6 +30,24 @@ final class AuthVerificationPolicyTest extends TestCase
             ->assertJsonPath('data.email_verification_required', false);
     }
 
+    public function test_unverified_agent_can_login_when_email_verification_is_enabled(): void
+    {
+        Setting::put('email_verification_enabled', true, 'boolean');
+        $user = User::factory()->unverified()->create([
+            'email' => 'unverified-agent@example.test',
+            'password' => 'SecretPass123',
+        ]);
+        $user->assignRole('agent');
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => $user->email,
+            'password' => 'SecretPass123',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.user.email_verified', false)
+            ->assertJsonPath('data.email_verification_required', false);
+    }
+
     public function test_registration_returns_verification_policy_when_enabled(): void
     {
         Setting::put('email_verification_enabled', true, 'boolean');
