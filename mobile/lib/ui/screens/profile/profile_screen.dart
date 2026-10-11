@@ -38,6 +38,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     super.initState();
     _name = TextEditingController(text: widget.user.name);
     _phone = TextEditingController(text: widget.user.phone ?? '');
+
+    // Refresh the server-controlled policy when the profile opens, so a
+    // platform admin's toggle is reflected without requiring a new login.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(sessionProvider.notifier).restoreSessionAfterVerification();
+      }
+    });
   }
 
   @override
@@ -156,7 +164,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final currentUser =
+        ref.watch(sessionProvider).asData?.value?.user ?? widget.user;
+    return Scaffold(
     appBar: WajhatakScreenHeader(title: 'تعديل الملف الشخصي'),
     body: SafeArea(
       child: ListView(
@@ -302,7 +313,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
 
           // توثيق البريد الإلكتروني — رمز حقيقي إلى الصندوق الفعلي.
-          if (widget.user.emailVerificationEnabled && widget.user.emailVerified != true) ...[
+          if (currentUser.emailVerificationEnabled &&
+              currentUser.emailVerified != true) ...[
             const SizedBox(height: 12),
             _ActionTile(
               icon: Icons.mark_email_unread_rounded,
@@ -318,7 +330,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 );
               },
             ),
-          ] else if (widget.user.emailVerificationEnabled) ...[
+          ] else if (currentUser.emailVerificationEnabled) ...[
             const SizedBox(height: 12),
             _FieldTile(
               icon: Icons.verified_rounded,
@@ -371,7 +383,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     ),
-  );
+    );
+  }
 }
 
 class _ActionTile extends StatelessWidget {
