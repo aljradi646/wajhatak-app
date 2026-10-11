@@ -42,7 +42,7 @@ class NotificationsScreen extends ConsumerWidget {
           if (items.isEmpty) {
             return const EmptyState(
               title: 'لا توجد إشعارات',
-              body: 'سيصلك هنا تنبيه عند ورود رسالة أو تحديث طلب معاينة.',
+              body: 'سيصلك هنا تنبيه عند ورود رسالة أو تحديث طلب معاينة أو رد على بلاغك.',
               icon: Icons.notifications_none_rounded,
             );
           }
@@ -72,6 +72,7 @@ class _NotificationCard extends StatelessWidget {
   final VoidCallback onTap;
 
   AccentTone get _tone => switch (item.kind) {
+    'support_ticket_reply' => AccentTone.violet,
     'message_received' || 'message' || 'message_sent' => AccentTone.teal,
     'viewing_request_created' ||
     'viewing_request_updated' ||
@@ -80,6 +81,7 @@ class _NotificationCard extends StatelessWidget {
   };
 
   IconData get _icon => switch (item.kind) {
+    'support_ticket_reply' => Icons.support_agent_rounded,
     'message_received' ||
     'message' ||
     'message_sent' => Icons.chat_bubble_rounded,

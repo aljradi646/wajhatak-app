@@ -23,6 +23,53 @@ final class SupportTicketApiTest extends TestCase
             ->assertJsonPath('data.title', 'سياسة الخصوصية');
     }
 
+    public function test_admin_reply_creates_database_notification_for_ticket_owner(): void
+    {
+        \\Spatie\\Permission\\Models\\Role::findOrCreate('admin');
+
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $user = User::factory()->create();
+        $ticket = \\App\\Models\\SupportTicket::query()->create([
+            'reference' => 'WJ-261011-NOTIFY1',
+            'user_id' => $user->id,
+            'subject' => 'بلاغ لاختبار الإشعار',
+            'category' => 'technical',
+            'status' => 'open',
+            'priority' => 'normal',
+        ]);
+        $ticket->messages()->create([
+            'user_id' => $user->id,
+            'sender_role' => 'user',
+            'body' => 'أواجه مشكلة تقنية في التطبيق.',
+        ]);
+
+        $this->actingAs($admin)->post('/admin/support-tickets/'.$ticket->id.'/reply', [
+            'message' => 'تم استلام البلاغ وسيتم متابعته.',
+            'status' => 'waiting_user',
+            'send_email' => '0',
+        ])->assertRedirect(route('admin.support-tickets.show', $ticket));
+
+        $this->assertDatabaseHas('support_ticket_messages', [
+            'support_ticket_id' => $ticket->id,
+            'sender_role' => 'admin',
+            'body' => 'تم استلام البلاغ وسيتم متابعته.',
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'type' => 'support_ticket_reply',
+        ]);
+
+        $notification = \\Illuminate\\Support\\Facades\\DB::table('notifications')
+            ->where('notifiable_id', $user->id)
+            ->where('type', 'support_ticket_reply')
+            ->first();
+        $payload = json_decode((string) $notification->data, true);
+        $this->assertSame($ticket->id, (int) $payload['support_ticket_id']);
+        $this->assertSame('تم استلام البلاغ وسيتم متابعته.', $payload['message']);
+    }
+
     public function test_user_can_submit_and_retrieve_only_their_own_ticket(): void
     {
         $user = User::factory()->create();
