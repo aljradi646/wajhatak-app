@@ -36,22 +36,25 @@ Future<void> confirmLogout(BuildContext context, WidgetRef ref) async {
   );
   if (confirmed != true || !context.mounted) return;
 
-  var serverSynced = true;
-  String? logoutMessage;
-  try {
-    await ref.read(sessionProvider.notifier).logout();
-  } on ApiFailure catch (error) {
-    serverSynced = false;
-    logoutMessage = error.message;
-  }
+  // The notifier clears local auth state before its first await.
+  // Do not wait for a potentially slow server response to leave the account.
+  final pendingLogout = ref.read(sessionProvider.notifier).logout();
   if (!context.mounted) return;
-
-  // Pop any pushed screens until we reach the root shell
   Navigator.of(context).popUntil((route) => route.isFirst);
-  util.notice(
-    context,
-    serverSynced
-        ? 'تم تسجيل الخروج بنجاح.'
-        : 'تم تسجيل الخروج محليًا. تعذر إنهاء الجلسة على الخادم: $logoutMessage',
-  );
+  util.notice(context, 'تم تسجيل الخروج من هذا الجهاز.');
+
+  try {
+    await pendingLogout;
+  } on ApiFailure catch (error) {
+    if (context.mounted) {
+      util.notice(
+        context,
+        'تم تسجيل الخروج محليًا، لكن تعذّر تأكيد إبطال جلسة الخادم: ${error.message}',
+      );
+    }
+  } catch (_) {
+    if (context.mounted) {
+      util.notice(context, 'تم تسجيل الخروج محليًا، وتعذّر الاتصال بالخادم لإبطال الجلسة.');
+    }
+  }
 }
