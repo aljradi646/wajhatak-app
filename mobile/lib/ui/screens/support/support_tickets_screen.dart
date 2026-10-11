@@ -119,7 +119,7 @@ class _SupportTicketDetailScreenState extends ConsumerState<SupportTicketDetailS
               Text(admin?'فريق الدعم':'أنت',style:TextStyle(fontWeight:FontWeight.w900,color:Theme.of(context).colorScheme.primary)),
               const SizedBox(height:5),Text(m.body,style:const TextStyle(height:1.6)),const SizedBox(height:6),Text(_date(m.createdAt),style:Theme.of(context).textTheme.labelSmall?.copyWith(color:Theme.of(context).colorScheme.onSurfaceVariant)),
             ]),
-          );
+          ));
         })),
         if(!ticket.isClosed)SafeArea(top:false,child:Padding(padding:const EdgeInsets.fromLTRB(12,8,12,12),child:Row(crossAxisAlignment:CrossAxisAlignment.end,children:[
           Expanded(child:TextField(controller:_reply,minLines:1,maxLines:4,decoration:const InputDecoration(hintText:'اكتب ردك...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:_sending?null:_sendReply,icon:_sending?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.send_rounded)),
