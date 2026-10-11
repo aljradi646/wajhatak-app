@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/config/app_config.dart';
+import '../core/services/firebase_push_messaging_service.dart';
+import '../core/services/lux_notification_service.dart';
 import '../data/api_client.dart';
 import '../data/models/models.dart';
 import '../data/preview_fixtures.dart';
@@ -49,6 +51,14 @@ final viewingRequestRepositoryProvider = Provider<ViewingRequestRepository>(
 
 final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => NotificationRepository(ref.watch(apiClientProvider)),
+);
+
+final firebasePushMessagingServiceProvider = Provider<FirebasePushMessagingService>(
+  (ref) => FirebasePushMessagingService(
+    ref.watch(apiClientProvider),
+    ref.watch(tokenStoreProvider),
+    ref.watch(localNotificationServiceProvider),
+  ),
 );
 
 final supportTicketRepositoryProvider = Provider<SupportTicketRepository>(
