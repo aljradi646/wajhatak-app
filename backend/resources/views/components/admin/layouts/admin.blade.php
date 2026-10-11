@@ -6,6 +6,7 @@
     $siteLogo = public_path('storage/branding/logo.png');
     $pendingPropertiesCount = \App\Models\Property::query()->where('status', 'pending')->count();
     $pendingAgentsCount = \App\Models\Agent::query()->where('verification_status', 'pending')->count();
+    $openSupportTicketsCount = \App\Models\SupportTicket::query()->whereIn('status', ['open', 'in_progress', 'waiting_user'])->count();
     $uiPreferences = auth()->check() && is_array(auth()->user()->ui_preferences) ? auth()->user()->ui_preferences : [];
     $serverTheme = in_array($uiPreferences['theme'] ?? null, ['light', 'dark', 'system'], true) ? $uiPreferences['theme'] : null;
     $cookieTheme = request()->cookie('lux_theme');
