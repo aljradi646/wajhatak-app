@@ -164,10 +164,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final currentUser =
-        ref.watch(sessionProvider).asData?.value?.user ?? widget.user;
-    return Scaffold(
+  Widget build(BuildContext context) => Scaffold(
     appBar: WajhatakScreenHeader(title: 'تعديل الملف الشخصي'),
     body: SafeArea(
       child: ListView(
@@ -313,8 +310,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
 
           // توثيق البريد الإلكتروني — رمز حقيقي إلى الصندوق الفعلي.
-          if (currentUser.emailVerificationEnabled &&
-              currentUser.emailVerified != true) ...[
+          if ((ref.watch(sessionProvider).asData?.value?.user ?? widget.user)
+                  .emailVerificationEnabled &&
+              (ref.watch(sessionProvider).asData?.value?.user ?? widget.user)
+                      .emailVerified !=
+                  true) ...[
             const SizedBox(height: 12),
             _ActionTile(
               icon: Icons.mark_email_unread_rounded,
@@ -330,7 +330,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 );
               },
             ),
-          ] else if (currentUser.emailVerificationEnabled) ...[
+          ] else if ((ref.watch(sessionProvider).asData?.value?.user ?? widget.user)
+              .emailVerificationEnabled) ...[
             const SizedBox(height: 12),
             _FieldTile(
               icon: Icons.verified_rounded,
@@ -383,8 +384,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     ),
-    );
-  }
+  );
 }
 
 class _ActionTile extends StatelessWidget {
