@@ -27,8 +27,9 @@ class AuthRepository {
       await _tokenStore.saveUser(user);
       return SessionData(user: user, token: token);
     } on ApiFailure catch (e) {
-      if (e.statusCode == 401 || e.statusCode == 403) {
-        // الخادم رفض التوكن — امسح كل شيء.
+      if (e.statusCode == 401) {
+        // 401 means the token is invalid/expired. A 403 is an authorization
+        // decision for a specific endpoint and must not sign the user out.
         await _tokenStore.clear();
         return null;
       }
