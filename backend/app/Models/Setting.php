@@ -46,6 +46,7 @@ class Setting extends Model
         'default_currency' => ['YER', 'string'],
         'maintenance_mode' => [false, 'boolean'],
         'registration_enabled' => [true, 'boolean'],
+        'email_verification_enabled' => [true, 'boolean'],
         'language' => ['ar', 'string'],
     ];
 

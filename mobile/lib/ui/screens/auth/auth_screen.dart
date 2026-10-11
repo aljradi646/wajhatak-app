@@ -138,8 +138,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         Navigator.of(context).popUntil((route) => route.isFirst);
         util.notice(context, 'تم تسجيل الدخول بنجاح.');
 
-        // التحقق الحقيقي من البريد: بعد التسجيل دائمًا، وبعد الدخول إن كان غير موثق.
-        if (user != null && user.emailVerified != true && mounted) {
+        // توثيق البريد خطوة اختيارية بعد التسجيل فقط؛ لا تعيق تسجيل الدخول.
+        if (_register && user != null && user.emailVerificationEnabled &&
+            user.emailVerified != true && mounted) {
           final autoSend = _register;
           await Navigator.of(context).push(
             MaterialPageRoute(
