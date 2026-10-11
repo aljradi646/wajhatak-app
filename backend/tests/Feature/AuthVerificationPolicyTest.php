@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -92,6 +93,11 @@ final class AuthVerificationPolicyTest extends TestCase
         $this->withToken($token)
             ->postJson('/api/v1/auth/logout')
             ->assertNoContent();
+
+        $this->assertNull(
+            PersonalAccessToken::findToken($token),
+            'The server must delete the personal access token on logout.',
+        );
 
         $this->withToken($token)
             ->getJson('/api/v1/me')

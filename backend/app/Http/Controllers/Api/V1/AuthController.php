@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
@@ -90,7 +91,28 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()?->delete();
+        $user = $request->user();
+        $plainTextToken = $request->bearerToken();
+
+        if (is_string($plainTextToken) && $plainTextToken !== '') {
+            // Resolve the token explicitly. This also covers environments where
+            // Sanctum's currentAccessToken is a transient session token.
+            $accessToken = PersonalAccessToken::findToken($plainTextToken);
+
+            if (
+                $accessToken !== null
+                && (string) $accessToken->tokenable_id === (string) $user->getKey()
+                && $accessToken->tokenable_type === $user->getMorphClass()
+            ) {
+                $accessToken->delete();
+            }
+        } else {
+            $currentAccessToken = $user->currentAccessToken();
+
+            if ($currentAccessToken instanceof PersonalAccessToken) {
+                $currentAccessToken->delete();
+            }
+        }
 
         return response()->json(status: 204);
     }
