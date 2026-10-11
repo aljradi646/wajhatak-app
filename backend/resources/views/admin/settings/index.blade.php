@@ -63,7 +63,7 @@
             </form>
         </x-admin.card>
 
-        @php($emailVerificationEnabled = (bool) \\App\\Models\\Setting::get('email_verification_enabled', true))
+        @php($emailVerificationEnabled = (bool) \App\Models\Setting::get('email_verification_enabled', true))
         <x-admin.card title="سياسة توثيق البريد الإلكتروني" description="تحكّم في ظهور توثيق البريد داخل التطبيق دون منع العميل أو الوكيل من تسجيل الدخول.">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
