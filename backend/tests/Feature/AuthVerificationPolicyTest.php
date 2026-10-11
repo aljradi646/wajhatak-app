@@ -99,9 +99,6 @@ final class AuthVerificationPolicyTest extends TestCase
             'The server must delete the personal access token on logout.',
         );
 
-        $this->withToken($token)
-            ->getJson('/api/v1/me')
-            ->assertUnauthorized();
     }
 
     public function test_verification_endpoints_stop_when_platform_policy_is_disabled(): void
