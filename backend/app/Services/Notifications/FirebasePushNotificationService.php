@@ -146,7 +146,7 @@ class FirebasePushNotificationService
     {
         $cacheKey = 'firebase_fcm_access_token:'.sha1((string) $credentials['client_email']);
 
-        return (string) Cache::remember($cacheKey, now()->addMinutes(50), function () use ($credentials): string {
+        $token = (string) Cache::remember($cacheKey, now()->addMinutes(50), function () use ($credentials): string {
             $now = time();
             $header = $this->base64Url(json_encode(['alg' => 'RS256', 'typ' => 'JWT'], JSON_THROW_ON_ERROR));
             $claims = $this->base64Url(json_encode([
@@ -182,6 +182,13 @@ class FirebasePushNotificationService
 
             return (string) $response->json('access_token', '');
         });
+
+        // Do not cache failed exchanges as an empty token for 50 minutes.
+        if ($token === '') {
+            Cache::forget($cacheKey);
+        }
+
+        return $token;
     }
 
     private function base64Url(string $value): string
