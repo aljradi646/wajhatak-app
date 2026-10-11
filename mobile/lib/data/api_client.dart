@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -338,6 +339,28 @@ class LuxApiClient {
         queryParameters: query,
       );
       return response.data ?? const {};
+    } on DioException catch (error) {
+      throw _toFailure(error);
+    }
+  }
+
+  /// Fetch file bytes through the authenticated API client and its interceptors.
+  Future<Uint8List> getBytes(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        path,
+        queryParameters: query,
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: const {
+            'Accept': 'application/pdf, text/csv, application/json',
+          },
+        ),
+      );
+      return Uint8List.fromList(response.data ?? const <int>[]);
     } on DioException catch (error) {
       throw _toFailure(error);
     }

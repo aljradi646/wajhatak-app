@@ -384,18 +384,40 @@ class _MessageBubbleState extends State<_MessageBubble> {
         ),
         if (items.isNotEmpty) ...[
           const SizedBox(height: 8),
-          LayoutBuilder(builder: (context, box) {
-            final columns = box.maxWidth >= 860 ? 3 : box.maxWidth >= 520 ? 2 : 1;
-            const gap = 10.0;
-            final cardWidth = (box.maxWidth - gap * (columns - 1)) / columns;
-            return Wrap(spacing: gap, runSpacing: gap, children: items.map((property) => SizedBox(
-              width: cardWidth, height: 318,
-              child: _AiPropertyMiniCard(
-                property: property, onTap: () => widget.onPropertyTap(property.propertyId),
-                onFavorite: widget.onFavoriteTap == null ? null : () => widget.onFavoriteTap!(property),
-              ),
-            )).toList(growable: false));
-          }),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cardWidth = constraints.maxWidth < 380
+                  ? constraints.maxWidth * .82
+                  : constraints.maxWidth < 640
+                      ? 300.0
+                      : (constraints.maxWidth / 3).clamp(300.0, 360.0).toDouble();
+              return SizedBox(
+                width: double.infinity,
+                height: 330,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsetsDirectional.only(end: 4),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final property = items[index];
+                    return SizedBox(
+                      width: cardWidth,
+                      height: 322,
+                      child: _AiPropertyMiniCard(
+                        property: property,
+                        onTap: () => widget.onPropertyTap(property.propertyId),
+                        onFavorite: widget.onFavoriteTap == null
+                            ? null
+                            : () => widget.onFavoriteTap!(property),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
         ],
       ]),
     ));

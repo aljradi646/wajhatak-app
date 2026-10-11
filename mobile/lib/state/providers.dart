@@ -56,10 +56,7 @@ final taxonomyRepositoryProvider = Provider<TaxonomyRepository>(
 );
 
 final agentReportRepositoryProvider = Provider<AgentReportRepository>(
-  (ref) => AgentReportRepository(
-    ref.watch(apiClientProvider),
-    ref.watch(tokenStoreProvider),
-  ),
+  (ref) => AgentReportRepository(ref.watch(apiClientProvider)),
 );
 
 final previewFixtureRepositoryProvider =

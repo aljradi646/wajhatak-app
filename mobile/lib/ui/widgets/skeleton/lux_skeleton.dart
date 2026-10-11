@@ -819,14 +819,16 @@ class AgentReportSkeleton extends StatelessWidget {
         // The real KPI grid sits inside a Card with 14px padding per side.
         final contentWidth =
             (constraints.maxWidth - 28).clamp(0.0, constraints.maxWidth).toDouble();
-        final columns = contentWidth >= 700
-            ? 3
-            : contentWidth >= 460
-            ? 2
-            : 1;
+        final columns = contentWidth >= 1000
+            ? 4
+            : contentWidth >= 640
+                ? 3
+                : contentWidth >= 300
+                    ? 2
+                    : 1;
         final cardWidth =
             (contentWidth - (columns - 1) * 10) / columns;
-        final cardRatio = cardWidth < 320 ? 2.8 : 2.7;
+        final cardRatio = cardWidth < 150 ? 1.1 : cardWidth < 320 ? 1.2 : 1.55;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
