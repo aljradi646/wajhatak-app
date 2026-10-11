@@ -88,14 +88,17 @@ void main() {
     addTearDown(container.dispose);
 
     final seenErrors = <Object>[];
+    final seenData = <List<LuxProperty>>[];
     container.listen(myListingsProvider, (prev, next) {
       if (next.asError != null) seenErrors.add(next.asError!.error);
+      if (next.asData?.value != null) seenData.add(next.asData!.value);
     }, fireImmediately: true);
 
     await Future<void>.delayed(const Duration(milliseconds: 300));
 
     expect(seenErrors, isEmpty);
-    expect(container.read(myListingsProvider).asData?.value, isEmpty);
+    expect(seenData, isNotEmpty);
+    expect(seenData.last, isEmpty);
     expect(
       container.read(sessionProvider).asData?.value?.user.id,
       1,
