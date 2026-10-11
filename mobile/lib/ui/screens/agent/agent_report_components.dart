@@ -181,7 +181,7 @@ class AgentReportSummaryGrid extends StatelessWidget {
             ? 4
             : constraints.maxWidth >= 640
                 ? 3
-                : constraints.maxWidth >= 300
+                : constraints.maxWidth >= 240
                     ? 2
                     : 1;
         final ratio = constraints.maxWidth < 390 ? 1.18 : 1.55;
