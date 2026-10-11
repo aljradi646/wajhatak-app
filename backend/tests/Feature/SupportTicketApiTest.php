@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\SupportTicket;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 final class SupportTicketApiTest extends TestCase
@@ -25,12 +28,12 @@ final class SupportTicketApiTest extends TestCase
 
     public function test_admin_reply_creates_database_notification_for_ticket_owner(): void
     {
-        \\Spatie\\Permission\\Models\\Role::findOrCreate('admin');
+        Role::findOrCreate('admin');
 
         $admin = User::factory()->create();
         $admin->assignRole('admin');
         $user = User::factory()->create();
-        $ticket = \\App\\Models\\SupportTicket::query()->create([
+        $ticket = SupportTicket::query()->create([
             'reference' => 'WJ-261011-NOTIFY1',
             'user_id' => $user->id,
             'subject' => 'بلاغ لاختبار الإشعار',
@@ -61,7 +64,7 @@ final class SupportTicketApiTest extends TestCase
             'type' => 'support_ticket_reply',
         ]);
 
-        $notification = \\Illuminate\\Support\\Facades\\DB::table('notifications')
+        $notification = DB::table('notifications')
             ->where('notifiable_id', $user->id)
             ->where('type', 'support_ticket_reply')
             ->first();
