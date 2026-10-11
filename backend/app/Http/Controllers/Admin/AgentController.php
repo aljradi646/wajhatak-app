@@ -15,7 +15,7 @@ class AgentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Agent::query()->with('user')->withCount('properties');
+        $query = Agent::query()->whereHas('user', fn ($userQuery) => $userQuery->role('agent'))->with(['user.roles'])->withCount('properties');
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('license_number', 'like', "%{$search}%")

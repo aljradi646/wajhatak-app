@@ -12,6 +12,8 @@ use App\Http\Controllers\Admin\PropertyFeatureController;
 use App\Http\Controllers\Admin\PropertyTypeController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SitePageController;
+use App\Http\Controllers\Admin\SupportTicketController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\UserPreferenceController;
 use App\Http\Controllers\Admin\ViewingRequestController;
@@ -22,6 +24,17 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Users
     Route::resource('users', UserController::class);
+
+    Route::get('support-tickets', [SupportTicketController::class, 'index'])->name('support-tickets.index');
+    Route::get('support-tickets/{ticket}', [SupportTicketController::class, 'show'])->whereNumber('ticket')->name('support-tickets.show');
+    Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->whereNumber('ticket')->name('support-tickets.reply');
+    Route::patch('support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus'])->whereNumber('ticket')->name('support-tickets.status');
+
+    Route::get('pages', [SitePageController::class, 'index'])->name('pages.index');
+    Route::get('pages/create', [SitePageController::class, 'create'])->name('pages.create');
+    Route::post('pages', [SitePageController::class, 'store'])->name('pages.store');
+    Route::get('pages/{page}/edit', [SitePageController::class, 'edit'])->name('pages.edit');
+    Route::patch('pages/{page}', [SitePageController::class, 'update'])->name('pages.update');
 
     // Activity Log (read-only)
     Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');

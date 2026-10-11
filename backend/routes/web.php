@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PublicSitePageController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -25,6 +26,14 @@ Route::get('/storage/{path}', function (string $path) {
     }
     return response()->file($file);
 })->where('path', '.*')->name('storage.file');
+
+Route::get('/pages', [PublicSitePageController::class, 'index'])->name('public.pages.index');
+Route::get('/pages/{slug}', [PublicSitePageController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('public.pages.show');
+Route::get('/privacy', fn () => redirect()->route('public.pages.show', 'privacy'))->name('public.privacy');
+Route::get('/terms', fn () => redirect()->route('public.pages.show', 'terms'))->name('public.terms');
+Route::get('/about', fn () => redirect()->route('public.pages.show', 'about'))->name('public.about');
+Route::get('/how-to-use', fn () => redirect()->route('public.pages.show', 'how-to-use'))->name('public.how-to-use');
+Route::get('/contact', fn () => redirect()->route('public.pages.show', 'contact'))->name('public.contact');
 
 Route::get('/dashboard', function () {
     return redirect()->route('admin.dashboard');
