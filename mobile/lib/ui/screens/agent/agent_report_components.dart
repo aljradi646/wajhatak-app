@@ -109,7 +109,7 @@ class AgentReportDocumentHeader extends StatelessWidget {
         '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
     final time =
         '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-    return '\$date \$time';
+    return date + ' ' + time;
   }
 }
 
