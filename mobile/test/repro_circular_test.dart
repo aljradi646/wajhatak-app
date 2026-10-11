@@ -25,6 +25,16 @@ class _UnauthorizedRepo extends PropertyRepository {
   }
 }
 
+class _ForbiddenRepo extends PropertyRepository {
+  _ForbiddenRepo()
+      : super(LuxApiClient(TokenStore(const FlutterSecureStorage())));
+
+  @override
+  Future<List<LuxProperty>> mine() async {
+    throw ApiFailure('ليس لديك صلاحية لهذا الإجراء', statusCode: 403);
+  }
+}
+
 class _UnauthorizedViewingRepo extends ViewingRequestRepository {
   _UnauthorizedViewingRepo()
       : super(LuxApiClient(TokenStore(const FlutterSecureStorage())));
@@ -66,6 +76,31 @@ void main() {
     expect(seenErrors, isEmpty);
     expect(container.read(sessionProvider).asData?.value, isNull,
         reason: 'بعد رفض التوكن تُمسح الجلسة تلقائيًا');
+  });
+
+  test('403 from a protected feature does not sign out the user', () async {
+    final container = ProviderContainer(
+      overrides: [
+        sessionProvider.overrideWith(_FakeSessionController.new),
+        propertyRepositoryProvider.overrideWithValue(_ForbiddenRepo()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final seenErrors = <Object>[];
+    container.listen(myListingsProvider, (prev, next) {
+      if (next.asError != null) seenErrors.add(next.asError!.error);
+    }, fireImmediately: true);
+
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    expect(seenErrors, isEmpty);
+    expect(container.read(myListingsProvider).asData?.value, isEmpty);
+    expect(
+      container.read(sessionProvider).asData?.value?.user.id,
+      1,
+      reason: '403 is a feature permission response, not an expired session',
+    );
   });
 
   test('concurrent 401s across providers do not corrupt state', () async {
