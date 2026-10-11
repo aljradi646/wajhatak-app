@@ -132,7 +132,11 @@ class LuxApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           // إيقاع هادئ + قاطع دارة يمنع الضغط على الخادم (وهو سبب منع 429).
-          await _throttle();
+          final requestPath = options.path.toLowerCase();
+          final isAuthRequest = requestPath.contains('/auth/login') ||
+              requestPath.contains('/auth/register') ||
+              requestPath.contains('/auth/logout');
+          await _throttle(bypassCircuitBreaker: isAuthRequest);
           // تجاوز تحدي InfinityFree: نضمن وجود كوكي __test صالح قبل كل طلب
           // (ensureCookie ترجع الكوكي فورًا لو كان طازجًا دون أي طلب إضافي).
           if (_challengeSolver.cookie == null) {
@@ -269,8 +273,15 @@ class LuxApiClient {
   }
 
   /// يفرض فجوة زمنية دنيا بين الطلبات للحفاظ على إيقاع هادئ غير مريب.
-  Future<void> _throttle() async {
-    await _waitOutBreaker();
+  Future<void> _throttle({bool bypassCircuitBreaker = false}) async {
+    if (bypassCircuitBreaker) {
+      // Auth recovery must remain usable when the breaker was opened by
+      // earlier failures (including errors from the previous signed-in user).
+      _breakerLiftedAt = null;
+      _rapidFailureStreak = 0;
+    } else {
+      await _waitOutBreaker();
+    }
     final sinceLast = DateTime.now().difference(_lastSent);
     if (sinceLast < _rateCooldown) {
       await Future.delayed(_rateCooldown - sinceLast);
@@ -289,6 +300,7 @@ class LuxApiClient {
 
   void _recordSuccess() {
     _rapidFailureStreak = 0;
+    _breakerLiftedAt = null;
   }
 
   /// أداة كشف صارمة لتحدّي InfinityFree الفعلي (نصّ AES مع 3 قيم `toNumbers`).
@@ -375,8 +387,12 @@ class LuxApiClient {
       final isUpload = data is FormData;
       final effectiveOptions = (options ?? Options()).copyWith(
         // رفع الملفات (صور) يحتاج مهلة أطول على استضافة بطيئة.
-        sendTimeout: isUpload ? const Duration(seconds: 120) : null,
-        receiveTimeout: isUpload ? const Duration(seconds: 120) : null,
+        sendTimeout: isUpload
+            ? const Duration(seconds: 120)
+            : options?.sendTimeout,
+        receiveTimeout: isUpload
+            ? const Duration(seconds: 120)
+            : options?.receiveTimeout,
       );
       final response = await _dio.post<dynamic>(
         path,
