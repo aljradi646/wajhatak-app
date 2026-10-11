@@ -120,7 +120,7 @@
                         </x-admin.nav-link>
 
                         <x-admin.nav-link href="{{ route('admin.support-tickets.index') }}" :active="request()->routeIs('admin.support-tickets.*')">
-                            <x-slot name="icon"><x-admin.icon name="message-circle" /></x-slot>
+                            <x-slot name="icon"><x-admin.icon name="messages" /></x-slot>
                             البلاغات والدعم
                         </x-admin.nav-link>
 

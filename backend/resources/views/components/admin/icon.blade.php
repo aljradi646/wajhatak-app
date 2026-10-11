@@ -89,6 +89,9 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z"/>
             @break
+        @case('book-open')
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 7v14m0-14C10.5 5.7 8.7 5 6 5H3v14h3c2.7 0 4.5.7 6 2m0-14c1.5-1.3 3.3-2 6-2h3v14h-3c-2.7 0-4.5.7-6 2"/>
+            @break
         @case('favorites')
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
             @break

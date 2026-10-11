@@ -9,6 +9,7 @@ use App\Models\Conversation;
 use App\Models\ReportLog;
 use App\Models\User;
 use App\Services\Mail\UnifiedMailService;
+use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 
 class AgentController extends Controller
@@ -145,6 +146,11 @@ class AgentController extends Controller
             'verified_by' => $request->boolean('is_active') ? $request->user()->id : null,
         ]);
 
+        // Keep the role and agent domain profile consistent regardless of
+        // whether the admin used the Agents form or the Users role editor.
+        Role::findOrCreate('agent');
+        $agent->user->assignRole('agent');
+
         ActivityLog::record('agent', "تم إنشاء وكيل «{$agent->user->name}»", $agent);
 
         return redirect()->route('admin.agents.index')->with('status', 'تم إنشاء الوكيل بنجاح.');
@@ -241,6 +247,9 @@ class AgentController extends Controller
             'reviews_count' => $data['reviews_count'],
             'is_active' => $request->boolean('is_active'),
         ]);
+
+        Role::findOrCreate('agent');
+        $agent->refresh()->user->assignRole('agent');
 
         ActivityLog::record('agent', "تم تحديث وكيل «{$agent->user->name}»", $agent);
 
