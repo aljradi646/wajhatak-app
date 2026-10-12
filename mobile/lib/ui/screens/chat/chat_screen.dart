@@ -40,6 +40,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     ActiveChatContext.conversationId = widget.conversation.id;
     ref.invalidate(notificationsProvider);
+    ref.invalidate(unreadNotificationCountProvider);
     // تحديث فوري عند فتح المحادثة (لا يُستخدم الكاش القديم) —
     // بنفس صرامه تحديث جرس الإشعارات.
     if (ref.exists(messagesProvider(widget.conversation.id))) {
