@@ -107,4 +107,77 @@ class AiConversationContextTest extends TestCase
 
         $this->assertNull($conversation->fresh()->context_state['pending_action']??null);
     }
+
+    public function test_property_references_do_not_survive_a_newer_non_property_reply(): void
+    {
+        $user = User::factory()->create();
+        $conversation = AiConversation::query()->create([
+            'user_id' => $user->id,
+            'locale' => 'ar',
+            'status' => 'active',
+        ]);
+
+        $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => 'هذه بعض العقارات المطابقة.',
+            'property_ids' => [101, 102],
+            'status' => 'ok',
+            'response_type' => 'property_results',
+        ]);
+
+        $this->assertSame([101, 102], app(\App\Services\AI\AiConversationService::class)
+            ->lastRetrievedPropertyIds($conversation));
+
+        $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => 'أنا مساعد وجهتك، وأساعدك في استخدام المنصة.',
+            'property_ids' => null,
+            'status' => 'ok',
+            'response_type' => 'text',
+        ]);
+
+        $this->assertSame([], app(\App\Services\AI\AiConversationService::class)
+            ->lastRetrievedPropertyIds($conversation));
+    }
+
+    public function test_pruning_archives_expired_conversations_and_deletes_their_messages(): void
+    {
+        $user = User::factory()->create();
+        $expired = AiConversation::query()->create([
+            'user_id' => $user->id,
+            'locale' => 'ar',
+            'status' => 'active',
+            'title' => 'بحث قديم',
+            'last_message_at' => now()->subDays(45),
+            'context_state' => ['active_search' => ['city' => 'صنعاء']],
+        ]);
+        $expired->messages()->create([
+            'role' => 'user',
+            'content' => 'أريد شقة قديمة',
+            'status' => 'ok',
+        ]);
+
+        $recent = AiConversation::query()->create([
+            'user_id' => $user->id,
+            'locale' => 'ar',
+            'status' => 'active',
+            'title' => 'بحث حديث',
+            'last_message_at' => now()->subDay(),
+            'context_state' => ['active_search' => ['city' => 'عدن']],
+        ]);
+        $recent->messages()->create([
+            'role' => 'user',
+            'content' => 'أريد شقة حديثة',
+            'status' => 'ok',
+        ]);
+
+        $pruned = app(\App\Services\AI\AiConversationService::class)->pruneExpired();
+
+        $this->assertSame(1, $pruned);
+        $this->assertSame('archived', $expired->fresh()->status);
+        $this->assertNull($expired->fresh()->context_state);
+        $this->assertSame(0, $expired->messages()->count());
+        $this->assertSame('active', $recent->fresh()->status);
+        $this->assertSame(1, $recent->messages()->count());
+    }
 }

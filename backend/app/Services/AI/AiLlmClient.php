@@ -27,6 +27,151 @@ class AiLlmClient
         return ['message'=>$message,'usage'=>(array)($data['usage']??[]),'model'=>(string)($data['model']??config('ai.llm.model'))];
     }
 
+    /**
+     * توليد رد نهائي بتدفق SSE من مزود متوافق مع OpenAI.
+     * لا تستخدم هذه الطريقة لاتخاذ قرارات الأدوات؛ يُحسم البحث أولًا ثم يُبث الملخص
+     * النصي وحده حتى لا تصل مخرجات تخطيط الأدوات أو بيانات داخلية إلى المستخدم.
+     *
+     * @param callable(string): void|null $onDelta
+     * @return array{message: array{role: string, content: string}, usage: array, model: string}
+     */
+    public function chatStream(array $messages, ?callable $onDelta = null): array
+    {
+        if (! $this->configured()) {
+            throw new RuntimeException('LLM provider is not configured.');
+        }
+
+        $payload = [
+            'model' => (string) config('ai.llm.model'),
+            'messages' => $messages,
+            'temperature' => (float) config('ai.llm.temperature', 0.2),
+            'max_tokens' => (int) config('ai.llm.max_output_tokens', 1200),
+            'stream' => true,
+        ];
+
+        $response = $this->client()->withOptions(['stream' => true])->post('/chat/completions', $payload);
+        if ($response->failed()) {
+            $message = $response->json('error.message') ?? $response->json('message') ?? 'inference request failed';
+            throw new RuntimeException('LLM HTTP '.$response->status().': '.mb_substr((string) $message, 0, 300));
+        }
+
+        $body = $response->toPsrResponse()->getBody();
+        $buffer = '';
+        $content = '';
+        $usage = [];
+        $model = (string) config('ai.llm.model');
+        $pendingText = '';
+        $insideThink = false;
+
+        $emitVisible = static function (string $text) use (&$content, $onDelta): void {
+            if ($text === '') {
+                return;
+            }
+
+            $content .= $text;
+            if ($onDelta !== null) {
+                $onDelta($text);
+            }
+        };
+
+        // لا نكشف <think> حتى عندما تصل علاماته على أكثر من chunk.
+        $filterText = static function (string $text, bool $flush = false) use (&$pendingText, &$insideThink, $emitVisible): void {
+            $pendingText .= $text;
+
+            while ($pendingText !== '') {
+                if ($insideThink) {
+                    $end = stripos($pendingText, '</think>');
+                    if ($end === false) {
+                        $pendingText = $flush ? '' : mb_substr($pendingText, -7, null, 'UTF-8');
+                        break;
+                    }
+
+                    $pendingText = substr($pendingText, $end + 8);
+                    $insideThink = false;
+                    continue;
+                }
+
+                $start = stripos($pendingText, '<think>');
+                if ($start !== false) {
+                    $emitVisible(substr($pendingText, 0, $start));
+                    $pendingText = substr($pendingText, $start + 7);
+                    $insideThink = true;
+                    continue;
+                }
+
+                if ($flush) {
+                    $emitVisible($pendingText);
+                    $pendingText = '';
+                    break;
+                }
+
+                // احتفظ بآخر ستة أحرف لاحتمال أن تكون بداية وسم <think>.
+                $safeLength = mb_strlen($pendingText, 'UTF-8') - 6;
+                if ($safeLength > 0) {
+                    $emitVisible(mb_substr($pendingText, 0, $safeLength, 'UTF-8'));
+                    $pendingText = mb_substr($pendingText, $safeLength, null, 'UTF-8');
+                }
+                break;
+            }
+        };
+
+        $consumeLine = static function (string $line) use (&$content, &$usage, &$model, $filterText): bool {
+            $line = rtrim($line, "\r");
+            if (! str_starts_with($line, 'data:')) {
+                return true;
+            }
+
+            $data = trim(substr($line, 5));
+            if ($data === '[DONE]') {
+                return false;
+            }
+
+            $event = json_decode($data, true);
+            if (! is_array($event)) {
+                return true;
+            }
+
+            if (is_string($event['model'] ?? null) && $event['model'] !== '') {
+                $model = $event['model'];
+            }
+            if (is_array($event['usage'] ?? null)) {
+                $usage = $event['usage'];
+            }
+
+            $delta = data_get($event, 'choices.0.delta.content');
+            if (is_string($delta) && $delta !== '') {
+                $filterText($delta);
+            }
+
+            return true;
+        };
+
+        $done = false;
+        while (! $body->eof() && ! $done) {
+            $buffer .= $body->read(1024);
+
+            while (($newline = strpos($buffer, "\n")) !== false) {
+                $line = substr($buffer, 0, $newline);
+                $buffer = substr($buffer, $newline + 1);
+                if (! $consumeLine($line)) {
+                    $done = true;
+                    break;
+                }
+            }
+        }
+
+        if (! $done && trim($buffer) !== '') {
+            $consumeLine($buffer);
+        }
+        $filterText('', true);
+
+        return [
+            'message' => ['role' => 'assistant', 'content' => trim($content)],
+            'usage' => $usage,
+            'model' => $model,
+        ];
+    }
+
     public function health(): array
     {
         $started=microtime(true);

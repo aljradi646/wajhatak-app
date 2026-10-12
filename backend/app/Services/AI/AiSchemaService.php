@@ -25,12 +25,12 @@ use Illuminate\Support\Facades\Schema;
  */
 class AiSchemaService
 {
-    private const CACHE_KEY = 'ai_schema_ready_v1';
+    private const CACHE_KEY = 'ai_schema_ready_v3';
     private const CACHE_TTL = 300;
     /** سقف إعادة بناء الفهرس تلقائيًا (حماية من تنفيذ ثقيل داخل طلب). */
     private const AUTO_INDEX_MAX_PROPERTIES = 5000;
 
-    private const TABLES = ['ai_conversations', 'ai_messages', 'ai_request_logs', 'ai_search_index', 'ai_user_memories', 'ai_message_feedback'];
+    private const TABLES = ['ai_conversations', 'ai_messages', 'ai_request_logs', 'ai_search_index', 'ai_user_memories', 'ai_message_feedback', 'ai_knowledge_articles'];
 
     public function __construct(private readonly AiIndexSyncService $indexer) {}
 
@@ -235,6 +235,24 @@ class AiSchemaService
             $this->ensureFullTextIndex();
         }
 
+        if (! Schema::hasTable('ai_knowledge_articles')) {
+            Schema::create('ai_knowledge_articles', function (Blueprint $table): void {
+                $table->id();
+                $table->string('slug', 120)->unique();
+                $table->string('topic', 160);
+                $table->longText('content');
+                $table->json('keywords');
+                $table->json('roles');
+                $table->string('target_screen', 100)->nullable();
+                $table->boolean('is_active')->default(true)->index();
+                $table->unsignedInteger('priority')->default(100)->index();
+                $table->unsignedInteger('version')->default(1);
+                $table->timestamps();
+                $table->index(['is_active', 'priority', 'updated_at'], 'ai_knowledge_active_priority_idx');
+            });
+            $created[] = 'ai_knowledge_articles';
+        }
+
         return $created;
     }
 
@@ -246,6 +264,7 @@ class AiSchemaService
         'ai_user_memories' => ['user_id' => true, 'memory_key' => true, 'memory_value' => true, 'confidence' => true, 'source' => true, 'last_used_at' => true, 'expires_at' => true],
         'ai_message_feedback' => ['ai_message_id' => true, 'user_id' => true, 'feedback' => true, 'note' => true],
         'ai_search_index' => ['property_id' => true, 'title' => true, 'description' => true, 'transaction_type' => true, 'status' => true, 'type_slug' => true, 'type_name_ar' => true, 'city' => true, 'district' => true, 'neighborhood' => true, 'price' => true, 'currency' => true, 'area' => true, 'bedrooms' => true, 'bathrooms' => true, 'is_furnished' => true, 'is_new' => true, 'is_featured' => true, 'published_at' => true, 'latitude' => true, 'longitude' => true, 'search_text' => true, 'content_hash' => true],
+        'ai_knowledge_articles' => ['slug' => true, 'topic' => true, 'content' => true, 'keywords' => true, 'roles' => true, 'target_screen' => true, 'is_active' => true, 'priority' => true, 'version' => true],
     ];
 
     /** @return list<string> الأعمدة التي أُضيفت الآن. */
@@ -321,6 +340,17 @@ class AiSchemaService
                 'longitude' => fn (Blueprint $t) => $t->decimal('longitude', 10, 7)->nullable(),
                 'search_text' => fn (Blueprint $t) => $t->text('search_text')->nullable(),
                 'content_hash' => fn (Blueprint $t) => $t->string('content_hash', 64)->nullable(),
+            ],
+            'ai_knowledge_articles' => [
+                'slug' => fn (Blueprint $t) => $t->string('slug', 120),
+                'topic' => fn (Blueprint $t) => $t->string('topic', 160),
+                'content' => fn (Blueprint $t) => $t->longText('content'),
+                'keywords' => fn (Blueprint $t) => $t->json('keywords'),
+                'roles' => fn (Blueprint $t) => $t->json('roles'),
+                'target_screen' => fn (Blueprint $t) => $t->string('target_screen', 100)->nullable(),
+                'is_active' => fn (Blueprint $t) => $t->boolean('is_active')->default(true)->index(),
+                'priority' => fn (Blueprint $t) => $t->unsignedInteger('priority')->default(100)->index(),
+                'version' => fn (Blueprint $t) => $t->unsignedInteger('version')->default(1),
             ],
         ];
 

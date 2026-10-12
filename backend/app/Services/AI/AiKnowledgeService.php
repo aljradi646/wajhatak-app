@@ -2,6 +2,10 @@
 
 namespace App\Services\AI;
 
+use App\Models\AiKnowledgeArticle;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
+
 /**
  * معرفة المنصة المعتمدة.
  *
@@ -10,7 +14,7 @@ namespace App\Services\AI;
  */
 class AiKnowledgeService
 {
-    public const VERSION = '2026-10-04.2';
+    public const VERSION = '2026-10-09.1';
 
     private const KNOWLEDGE_BASE = [
         [
@@ -87,55 +91,229 @@ class AiKnowledgeService
         ],
     ];
 
+    private ?string $resolvedVersion = null;
+
     public function version(): string
     {
-        return self::VERSION;
+        if ($this->resolvedVersion !== null) {
+            return $this->resolvedVersion;
+        }
+
+        $version = self::VERSION;
+        try {
+            if (Schema::hasTable('ai_knowledge_articles')) {
+                $latest = AiKnowledgeArticle::query()->max('updated_at');
+                if (is_string($latest) && $latest !== '') {
+                    $version .= '+'.substr(hash('sha256', $latest), 0, 8);
+                }
+            }
+        } catch (Throwable) {
+            // Use the built-in version if the database table is not ready.
+        }
+
+        return $this->resolvedVersion = $version;
     }
 
+    /**
+     * يضمن وجود نسخة قابلة للتحرير من الأسئلة المضمنة دون استبدال أي تعديل سابق.
+     * يُستدعى من شاشة إدارة المعرفة فقط؛ تبقى المعرفة المضمنة متاحة إن لم تُنفذ الهجرة.
+     */
+    public function syncBuiltInArticles(): int
+    {
+        try {
+            if (! Schema::hasTable('ai_knowledge_articles')) {
+                return 0;
+            }
+
+            $created = 0;
+            foreach (self::KNOWLEDGE_BASE as $item) {
+                $article = AiKnowledgeArticle::query()->firstOrCreate(
+                    ['slug' => $item['id']],
+                    [
+                        'topic' => $item['topic'],
+                        'content' => $item['content'],
+                        'keywords' => $item['keywords'],
+                        'roles' => $item['roles'],
+                        'target_screen' => $item['target_screen'],
+                        'is_active' => true,
+                        'priority' => 100,
+                        'version' => 1,
+                    ],
+                );
+                if ($article->wasRecentlyCreated) {
+                    $created++;
+                }
+            }
+
+            return $created;
+        } catch (Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+    }
+
+    /**
+     * المعرفة المضمنة تعمل كقيمة افتراضية، ويمكن تحريرها من لوحة التحكم.
+     * المقالات المخزنة تتجاوز الافتراضي ذي slug نفسه؛ المقالات الأخرى تضاف إليه.
+     *
+     * @return list<array<string, mixed>>
+     */
     public function overview(string $role = 'client'): array
     {
-        $role = strtolower($role ?: 'client');
-
+        $items = $this->entriesForRole($role);
         return array_values(array_map(
             fn (array $item) => [
                 'id' => $item['id'],
                 'topic' => $item['topic'],
                 'content' => $item['content'],
-                'target_screen' => $item['target_screen'],
-                'version' => self::VERSION,
+                'target_screen' => $item['target_screen'] ?? null,
+                'version' => $item['version'] ?? $this->version(),
             ],
-            array_filter(self::KNOWLEDGE_BASE, fn (array $item) => in_array($role, $item['roles'], true)),
+            $items,
         ));
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function searchKnowledge(string $query, string $role = 'client'): array
     {
         $normalized = $this->normalize($query);
-        $role = strtolower($role ?: 'client');
+        if ($normalized === '') {
+            return [];
+        }
+
         $results = [];
+        foreach ($this->entriesForRole($role) as $item) {
+            // المرادفات العربية قد تتكرر بصيغ إملائية مختلفة (مثل ة/ه).
+            // احتسب الكلمة المعيارية مرة واحدة حتى لا تفوز مادة لمجرد التكرار.
+            $matchedKeywords = [];
+            foreach ((array) ($item['keywords'] ?? []) as $keyword) {
+                $needle = $this->normalize((string) $keyword);
+                if ($needle === '') {
+                    continue;
+                }
+
+                // الكلمات المفردة تقبل التصريفات الشائعة جزئيًا، أما العبارات
+                // المركبة فيلزم أن تبدأ وتنتهي عند حدود كلمة حتى لا تتحول
+                // «أطلب معاينة» إلى تطابق زائف مع «طلب معاينة».
+                $matched = str_contains($needle, ' ')
+                    ? preg_match('/(?<![\\p{L}\\p{N}])'.preg_quote($needle, '/').'(?![\\p{L}\\p{N}])/u', $normalized) === 1
+                    : str_contains($normalized, $needle);
+
+                if ($matched) {
+                    $matchedKeywords[$needle] = true;
+                }
+            }
+            $score = count($matchedKeywords);
+
+            if ($score > 0) {
+                unset($item['slug'], $item['is_active'], $item['is_builtin']);
+                $item['version'] = $item['version'] ?? $this->version();
+                $item['score'] = $score;
+                $results[] = $item;
+            }
+        }
+
+        usort($results, static fn (array $a, array $b) =>
+            ($b['score'] <=> $a['score']) ?: ((int) ($a['priority'] ?? 100) <=> (int) ($b['priority'] ?? 100))
+        );
+
+        return array_slice($results, 0, 5);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function entriesForRole(string $role): array
+    {
+        $role = strtolower(trim($role)) ?: 'client';
+        $entries = [];
+        $builtInSlugs = array_column(self::KNOWLEDGE_BASE, 'id');
 
         foreach (self::KNOWLEDGE_BASE as $item) {
             if (! in_array($role, $item['roles'], true)) {
                 continue;
             }
 
-            $score = 0;
-            foreach ($item['keywords'] as $keyword) {
-                if (str_contains($normalized, $this->normalize($keyword))) {
-                    $score++;
-                }
-            }
-
-            if ($score > 0) {
-                $item['version'] = self::VERSION;
-                $item['score'] = $score;
-                $results[] = $item;
-            }
+            $item['version'] = $this->version();
+            $item['priority'] = 100;
+            $entries[$item['id']] = $item;
         }
 
-        usort($results, fn (array $a, array $b) => $b['score'] <=> $a['score']);
+        foreach ($this->databaseEntries() as $article) {
+            $slug = (string) $article['slug'];
+            $isBuiltIn = in_array($slug, $builtInSlugs, true);
 
-        return array_slice($results, 0, 5);
+            if ($isBuiltIn) {
+                // وجود سجل مخصص لهذا slug يعني أن قرارات التفعيل والأدوار
+                // والمحتوى في قاعدة البيانات هي المرجع، حتى إذا عُطّلت المادة.
+                unset($entries[$slug]);
+                if (! $article['is_active'] || ! in_array($role, $article['roles'], true)) {
+                    continue;
+                }
+
+                $article['id'] = $slug;
+                $entries[$slug] = $article;
+                continue;
+            }
+
+            if (! $article['is_active'] || ! in_array($role, $article['roles'], true)) {
+                continue;
+            }
+
+            $article['id'] = 'article-'.$article['id'];
+            $entries[$article['id']] = $article;
+        }
+
+        return array_values($entries);
+    }
+
+    /**
+     * تضمين المقالات المضمنة حتى لو أوقفها المدير كي لا تظهر النسخة الافتراضية
+     * مجددًا؛ أما المقالات الإضافية المتوقفة فتبقى خارج البحث.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function databaseEntries(): array
+    {
+        try {
+            if (! Schema::hasTable('ai_knowledge_articles')) {
+                return [];
+            }
+
+            $builtInSlugs = array_column(self::KNOWLEDGE_BASE, 'id');
+
+            // لا تسمح لعدد كبير من المقالات المخصصة بإقصاء تعديل سؤال مضمن
+            // من الاسترجاع: حمّل التعديلات التسعة بصورة مستقلة، ثم حدّ المخصصات.
+            $builtIn = AiKnowledgeArticle::query()->whereIn('slug', $builtInSlugs)->get();
+            $custom = AiKnowledgeArticle::query()
+                ->whereNotIn('slug', $builtInSlugs)
+                ->where('is_active', true)
+                ->orderBy('priority')
+                ->orderByDesc('updated_at')
+                ->limit(200)
+                ->get();
+
+            return $builtIn->concat($custom)
+                ->map(fn (AiKnowledgeArticle $article) => [
+                    'id' => (int) $article->id,
+                    'slug' => (string) $article->slug,
+                    'topic' => (string) $article->topic,
+                    'content' => (string) $article->content,
+                    'keywords' => (array) $article->keywords,
+                    'target_screen' => $article->target_screen,
+                    'roles' => (array) $article->roles,
+                    'priority' => (int) $article->priority,
+                    'version' => 'article-'.$article->id.'-v'.$article->version,
+                    'is_active' => (bool) $article->is_active,
+                ])
+                ->values()
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     private function normalize(string $text): string
