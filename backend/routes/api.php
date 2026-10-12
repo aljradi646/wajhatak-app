@@ -100,6 +100,7 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
         Route::delete('viewing-requests/{viewingRequest}', [ViewingRequestController::class, 'destroy'])->name('viewing-requests.destroy');
 
         Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
         Route::post('notifications/{notificationId}/read', [NotificationController::class, 'read'])->name('notifications.read');
 
         Route::get('support-tickets', [SupportTicketController::class, 'index'])->name('support-tickets.index');
