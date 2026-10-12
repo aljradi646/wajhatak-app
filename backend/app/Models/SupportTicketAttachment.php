@@ -7,6 +7,8 @@ use Illuminate\\Database\\Eloquent\\Relations\\BelongsTo;
 
 class SupportTicketAttachment extends Model
 {
+    protected $hidden = ['disk', 'path'];
+
     protected $fillable = [
         'support_ticket_id',
         'support_ticket_message_id',
