@@ -28,6 +28,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('support-tickets', [SupportTicketController::class, 'index'])->name('support-tickets.index');
     Route::get('support-tickets/{ticket}', [SupportTicketController::class, 'show'])->whereNumber('ticket')->name('support-tickets.show');
+    Route::get('support-tickets/{ticket}/attachments/{attachment}', [SupportTicketController::class, 'downloadAttachment'])->whereNumber(['ticket', 'attachment'])->name('support-tickets.attachments.download');
     Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->whereNumber('ticket')->name('support-tickets.reply');
     Route::patch('support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus'])->whereNumber('ticket')->name('support-tickets.status');
 
