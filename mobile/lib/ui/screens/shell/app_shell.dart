@@ -187,6 +187,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       (_, next) {
         if (next.asData?.value != null) {
           unawaited(ref.read(firebasePushMessagingServiceProvider).initializeAndRegister());
+          unawaited(ref.read(realtimeServiceProvider).start());
+        } else {
+          unawaited(ref.read(realtimeServiceProvider).stop());
         }
       },
     );
