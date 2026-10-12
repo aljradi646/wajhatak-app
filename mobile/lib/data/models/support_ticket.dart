@@ -76,14 +76,15 @@ class SupportTicket {
   final List<SupportTicketMessage> messages;
   final List<SupportTicketAttachment> attachments;
 
-  bool get isClosed => status == 'closed';
+  bool get isClosed => status == 'closed' || status == 'rejected';
 
   String get statusLabel => switch (status) {
-        'open' => 'مفتوح',
+        'open' => 'جديد',
         'in_progress' => 'قيد المعالجة',
         'waiting_user' => 'بانتظارك',
         'resolved' => 'تم الحل',
         'closed' => 'مغلق',
+        'rejected' => 'مرفوض',
         _ => status,
       };
 
