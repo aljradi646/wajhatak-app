@@ -293,9 +293,9 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                 padding: EdgeInsets.symmetric(vertical: 10),
                 child: LuxSkeleton(height: 54),
               ),
-              error: (error, _) => const Text(
-                'تعذر تحميل أنواع العقارات. تحقق من اتصالك بالشبكة ثم أعد المحاولة.',
-                style: TextStyle(color: Colors.red),
+              error: (error, _) => ErrorState(
+                message: 'تعذر تحميل أنواع العقارات.',
+                onRetry: () => ref.invalidate(propertyTypesProvider),
               ),
             ),
             const SizedBox(height: 12),
@@ -330,32 +330,53 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
               onChanged: (value) => setState(() => _currency = value),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _area,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'المساحة م²'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextFormField(
-                    controller: _bedrooms,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'غرف النوم'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextFormField(
-                    controller: _bathrooms,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'الحمامات'),
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 520
+                    ? 3
+                    : constraints.maxWidth >= 320
+                    ? 2
+                    : 1;
+                final fieldWidth =
+                    (constraints.maxWidth - (columns - 1) * 10) / columns;
+
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                      width: fieldWidth,
+                      child: TextFormField(
+                        controller: _area,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'المساحة م²',
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: fieldWidth,
+                      child: TextFormField(
+                        controller: _bedrooms,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'غرف النوم',
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: fieldWidth,
+                      child: TextFormField(
+                        controller: _bathrooms,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'الحمامات',
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -446,7 +467,10 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                   LuxSkeleton(width: 92, height: 34, radius: 18),
                 ],
               ),
-              error: (error, _) => const SizedBox.shrink(),
+              error: (error, _) => ErrorState(
+                message: 'تعذر تحميل مزايا العقارات.',
+                onRetry: () => ref.invalidate(featuresProvider),
+              ),
             ),
             const SizedBox(height: 24),
             Row(
@@ -499,88 +523,99 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
                 ),
               )
             else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: images.length,
-                itemBuilder: (context, index) {
-                  final image = images[index];
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(image.url, fit: BoxFit.cover),
-                        if (image.isCover)
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'غلاف',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 760
+                      ? 4
+                      : constraints.maxWidth >= 480
+                      ? 3
+                      : 2;
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: images.length,
+                    itemBuilder: (context, index) {
+                      final image = images[index];
+
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(image.url, fit: BoxFit.cover),
+                            if (image.isCover)
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'غلاف',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                    ),
+                                  ),
                                 ),
+                              ),
+                            Positioned(
+                              top: 2,
+                              left: 2,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (!image.isCover)
+                                    GestureDetector(
+                                      onTap: () => _setCover(image),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black54,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.star_border,
+                                          color: Colors.white,
+                                          size: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () => _deleteImage(image),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                        Positioned(
-                          top: 2,
-                          left: 2,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!image.isCover)
-                                GestureDetector(
-                                  onTap: () => _setCover(image),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.black54,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.star_border,
-                                      color: Colors.white,
-                                      size: 14,
-                                    ),
-                                  ),
-                                ),
-                              const SizedBox(width: 4),
-                              GestureDetector(
-                                onTap: () => _deleteImage(image),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black54,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                    size: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               ),
@@ -646,7 +681,10 @@ class _CurrencyField extends ConsumerWidget {
         padding: EdgeInsets.symmetric(vertical: 10),
         child: LuxSkeleton(height: 54),
       ),
-      error: (_error, _stackTrace) => const SizedBox.shrink(),
+      error: (_error, _stackTrace) => ErrorState(
+        message: 'تعذر تحميل قائمة العملات.',
+        onRetry: () => ref.invalidate(currenciesProvider),
+      ),
     );
   }
 }
