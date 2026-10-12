@@ -115,23 +115,5 @@
                 <span x-text="loading ? 'جارٍ تسجيل الدخول…' : 'تسجيل الدخول'"></span>
             </button>
         </form>
-
-        {{-- Register CTA --}}
-        <div class="pt-1">
-            <div class="mb-4 flex items-center gap-3">
-                <span class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></span>
-                <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">أو</span>
-                <span class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></span>
-            </div>
-
-            <a
-                href="{{ route('register') }}"
-                class="flex w-full items-center justify-center gap-2 rounded-2xl border-2 px-6 py-3.5 text-sm font-extrabold transition hover:shadow-md"
-                style="border-color: #0E8A6D; color: #0E8A6D;"
-            >
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-                إنشاء حساب جديد
-            </a>
-        </div>
     </div>
 </x-guest-layout>
