@@ -58,6 +58,7 @@ class UserController extends Controller
             'avatar_path' => ['nullable', 'string', 'max:500'],
             'is_active' => ['sometimes', 'boolean'],
             'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', Rule::exists('roles', 'name')],
         ]);
 
         $user = User::create([
@@ -136,34 +137,36 @@ class UserController extends Controller
             }
         }
 
-        $user->fill([
-            'name' => $data['name'],
-            'email' => strtolower($data['email']),
-            'phone' => $data['phone'] ?? null,
-            'locale' => $data['locale'] ?? 'ar',
-            'avatar_path' => $data['avatar_path'] ?? null,
-            'is_active' => $request->boolean('is_active'),
-        ]);
-        if (! empty($data['password'])) {
-            $user->password = Hash::make($data['password']);
-        }
-        $user->save();
-
-        if (array_key_exists('roles', $data)) {
-            $user->syncRoles($data['roles'] ?? []);
-
-            // Create the domain profile whenever the agent role is granted.
-            // Keep it when the role is removed so re-granting the role restores
-            // the same identity; agent listing is filtered by the current role.
-            if ($user->hasRole('agent')) {
-                Agent::query()->firstOrCreate(
-                    ['user_id' => $user->id],
-                    ['is_active' => false, 'verification_status' => 'pending']
-                );
+        DB::transaction(function () use ($request, $data, $user): void {
+            $user->fill([
+                'name' => $data['name'],
+                'email' => strtolower($data['email']),
+                'phone' => $data['phone'] ?? null,
+                'locale' => $data['locale'] ?? 'ar',
+                'avatar_path' => $data['avatar_path'] ?? null,
+                'is_active' => $request->boolean('is_active'),
+            ]);
+            if (! empty($data['password'])) {
+                $user->password = Hash::make($data['password']);
             }
-        }
+            $user->save();
 
-        ActivityLog::record('user', "تم تحديث المستخدم «{$user->name}»", $user);
+            if (array_key_exists('roles', $data)) {
+                $user->syncRoles($data['roles'] ?? []);
+
+                // Keep the agent profile when a role is removed; re-granting the
+                // role restores the same identity without touching user-owned data.
+                if ($user->hasRole('agent')) {
+                    Agent::query()->firstOrCreate(
+                        ['user_id' => $user->id],
+                        ['is_active' => false, 'verification_status' => 'pending']
+                    );
+                }
+            }
+
+            ActivityLog::record('user', "تم تحديث المستخدم «{$user->name}»", $user);
+        });
+
 
         return redirect()->route('admin.users.index')->with('status', 'تم تحديث المستخدم بنجاح.');
     }
