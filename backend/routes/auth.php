@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\AdminTwoFactorController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
@@ -30,6 +31,14 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('admin/2fa', [AdminTwoFactorController::class, 'show'])
+        ->middleware('throttle:10,1')
+        ->name('admin.2fa.challenge');
+
+    Route::post('admin/2fa', [AdminTwoFactorController::class, 'verify'])
+        ->middleware('throttle:6,1')
+        ->name('admin.2fa.verify');
+
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
 
