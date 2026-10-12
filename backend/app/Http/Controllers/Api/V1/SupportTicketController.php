@@ -1,15 +1,15 @@
 <?php
 
-namespace App\\Http\\Controllers\\Api\\V1;
+namespace App\Http\Controllers\Api\V1;
 
-use App\\Http\\Controllers\\Controller;
-use App\\Models\\SupportTicket;
-use App\\Models\\SupportTicketAttachment;
-use Illuminate\\Http\\JsonResponse;
-use Illuminate\\Http\\Request;
-use Illuminate\\Support\\Facades\\Storage;
-use Illuminate\\Support\\Str;
-use Symfony\\Component\\HttpFoundation\\BinaryFileResponse;
+use App\Http\Controllers\Controller;
+use App\Models\SupportTicket;
+use App\Models\SupportTicketAttachment;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SupportTicketController extends Controller
 {
@@ -63,7 +63,7 @@ class SupportTicketController extends Controller
                 'uploaded_by' => $request->user()->id,
                 'disk' => 'local',
                 'path' => $path,
-                'original_name' => Str::limit(preg_replace('/[^\\pL\\pN._ -]/u', '_', basename($file->getClientOriginalName())) ?: 'attachment', 255, ''),
+                'original_name' => Str::limit(preg_replace('/[^\pL\pN._ -]/u', '_', basename($file->getClientOriginalName())) ?: 'attachment', 255, ''),
                 'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
                 'size_bytes' => $file->getSize(),
             ]);
@@ -122,7 +122,7 @@ class SupportTicketController extends Controller
                 'uploaded_by' => $request->user()->id,
                 'disk' => 'local',
                 'path' => $path,
-                'original_name' => Str::limit(preg_replace('/[^\\pL\\pN._ -]/u', '_', basename($file->getClientOriginalName())) ?: 'attachment', 255, ''),
+                'original_name' => Str::limit(preg_replace('/[^\pL\pN._ -]/u', '_', basename($file->getClientOriginalName())) ?: 'attachment', 255, ''),
                 'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
                 'size_bytes' => $file->getSize(),
             ]);
