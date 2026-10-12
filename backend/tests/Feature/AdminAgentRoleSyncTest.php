@@ -56,6 +56,12 @@ final class AdminAgentRoleSyncTest extends TestCase
             'verification_status' => 'pending',
         ]);
 
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $client->id,
+            'type' => 'user_role_changed',
+        ]);
+
         $this->actingAs($admin)->get('/admin/agents')
             ->assertOk()
             ->assertSee('Role Change Test User')
