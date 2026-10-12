@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cross_file/cross_file.dart';
 import 'package:dio/dio.dart';
 import '../api_client.dart';
@@ -39,6 +41,9 @@ class SupportTicketRepository {
     final json = await _api.post('/support-tickets', data: data);
     return SupportTicket.fromJson(json['data'] as Map<String, dynamic>);
   }
+
+  Future<Uint8List> attachmentBytes(int ticketId, int attachmentId) =>
+      _api.getBytes('/support-tickets/$ticketId/attachments/$attachmentId');
 
   Future<SupportTicket> reply(int id, String message) async {
     final json = await _api.post('/support-tickets/$id/reply', data: {
