@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Services\Email\EmailVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,12 +24,24 @@ class EmailVerificationController extends Controller
         $user = $request->user();
 
         if ($user->email_verified_at !== null) {
-            return response()->json(['data' => ['verified' => true, 'message' => 'بريدك موثق بالفعل.']]);
+            return response()->json(['data' => [
+                'enabled' => (bool) Setting::get('email_verification_enabled', true),
+                'verified' => true,
+                'message' => 'بريدك موثق بالفعل.',
+            ]]);
+        }
+
+        if (! (bool) Setting::get('email_verification_enabled', true)) {
+            return response()->json([
+                'message' => 'توثيق البريد الإلكتروني معطّل حاليًا من إعدادات المنصة.',
+                'data' => ['enabled' => false, 'verified' => false],
+            ], 409);
         }
 
         $result = $this->verifier->sendCode($user);
 
         return response()->json(['data' => [
+            'enabled' => true,
             'verified' => false,
             'ok' => $result['ok'],
             'message' => $result['message'],
@@ -41,6 +54,13 @@ class EmailVerificationController extends Controller
     /** POST /me/email/verify — تأكيد الرمز. */
     public function verify(Request $request): JsonResponse
     {
+        if (! (bool) Setting::get('email_verification_enabled', true)) {
+            return response()->json([
+                'message' => 'توثيق البريد الإلكتروني معطّل حاليًا من إعدادات المنصة.',
+                'data' => ['enabled' => false, 'verified' => false],
+            ], 409);
+        }
+
         $data = $request->validate([
             'code' => ['required', 'digits:6'],
         ], [
@@ -62,7 +82,15 @@ class EmailVerificationController extends Controller
     {
         $user = $request->user();
 
+        if (! (bool) Setting::get('email_verification_enabled', true)) {
+            return response()->json([
+                'message' => 'توثيق البريد الإلكتروني معطّل حاليًا من إعدادات المنصة.',
+                'data' => ['enabled' => false, 'verified' => $user->email_verified_at !== null],
+            ], 409);
+        }
+
         return response()->json(['data' => [
+            'enabled' => true,
             'verified' => $user->email_verified_at !== null,
             'resend_in' => $this->verifier->resendIn($user),
             'resend_available_at' => $this->verifier->resendAvailableAt($user),
