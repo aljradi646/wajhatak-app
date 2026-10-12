@@ -31,7 +31,8 @@ class AdminUserSeeder extends Seeder
         }
 
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new \\InvalidArgumentException('ADMIN_EMAIL must be a valid email address.');
+            $this->command?->error('Admin account was not created: ADMIN_EMAIL is not a valid email address.');
+            return;
         }
 
         if (strlen($password) < 12
@@ -39,7 +40,8 @@ class AdminUserSeeder extends Seeder
             || ! preg_match('/[A-Z]/', $password)
             || ! preg_match('/[0-9]/', $password)
             || ! preg_match('/[^A-Za-z0-9]/', $password)) {
-            throw new \\InvalidArgumentException('ADMIN_PASSWORD must be at least 12 characters and include upper/lowercase letters, a number, and a symbol.');
+            $this->command?->error('Admin account was not created: ADMIN_PASSWORD must be at least 12 characters and include upper/lowercase letters, a number, and a symbol.');
+            return;
         }
         $user = User::query()->updateOrCreate(
             ['email' => $email],
