@@ -28,6 +28,12 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $user = $request->user();
+        if ($user && $user->hasRole('admin') && $user->two_factor_enabled_at && $user->two_factor_secret) {
+            $request->session()->forget('admin_2fa_verified_at');
+            return redirect()->route('admin.2fa.challenge');
+        }
+
         // Prevent redirect to external URLs (open redirect protection)
         $intended = $request->session()->pull('url.intended', route('dashboard', absolute: false));
         $host = parse_url($intended, PHP_URL_HOST);
