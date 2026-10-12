@@ -21,7 +21,6 @@ class SendFcmPushNotification implements ShouldQueue
         public int $userId,
         public string $notificationId,
     ) {
-        $this->onQueue('notifications');
     }
 
     public function handle(FcmPushService $fcm): void
