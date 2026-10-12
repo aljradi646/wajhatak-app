@@ -733,6 +733,18 @@ final notificationsProvider = FutureProvider<List<LuxNotification>>((
       : ref.watch(notificationRepositoryProvider).notifications();
 });
 
+final unreadNotificationCountProvider = FutureProvider<int>((ref) async {
+  if (!AppConfig.isUiPreview &&
+      ref.watch(sessionProvider).asData?.value == null) {
+    return 0;
+  }
+  if (AppConfig.isUiPreview) {
+    final items = await (await _preview(ref)).notifications();
+    return items.where((item) => !item.isRead).length;
+  }
+  return ref.watch(notificationRepositoryProvider).unreadCount();
+});
+
 // ---------------------------------------------------------------------------
 // البحث وحالة المفضلة
 // ---------------------------------------------------------------------------
