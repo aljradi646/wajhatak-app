@@ -6,6 +6,8 @@ use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -44,6 +46,7 @@ class LoginRequest extends FormRequest
 
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
+            $this->recordFailedLoginAttempt();
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
@@ -74,6 +77,28 @@ class LoginRequest extends FormRequest
                 'minutes' => ceil($seconds / 60),
             ]),
         ]);
+    }
+
+    /**
+     * Persist a privacy-preserving record of failed authentication attempts.
+     * Audit storage failures must never reveal implementation details to the client.
+     */
+    private function recordFailedLoginAttempt(): void
+    {
+        try {
+            if (! Schema::hasTable('failed_login_attempts')) {
+                return;
+            }
+
+            DB::table('failed_login_attempts')->insert([
+                'email_hash' => hash('sha256', mb_strtolower(trim((string) $this->input('email')))),
+                'ip_address' => substr((string) $this->ip(), 0, 45),
+                'user_agent' => substr((string) $this->userAgent(), 0, 1000),
+                'attempted_at' => now(),
+            ]);
+        } catch (\\Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**
