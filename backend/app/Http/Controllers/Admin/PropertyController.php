@@ -109,9 +109,7 @@ class PropertyController extends Controller
         $recipient = $property->agent?->user;
         if ($recipient) {
             $recipient->notify(new PropertyModerationResult($property, 'approved'));
-            if ($recipient->notificationPreference?->property_updates ?? true) {
-                Mail::to($recipient->email)->queue(new PropertyModerationMail($property, 'approved'));
-            }
+            $this->queueModerationEmail($recipient, $property, 'approved');
         }
         ActivityLog::record('property', "تمت الموافقة على العقار «{$property->title}» ({$property->reference_code}) ونشره", $property);
         return back()->with('status', 'تم اعتماد العقار وإشعار الوكيل.');
@@ -130,9 +128,7 @@ class PropertyController extends Controller
         $recipient = $property->agent?->user;
         if ($recipient) {
             $recipient->notify(new PropertyModerationResult($property, 'rejected', $reason));
-            if ($recipient->notificationPreference?->property_updates ?? true) {
-                Mail::to($recipient->email)->queue(new PropertyModerationMail($property, 'rejected', $reason));
-            }
+            $this->queueModerationEmail($recipient, $property, 'rejected', $reason);
         }
         ActivityLog::record('property', "تم رفض العقار «{$property->title}» ({$property->reference_code})", $property, properties: ['reason' => $reason]);
         return back()->with('status', 'تم رفض العقار وإشعار الوكيل بسبب الرفض.');
@@ -298,6 +294,20 @@ class PropertyController extends Controller
         ActivityLog::record('property', "{$msg} ({$properties->count()} عنصر)", null, properties: ['action' => $data['action'], 'ids' => $properties->pluck('id')->all()]);
 
         return back()->with('status', $msg);
+    }
+
+    private function queueModerationEmail(\App\Models\User $recipient, Property $property, string $decision, ?string $reason = null): void
+    {
+        if (! ($recipient->notificationPreference?->property_updates ?? true)) {
+            return;
+        }
+
+        try {
+            Mail::to($recipient->email)->queue(new PropertyModerationMail($property, $decision, $reason));
+        } catch (\Throwable $exception) {
+            // Email delivery is optional and must not roll back a completed moderation decision.
+            report($exception);
+        }
     }
 
     private function validateData(Request $request, ?Property $property = null): array
