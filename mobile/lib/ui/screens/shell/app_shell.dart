@@ -58,6 +58,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     _notificationTimer = Timer.periodic(const Duration(seconds: 25), (_) {
       if (ref.read(sessionProvider).asData?.value != null) {
         ref.invalidate(notificationsProvider);
+        ref.invalidate(unreadNotificationCountProvider);
         ref.invalidate(conversationsProvider);
       }
     });
@@ -153,7 +154,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     final notifications =
         ref.watch(notificationsProvider).asData?.value ??
         const <LuxNotification>[];
-    final unreadCount = notifications.where((item) => !item.isRead).length;
+    final unreadCount = ref.watch(unreadNotificationCountProvider).asData?.value ??
+        notifications.where((item) => !item.isRead).length;
     ref.listen<AsyncValue<List<LuxNotification>>>(
       notificationsProvider,
       (_, next) =>
