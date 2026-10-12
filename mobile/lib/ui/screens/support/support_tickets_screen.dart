@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cross_file/cross_file.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/icon_badges.dart';
@@ -140,6 +142,19 @@ class _SupportTicketDetailScreenState extends ConsumerState<SupportTicketDetailS
   final _reply=TextEditingController();late Future<SupportTicket> _ticketFuture;bool _sending=false;
   @override void initState(){super.initState();_ticketFuture=ref.read(supportTicketRepositoryProvider).show(widget.ticketId);}
   @override void dispose(){_reply.dispose();super.dispose();}
+  Future<void> _openAttachment(SupportTicket ticket, SupportTicketAttachment attachment) async {
+    try {
+      final bytes = await ref.read(supportTicketRepositoryProvider).attachmentBytes(ticket.id, attachment.id);
+      await Share.shareXFiles([
+        XFile.fromData(bytes, name: attachment.originalName, mimeType: attachment.mimeType),
+      ], text: 'مرفق البلاغ ${ticket.reference}');
+    } on ApiFailure catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } on Object {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر فتح المرفق. حاول مرة أخرى.')));
+    }
+  }
+
   Future<void> _sendReply()async{
     final text=_reply.text.trim();if(text.length<2||_sending)return;setState(()=>_sending=true);
     try{final ticket=await ref.read(supportTicketRepositoryProvider).reply(widget.ticketId,text);_reply.clear();ref.invalidate(supportTicketsProvider);if(mounted)setState(()=>_ticketFuture=Future.value(ticket));}
@@ -156,6 +171,26 @@ class _SupportTicketDetailScreenState extends ConsumerState<SupportTicketDetailS
         Container(width:double.infinity,padding:const EdgeInsets.all(16),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surface,border:Border(bottom:BorderSide(color:Theme.of(context).colorScheme.outlineVariant))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text(ticket.subject,style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w900)),const SizedBox(height:4),Text(ticket.reference+' · '+ticket.statusLabel,style:TextStyle(color:Theme.of(context).colorScheme.primary,fontWeight:FontWeight.w800)),
         ])),
+        if (ticket.attachments.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal:12, vertical:8),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: ticket.attachments.map((attachment) => ActionChip(
+                avatar: Icon(attachment.mimeType.startsWith('image/') ? Icons.image_rounded : Icons.attach_file_rounded, size:18),
+                label: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth:180),
+                  child: Text(attachment.originalName, overflow: TextOverflow.ellipsis),
+                ),
+                onPressed: () => _openAttachment(ticket, attachment),
+              )).toList(),
+            ),
+          ),
         Expanded(child:ListView.builder(padding:const EdgeInsets.all(16),itemCount:ticket.messages.length,itemBuilder:(context,index){
           final m=ticket.messages[index];final admin=m.senderRole=='admin';
           return Align(alignment:admin?AlignmentDirectional.centerStart:AlignmentDirectional.centerEnd,child:Container(
