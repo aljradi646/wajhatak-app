@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Permission\Models\Role;
 
@@ -77,6 +78,8 @@ class AuthController extends Controller
         $user = User::query()->where('email', $email)->first();
 
         if (! $user || ! $user->is_active || ! Hash::check($request->string('password')->toString(), $user->password)) {
+            $this->recordFailedLoginAttempt($email, $request);
+
             return response()->json(['message' => 'بيانات الدخول غير صحيحة.'], 422);
         }
 
@@ -87,6 +90,24 @@ class AuthController extends Controller
             'token' => $token,
             'email_verification_required' => false,
         ]]);
+    }
+
+    private function recordFailedLoginAttempt(string $email, Request $request): void
+    {
+        try {
+            if (! Schema::hasTable('failed_login_attempts')) {
+                return;
+            }
+
+            DB::table('failed_login_attempts')->insert([
+                'email_hash' => hash('sha256', mb_strtolower(trim($email))),
+                'ip_address' => substr((string) $request->ip(), 0, 45),
+                'user_agent' => substr((string) $request->userAgent(), 0, 1000),
+                'attempted_at' => now(),
+            ]);
+        } catch (\\Throwable $exception) {
+            report($exception);
+        }
     }
 
     public function logout(Request $request): JsonResponse
