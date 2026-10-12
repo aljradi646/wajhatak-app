@@ -45,9 +45,11 @@ class AppDrawer extends ConsumerWidget {
     final theme = Theme.of(context);
     final session = ref.watch(sessionProvider).asData?.value;
     final user = session?.user;
+    final drawerWidth =
+        (MediaQuery.sizeOf(context).width * .88).clamp(0.0, 360.0).toDouble();
     return Drawer(
       backgroundColor: theme.scaffoldBackgroundColor,
-      width: 330,
+      width: drawerWidth,
       child: SafeArea(
         top: true,
         bottom: true,
@@ -220,7 +222,7 @@ class AppDrawer extends ConsumerWidget {
                       _DrawerEntry(
                         icon: Icons.real_estate_agent_rounded,
                         tone: AccentTone.indigo,
-                        label: 'مساحة الوكيل وعقاراتي',
+                        label: 'عقاراتي',
                         onTap: () => _closeThen(context, onAgentWorkspace),
                       ),
                     if (user.isAgent)

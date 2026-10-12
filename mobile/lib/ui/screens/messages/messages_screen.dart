@@ -9,36 +9,57 @@ import '../../widgets.dart';
 import '../auth/auth_screen.dart';
 import '../chat/chat_screen.dart';
 
-/// قائمة المحادثات — عنوان كل محادثة هو اسم الوكيل (وليس اسم العقار).
+/// قائمة المحادثات — تعرض الطرف الآخر مهما كان نوع حسابه.
 class MessagesScreen extends ConsumerWidget {
-  const MessagesScreen({super.key});
+  const MessagesScreen({super.key, this.standalone = false});
+
+  /// Use true when this screen is pushed as a route instead of living in AppShell.
+  final bool standalone;
+
+  Widget _wrap(BuildContext context, Widget body) {
+    if (!standalone) return body;
+    return Scaffold(
+      appBar: const WajhatakScreenHeader(
+        title: 'الرسائل',
+        subtitle: 'محادثاتك مع العملاء والوكلاء',
+      ),
+      body: body,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     if (session.isLoading) {
-      return const ConversationListSkeleton();
+      return _wrap(
+        context,
+        ConversationListSkeleton(showTitle: !standalone),
+      );
     }
     if (session.asData?.value == null) {
-      return AuthRequiredScreen(
-        title: 'رسائلك الخاصة',
-        body: 'سجّل دخولك لمراسلة الوكلاء وحفظ محادثاتك.',
-        actionLabel: 'تسجيل الدخول',
+      return _wrap(
+        context,
+        AuthRequiredScreen(
+          title: 'رسائلك الخاصة',
+          body: 'سجّل دخولك لمراسلة الوكلاء وحفظ محادثاتك.',
+          actionLabel: 'تسجيل الدخول',
+        ),
       );
     }
     final conversations = ref.watch(conversationsProvider);
-    return Column(
+    final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
-          child: Text(
-            'الرسائل',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+        if (!standalone)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
+            child: Text(
+              'الرسائل',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+            ),
           ),
-        ),
         Expanded(
           child: LuxAsyncView<List<ConversationItem>>(
             value: conversations,
@@ -63,6 +84,7 @@ class MessagesScreen extends ConsumerWidget {
         ),
       ],
     );
+    return _wrap(context, body);
   }
 }
 
@@ -74,15 +96,9 @@ class _ConversationTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isAgentView =
-        ref.watch(sessionProvider).asData?.value?.user.isAgent == true;
-    // الاسم المعروض: الطرف الآخر في المحادثة.
-    final displayName =
-        (isAgentView ? item.clientName : item.agentName) ?? item.title;
-    // صورة الطرف الآخر الحقيقية (الوكيل للعميل / العميل للوكيل).
-    final otherAvatarUrl = isAgentView
-        ? item.clientAvatarUrl
-        : item.agentAvatarUrl;
+    final currentUser = ref.watch(sessionProvider).asData?.value?.user;
+    final displayName = item.otherParticipantNameFor(currentUser?.id);
+    final otherAvatarUrl = item.otherParticipantAvatarUrlFor(currentUser?.id);
     final hasRecentActivity =
         item.lastMessageAt != null &&
         DateTime.now().difference(item.lastMessageAt!).inHours < 24;
@@ -164,7 +180,9 @@ class _ConversationTile extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             item.previewIsPropertyCard
-                                ? 'عرض تفاصيل العقار'
+                                ? (item.preview?.trim().isNotEmpty == true
+                                      ? item.preview!
+                                      : 'عرض تفاصيل العقار')
                                 : (item.preview?.isNotEmpty == true
                                       ? item.preview!
                                       : 'ابدأ المحادثة الآن'),

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\Agent;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -71,6 +72,13 @@ class UserController extends Controller
 
         if (! empty($data['roles'])) {
             $user->syncRoles($data['roles']);
+        }
+
+        if ($user->hasRole('agent')) {
+            Agent::query()->firstOrCreate(
+                ['user_id' => $user->id],
+                ['is_active' => false, 'verification_status' => 'pending']
+            );
         }
 
         ActivityLog::record('user', "تم إنشاء المستخدم «{$user->name}»", $user);
@@ -143,6 +151,16 @@ class UserController extends Controller
 
         if (array_key_exists('roles', $data)) {
             $user->syncRoles($data['roles'] ?? []);
+
+            // Create the domain profile whenever the agent role is granted.
+            // Keep it when the role is removed so re-granting the role restores
+            // the same identity; agent listing is filtered by the current role.
+            if ($user->hasRole('agent')) {
+                Agent::query()->firstOrCreate(
+                    ['user_id' => $user->id],
+                    ['is_active' => false, 'verification_status' => 'pending']
+                );
+            }
         }
 
         ActivityLog::record('user', "تم تحديث المستخدم «{$user->name}»", $user);

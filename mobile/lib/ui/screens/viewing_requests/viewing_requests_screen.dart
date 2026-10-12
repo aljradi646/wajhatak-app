@@ -280,32 +280,45 @@ class _ViewingRequestCardState extends ConsumerState<_ViewingRequestCard> {
             ],
             if (widget.canRespond && pending) ...[
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _updatingStatus == null
-                          ? () => _respond('rejected')
-                          : null,
-                      child: Text(
-                        _updatingStatus == 'rejected' ? 'جارٍ الرفض…' : 'رفض',
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final stackButtons = constraints.maxWidth < 340;
+                  final buttonWidth = stackButtons
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - 10) / 2;
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      SizedBox(
+                        width: buttonWidth,
+                        child: OutlinedButton(
+                          onPressed: _updatingStatus == null
+                              ? () => _respond('rejected')
+                              : null,
+                          child: Text(
+                            _updatingStatus == 'rejected'
+                                ? 'جارٍ الرفض…'
+                                : 'رفض',
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _updatingStatus == null
-                          ? () => _respond('confirmed')
-                          : null,
-                      child: Text(
-                        _updatingStatus == 'confirmed'
-                            ? 'جارٍ التأكيد…'
-                            : 'تأكيد الموعد',
+                      SizedBox(
+                        width: buttonWidth,
+                        child: FilledButton(
+                          onPressed: _updatingStatus == null
+                              ? () => _respond('confirmed')
+                              : null,
+                          child: Text(
+                            _updatingStatus == 'confirmed'
+                                ? 'جارٍ التأكيد…'
+                                : 'تأكيد الموعد',
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
             ],
 

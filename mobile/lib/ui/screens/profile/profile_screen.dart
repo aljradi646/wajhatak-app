@@ -38,6 +38,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     super.initState();
     _name = TextEditingController(text: widget.user.name);
     _phone = TextEditingController(text: widget.user.phone ?? '');
+
+    // Refresh the server-controlled policy when the profile opens, so a
+    // platform admin's toggle is reflected without requiring a new login.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(sessionProvider.notifier).restoreSessionAfterVerification();
+      }
+    });
   }
 
   @override
@@ -302,7 +310,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
 
           // توثيق البريد الإلكتروني — رمز حقيقي إلى الصندوق الفعلي.
-          if (widget.user.emailVerified != true) ...[
+          if ((ref.watch(sessionProvider).asData?.value?.user ?? widget.user)
+                  .emailVerificationEnabled &&
+              (ref.watch(sessionProvider).asData?.value?.user ?? widget.user)
+                      .emailVerified !=
+                  true) ...[
             const SizedBox(height: 12),
             _ActionTile(
               icon: Icons.mark_email_unread_rounded,
@@ -318,7 +330,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 );
               },
             ),
-          ] else ...[
+          ] else if ((ref.watch(sessionProvider).asData?.value?.user ?? widget.user)
+              .emailVerificationEnabled) ...[
             const SizedBox(height: 12),
             _FieldTile(
               icon: Icons.verified_rounded,

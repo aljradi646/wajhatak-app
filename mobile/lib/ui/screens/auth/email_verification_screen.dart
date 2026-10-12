@@ -106,7 +106,12 @@ class _EmailVerificationScreenState
         _resendUntil = null;
         setState(() => _resendIn = 0);
       }
-    } on ApiFailure {
+    } on ApiFailure catch (error) {
+      if (error.statusCode == 409 && mounted) {
+        util.notice(context, error.message);
+        await ref.read(sessionProvider.notifier).restoreSessionAfterVerification();
+        if (mounted) Navigator.of(context).pop(false);
+      }
       // لا نعتمد على ساعة الجهاز عند فشل مزامنة الخادم.
     }
   }
@@ -137,6 +142,11 @@ class _EmailVerificationScreenState
     } on ApiFailure catch (error) {
       if (mounted) {
         util.notice(context, error.message);
+        if (error.statusCode == 409) {
+          await ref.read(sessionProvider.notifier).restoreSessionAfterVerification();
+          if (mounted) Navigator.of(context).pop(false);
+          return;
+        }
         await _refreshServerStatus();
       }
     } finally {
@@ -163,7 +173,13 @@ class _EmailVerificationScreenState
         util.notice(context, result.message);
       }
     } on ApiFailure catch (error) {
-      if (mounted) util.notice(context, error.message);
+      if (mounted) {
+        util.notice(context, error.message);
+        if (error.statusCode == 409) {
+          await ref.read(sessionProvider.notifier).restoreSessionAfterVerification();
+          if (mounted) Navigator.of(context).pop(false);
+        }
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

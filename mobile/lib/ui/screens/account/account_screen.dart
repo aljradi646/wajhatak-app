@@ -11,6 +11,8 @@ import '../auth/auth_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../settings/settings_screen.dart';
+import '../support/support_tickets_screen.dart';
+import '../support/legal_pages_screen.dart';
 import '../viewing_requests/viewing_requests_screen.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -147,8 +149,8 @@ class AccountScreen extends ConsumerWidget {
           _AccountTile(
             icon: Icons.apartment_rounded,
             tone: AccentTone.indigo,
-            title: 'لوحة الوكيل وعقاراتي',
-            subtitle: 'إدارة عقاراتك وطلبات المعاينة',
+            title: 'عقاراتي',
+            subtitle: 'إدارة العقارات وحالاتها وطلبات المعاينة',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const AgentDashboardScreen()),
             ),
@@ -171,6 +173,12 @@ class AccountScreen extends ConsumerWidget {
             context,
           ).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
         ),
+        _AccountTile(icon: Icons.support_agent_rounded, tone: AccentTone.teal,
+          title: 'البلاغات والدعم', subtitle: 'أرسل بلاغًا وتابع رد فريق وجهتك',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SupportTicketsScreen()))),
+        _AccountTile(icon: Icons.policy_rounded, tone: AccentTone.violet,
+          title: 'السياسات والخصوصية والشروط', subtitle: 'سياسة الخصوصية والشروط ودليل الاستخدام',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LegalPagesScreen()))),
         const SizedBox(height: 18),
         OutlinedButton.icon(
           style: OutlinedButton.styleFrom(

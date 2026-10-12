@@ -79,6 +79,20 @@ class AgentReportApiTest extends TestCase
     // Tests
     // ---------------------------------------------------------------------
 
+    public function test_agent_can_unpublish_and_resubmit_own_listing_but_cannot_publish_directly(): void
+    {
+        [$user, $agent] = $this->makeAgent();
+        $property = $this->makeProperty($agent, ['status' => PropertyStatus::Published]);
+        Sanctum::actingAs($user);
+
+        $this->patchJson('/api/v1/properties/'.$property->id, ['status' => 'draft'])->assertOk();
+        $this->assertDatabaseHas('properties', ['id' => $property->id, 'status' => PropertyStatus::Draft->value]);
+        $this->patchJson('/api/v1/properties/'.$property->id, ['status' => 'published'])->assertUnprocessable();
+        $this->assertDatabaseHas('properties', ['id' => $property->id, 'status' => PropertyStatus::Draft->value]);
+        $this->patchJson('/api/v1/properties/'.$property->id, ['status' => 'pending'])->assertOk();
+        $this->assertDatabaseHas('properties', ['id' => $property->id, 'status' => PropertyStatus::Pending->value]);
+    }
+
     public function test_agent_reports_catalog_lists_real_types_and_history(): void
     {
         [$user] = $this->makeAgent();

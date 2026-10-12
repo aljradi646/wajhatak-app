@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -106,22 +108,58 @@ Future<void> startConversation(
     if (!context.mounted) return;
     if (ref.read(sessionProvider).asData?.value == null) return;
   }
+  var loadingDialogOpen = true;
+  unawaited(
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+              const SizedBox(width: 14),
+              Flexible(
+                child: Text(
+                  'جارٍ فتح المحادثة...',
+                  style: Theme.of(dialogContext).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
   try {
     final conversation = await ref
         .read(conversationRepositoryProvider)
         .startConversation(propertyId);
+    if (!context.mounted) return;
+
+    Navigator.of(context, rootNavigator: true).pop();
+    loadingDialogOpen = false;
     ref.invalidate(conversationsProvider);
-    if (context.mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ChatScreen(
-            conversation: conversation,
-            pendingProperty: pendingProperty,
-          ),
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          conversation: conversation,
+          pendingProperty: pendingProperty,
         ),
-      );
-    }
+      ),
+    );
   } on ApiFailure catch (error) {
     if (context.mounted) notice(context, error.message);
+  } finally {
+    if (loadingDialogOpen && context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
   }
 }

@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\PropertyController;
+use App\Http\Controllers\Api\V1\SitePageController;
+use App\Http\Controllers\Api\V1\SupportTicketController;
 use App\Http\Controllers\Api\V1\TaxonomyController;
 use App\Http\Controllers\Api\V1\ViewingRequestController;
 use Illuminate\Support\Facades\Route;
@@ -35,6 +37,9 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
     Route::get('cities', [TaxonomyController::class, 'cities'])->name('cities.index');
     Route::get('areas', [TaxonomyController::class, 'areas'])->name('areas.index');
     Route::get('currencies', [TaxonomyController::class, 'currencies'])->name('currencies.index');
+
+    Route::get('pages', [SitePageController::class, 'index'])->name('pages.index');
+    Route::get('pages/{slug}', [SitePageController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('pages.show');
 
     // -------------------------------------------------------------------
     // المساعد العقاري الذكي — Flutter يتصل بـ Laravel فقط، وLaravel وحده
@@ -96,6 +101,11 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
 
         Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::post('notifications/{notificationId}/read', [NotificationController::class, 'read'])->name('notifications.read');
+
+        Route::get('support-tickets', [SupportTicketController::class, 'index'])->name('support-tickets.index');
+        Route::post('support-tickets', [SupportTicketController::class, 'store'])->middleware('throttle:5,1')->name('support-tickets.store');
+        Route::get('support-tickets/{ticket}', [SupportTicketController::class, 'show'])->whereNumber('ticket')->name('support-tickets.show');
+        Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->middleware('throttle:10,1')->whereNumber('ticket')->name('support-tickets.reply');
 
         // محادثات المساعد (تتطلب حسابًا) — عزل ملكية كامل داخل المتحكم.
         Route::get('ai/conversations', [AiAssistantController::class, 'conversations'])->name('ai.conversations.index');

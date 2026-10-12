@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -24,6 +25,7 @@ class TokenStore {
   static const _tokenKey = 'lux_access_token';
   static const _loginTimeKey = 'lux_login_time';
   static const _userKey = 'lux_cached_user';
+  static const _deviceIdKey = 'lux_device_id';
   static const _sessionDuration = Duration(days: 30);
   final FlutterSecureStorage _storage;
 
@@ -82,6 +84,21 @@ class TokenStore {
     }
   }
 
+  /// Keeps the installation identifier across sign-outs so the matching
+  /// push-token registration can be removed from the current user's account.
+  Future<String> readOrCreateDeviceId() async {
+    try {
+      final current = await _storage.read(key: _deviceIdKey);
+      if (current != null && current.isNotEmpty) return current;
+      final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
+      final value = 'wajhatak-$stamp';
+      await _storage.write(key: _deviceIdKey, value: value);
+      return value;
+    } on Object {
+      return 'wajhatak-' + DateTime.now().microsecondsSinceEpoch.toRadixString(16);
+    }
+  }
+
   // --- بيانات المستخدم المخزّنة محليًا -----------------------------------
 
   Future<void> saveUser(LuxUser user) async {
@@ -131,7 +148,11 @@ class LuxApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           // إيقاع هادئ + قاطع دارة يمنع الضغط على الخادم (وهو سبب منع 429).
-          await _throttle();
+          final requestPath = options.path.toLowerCase();
+          final isAuthRequest = requestPath.contains('/auth/login') ||
+              requestPath.contains('/auth/register') ||
+              requestPath.contains('/auth/logout');
+          await _throttle(bypassCircuitBreaker: isAuthRequest);
           // تجاوز تحدي InfinityFree: نضمن وجود كوكي __test صالح قبل كل طلب
           // (ensureCookie ترجع الكوكي فورًا لو كان طازجًا دون أي طلب إضافي).
           if (_challengeSolver.cookie == null) {
@@ -175,8 +196,14 @@ class LuxApiClient {
         onError: (error, handler) async {
           final statusCode = error.response?.statusCode;
 
-          // مهما كانت الحالة، سجّل الفشل لتغذية قاطع الدارة قبل المحاولة.
-          _recordFailure();
+          // Count only transient transport/server failures toward the breaker.
+          // Expected client errors (401/403/404/409/422/429) must not lock
+          // unrelated API calls behind a 20-second cooldown.
+          if (statusCode == null || statusCode >= 500) {
+            _recordFailure();
+          } else {
+            _recordSuccess();
+          }
 
           // تخفيف الاستضافة (429) — لا نعيد المحاولة إطلاقًا ونورد خطأً واضحًا.
           if (statusCode == 429) {
@@ -212,7 +239,9 @@ class LuxApiClient {
             }
           }
 
-          if (statusCode == 401 || statusCode == 403) {
+          // 403 means the session may be valid but lacks permission.
+          // Only 401 represents an unauthenticated/expired-token response.
+          if (statusCode == 401) {
             unawaited(_tokenStore.clear());
           }
           final payload = error.response?.data;
@@ -268,8 +297,15 @@ class LuxApiClient {
   }
 
   /// يفرض فجوة زمنية دنيا بين الطلبات للحفاظ على إيقاع هادئ غير مريب.
-  Future<void> _throttle() async {
-    await _waitOutBreaker();
+  Future<void> _throttle({bool bypassCircuitBreaker = false}) async {
+    if (bypassCircuitBreaker) {
+      // Auth recovery must remain usable when the breaker was opened by
+      // earlier failures (including errors from the previous signed-in user).
+      _breakerLiftedAt = null;
+      _rapidFailureStreak = 0;
+    } else {
+      await _waitOutBreaker();
+    }
     final sinceLast = DateTime.now().difference(_lastSent);
     if (sinceLast < _rateCooldown) {
       await Future.delayed(_rateCooldown - sinceLast);
@@ -288,6 +324,7 @@ class LuxApiClient {
 
   void _recordSuccess() {
     _rapidFailureStreak = 0;
+    _breakerLiftedAt = null;
   }
 
   /// أداة كشف صارمة لتحدّي InfinityFree الفعلي (نصّ AES مع 3 قيم `toNumbers`).
@@ -343,6 +380,28 @@ class LuxApiClient {
     }
   }
 
+  /// Fetch file bytes through the authenticated API client and its interceptors.
+  Future<Uint8List> getBytes(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        path,
+        queryParameters: query,
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: const {
+            'Accept': 'application/pdf, text/csv, application/json',
+          },
+        ),
+      );
+      return Uint8List.fromList(response.data ?? const <int>[]);
+    } on DioException catch (error) {
+      throw _toFailure(error);
+    }
+  }
+
   Future<Map<String, dynamic>> post(
     String path, {
     Object? data,
@@ -352,8 +411,12 @@ class LuxApiClient {
       final isUpload = data is FormData;
       final effectiveOptions = (options ?? Options()).copyWith(
         // رفع الملفات (صور) يحتاج مهلة أطول على استضافة بطيئة.
-        sendTimeout: isUpload ? const Duration(seconds: 120) : null,
-        receiveTimeout: isUpload ? const Duration(seconds: 120) : null,
+        sendTimeout: isUpload
+            ? const Duration(seconds: 120)
+            : options?.sendTimeout,
+        receiveTimeout: isUpload
+            ? const Duration(seconds: 120)
+            : options?.receiveTimeout,
       );
       final response = await _dio.post<dynamic>(
         path,

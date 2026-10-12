@@ -244,9 +244,9 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                     padding: EdgeInsets.symmetric(vertical: 10),
                     child: LuxSkeleton(height: 54),
                   ),
-                  error: (error, _) => const Text(
-                    'تعذر تحميل أنواع العقارات. تحقق من اتصالك بالشبكة ثم أعد المحاولة.',
-                    style: TextStyle(color: Colors.red),
+                  error: (error, _) => ErrorState(
+                    message: 'تعذر تحميل أنواع العقارات.',
+                    onRetry: () => ref.invalidate(propertyTypesProvider),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -317,117 +317,162 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
               title: 'السعر والمساحة',
               children: [
                 // [ حقل السعر ] [ قائمة العملة ▼ ]
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: TextFormField(
-                        controller: _price,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'السعر',
-                          prefixIcon: Icon(Icons.attach_money_rounded),
-                        ),
-                        validator: (value) =>
-                            double.tryParse((value ?? '').trim()) != null
-                            ? null
-                            : 'أدخل سعرًا صحيحًا.',
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    Widget priceField() => TextFormField(
+                      controller: _price,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: currencies.when(
-                        data: (list) => DropdownButtonFormField<String>(
-                          initialValue: _currency,
-                          isExpanded: true,
-                          menuMaxHeight: 300,
-                          decoration: const InputDecoration(
-                            labelText: 'العملة',
-                            prefixIcon: Icon(Icons.currency_exchange_rounded),
-                          ),
-                          items: [
-                            for (final currency in list)
-                              DropdownMenuItem(
-                                value: currency.code,
-                                child: Text(
-                                  '${currency.flag} ${currency.symbolAr}',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                      decoration: const InputDecoration(
+                        labelText: 'السعر',
+                        prefixIcon: Icon(Icons.attach_money_rounded),
+                      ),
+                      validator: (value) =>
+                          double.tryParse((value ?? '').trim()) != null
+                          ? null
+                          : 'أدخل سعرًا صحيحًا.',
+                    );
+
+                    Widget currencyField() => currencies.when(
+                      data: (list) => DropdownButtonFormField<String>(
+                        initialValue: _currency,
+                        isExpanded: true,
+                        menuMaxHeight: 300,
+                        decoration: const InputDecoration(
+                          labelText: 'العملة',
+                          prefixIcon: Icon(Icons.currency_exchange_rounded),
+                        ),
+                        items: [
+                          for (final currency in list)
+                            DropdownMenuItem(
+                              value: currency.code,
+                              child: Text(
+                                '${currency.flag} ${currency.symbolAr}',
+                                overflow: TextOverflow.ellipsis,
                               ),
-                          ],
-                          onChanged: (value) =>
-                              setState(() => _currency = value ?? 'YER'),
-                        ),
-                        loading: () => const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 10),
-                          child: LuxSkeleton(height: 54),
-                        ),
-                        error: (_error, _stackTrace) => TextFormField(
-                          initialValue: _currency,
-                          decoration: const InputDecoration(
-                            labelText: 'العملة',
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _currency = value ?? 'YER'),
+                      ),
+                      loading: () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: LuxSkeleton(height: 54),
+                      ),
+                      error: (_error, _stackTrace) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'تعذر تحميل العملات',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                            ),
                           ),
-                          onSaved: (value) => _currency = value ?? 'YER',
-                        ),
+                          TextButton(
+                            onPressed: () => ref.invalidate(currenciesProvider),
+                            child: const Text('إعادة المحاولة'),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    );
+
+                    if (constraints.maxWidth < 320) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          priceField(),
+                          const SizedBox(height: 10),
+                          currencyField(),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: priceField()),
+                        const SizedBox(width: 10),
+                        Expanded(flex: 2, child: currencyField()),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _area,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'المساحة م²',
-                          prefixIcon: Icon(Icons.square_foot_rounded),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth < 320 ? 1 : 2;
+                    final fieldWidth =
+                        (constraints.maxWidth - (columns - 1) * 10) /
+                        columns;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextFormField(
+                            controller: _area,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'المساحة م²',
+                              prefixIcon: Icon(Icons.square_foot_rounded),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _bedrooms,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'غرف النوم',
-                          prefixIcon: Icon(Icons.bed_rounded),
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextFormField(
+                            controller: _bedrooms,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'غرف النوم',
+                              prefixIcon: Icon(Icons.bed_rounded),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _bathrooms,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'الحمامات',
-                          prefixIcon: Icon(Icons.bathtub_rounded),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth < 320 ? 1 : 2;
+                    final fieldWidth =
+                        (constraints.maxWidth - (columns - 1) * 10) /
+                        columns;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextFormField(
+                            controller: _bathrooms,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'الحمامات',
+                              prefixIcon: Icon(Icons.bathtub_rounded),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _parkingSpaces,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'المواقف',
-                          prefixIcon: Icon(Icons.directions_car_rounded),
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextFormField(
+                            controller: _parkingSpaces,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'المواقف',
+                              prefixIcon: Icon(Icons.directions_car_rounded),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -457,7 +502,10 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                     padding: EdgeInsets.symmetric(vertical: 10),
                     child: LuxSkeleton(height: 54),
                   ),
-                  error: (_error, _stackTrace) => const SizedBox.shrink(),
+                  error: (_error, _stackTrace) => ErrorState(
+                    message: 'تعذر تحميل الدول.',
+                    onRetry: () => ref.invalidate(countriesProvider),
+                  ),
                 ),
                 if (_country != null) ...[
                   const SizedBox(height: 12),
@@ -481,7 +529,12 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           padding: EdgeInsets.symmetric(vertical: 10),
                           child: LuxSkeleton(height: 54),
                         ),
-                        error: (_error, _stackTrace) => const SizedBox.shrink(),
+                        error: (_error, _stackTrace) => ErrorState(
+                          message: 'تعذر تحميل المحافظات والمناطق.',
+                          onRetry: () => ref.invalidate(
+                            regionsProvider(_country!.id),
+                          ),
+                        ),
                       ),
                 ],
                 if (_region != null) ...[
@@ -505,7 +558,12 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           padding: EdgeInsets.symmetric(vertical: 10),
                           child: LuxSkeleton(height: 54),
                         ),
-                        error: (_error, _stackTrace) => const SizedBox.shrink(),
+                        error: (_error, _stackTrace) => ErrorState(
+                          message: 'تعذر تحميل المدن.',
+                          onRetry: () => ref.invalidate(
+                            citiesProvider(_region!.id),
+                          ),
+                        ),
                       ),
                 ],
                 if (_city != null) ...[
@@ -521,8 +579,16 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           onChanged: (value) =>
                               setState(() => _areaLocation = value),
                         ),
-                        loading: () => const SizedBox.shrink(),
-                        error: (_error, _stackTrace) => const SizedBox.shrink(),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: LuxSkeleton(height: 54),
+                        ),
+                        error: (_error, _stackTrace) => ErrorState(
+                          message: 'تعذر تحميل الأحياء.',
+                          onRetry: () => ref.invalidate(
+                            areasProvider(_city!.id),
+                          ),
+                        ),
                       ),
                 ],
                 const SizedBox(height: 12),
@@ -624,7 +690,10 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                       LuxSkeleton(width: 92, height: 34, radius: 18),
                     ],
                   ),
-                  error: (error, stackTrace) => const SizedBox.shrink(),
+                  error: (error, stackTrace) => ErrorState(
+                    message: 'تعذر تحميل مزايا العقارات.',
+                    onRetry: () => ref.invalidate(featuresProvider),
+                  ),
                 ),
               ],
             ),

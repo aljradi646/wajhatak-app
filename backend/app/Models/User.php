@@ -82,6 +82,11 @@ class User extends Authenticatable
         return $this->hasOne(UserNotificationPreference::class);
     }
 
+    public function supportTickets(): HasMany
+    {
+        return $this->hasMany(SupportTicket::class);
+    }
+
     public function devices(): HasMany
     {
         return $this->hasMany(UserDevice::class);

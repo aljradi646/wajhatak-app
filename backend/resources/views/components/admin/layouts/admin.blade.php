@@ -6,6 +6,7 @@
     $siteLogo = public_path('storage/branding/logo.png');
     $pendingPropertiesCount = \App\Models\Property::query()->where('status', 'pending')->count();
     $pendingAgentsCount = \App\Models\Agent::query()->where('verification_status', 'pending')->count();
+    $openSupportTicketsCount = \App\Models\SupportTicket::query()->whereIn('status', ['open', 'in_progress', 'waiting_user'])->count();
     $uiPreferences = auth()->check() && is_array(auth()->user()->ui_preferences) ? auth()->user()->ui_preferences : [];
     $serverTheme = in_array($uiPreferences['theme'] ?? null, ['light', 'dark', 'system'], true) ? $uiPreferences['theme'] : null;
     $cookieTheme = request()->cookie('lux_theme');
@@ -119,6 +120,11 @@
                             المستخدمون
                         </x-admin.nav-link>
 
+                        <x-admin.nav-link href="{{ route('admin.support-tickets.index') }}" :active="request()->routeIs('admin.support-tickets.*')" :badge="$openSupportTicketsCount">
+                            <x-slot name="icon"><x-admin.icon name="messages" /></x-slot>
+                            البلاغات والدعم
+                        </x-admin.nav-link>
+
                         <x-admin.nav-link href="{{ route('admin.activity-logs.index') }}" :active="request()->routeIs('admin.activity-logs.*')">
                             <x-slot name="icon"><x-admin.icon name="activity" /></x-slot>
                             سجل النشاطات
@@ -160,6 +166,11 @@
                         </x-admin.nav-link>
 
                         <div x-show="!collapsed" class="pt-4 text-[11px] font-bold uppercase tracking-wider text-gray-400 px-3 dark:text-gray-500" x-cloak>المحتوى</div>
+
+                        <x-admin.nav-link href="{{ route('admin.pages.index') }}" :active="request()->routeIs('admin.pages.*')">
+                            <x-slot name="icon"><x-admin.icon name="book-open" /></x-slot>
+                            صفحات الموقع والسياسات
+                        </x-admin.nav-link>
 
                         <x-admin.nav-link href="{{ route('admin.property-types.index') }}" :active="request()->routeIs('admin.property-types.*')">
                             <x-slot name="icon"><x-admin.icon name="property-types" /></x-slot>

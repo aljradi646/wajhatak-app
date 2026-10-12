@@ -32,7 +32,7 @@ class SettingController extends Controller
         $groups = [
             'عام' => ['site_name', 'site_tagline', 'language', 'default_currency'],
             'تواصل' => ['support_email', 'support_phone', 'address'],
-            'النظام' => ['maintenance_mode', 'registration_enabled'],
+            'النظام' => ['maintenance_mode', 'registration_enabled', 'email_verification_enabled'],
         ];
         $grouped = [];
         foreach ($groups as $label => $keys) {

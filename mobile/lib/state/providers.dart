@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/config/app_config.dart';
+import '../core/services/firebase_push_messaging_service.dart';
+import '../core/services/lux_notification_service.dart';
 import '../data/api_client.dart';
 import '../data/models/models.dart';
 import '../data/preview_fixtures.dart';
@@ -51,15 +53,24 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => NotificationRepository(ref.watch(apiClientProvider)),
 );
 
+final firebasePushMessagingServiceProvider = Provider<FirebasePushMessagingService>(
+  (ref) => FirebasePushMessagingService(
+    ref.watch(apiClientProvider),
+    ref.watch(tokenStoreProvider),
+    ref.watch(localNotificationServiceProvider),
+  ),
+);
+
+final supportTicketRepositoryProvider = Provider<SupportTicketRepository>(
+  (ref) => SupportTicketRepository(ref.watch(apiClientProvider)),
+);
+
 final taxonomyRepositoryProvider = Provider<TaxonomyRepository>(
   (ref) => TaxonomyRepository(ref.watch(apiClientProvider)),
 );
 
 final agentReportRepositoryProvider = Provider<AgentReportRepository>(
-  (ref) => AgentReportRepository(
-    ref.watch(apiClientProvider),
-    ref.watch(tokenStoreProvider),
-  ),
+  (ref) => AgentReportRepository(ref.watch(apiClientProvider)),
 );
 
 final previewFixtureRepositoryProvider =
@@ -72,6 +83,31 @@ final previewFixtureRepositoryProvider =
 // ---------------------------------------------------------------------------
 
 class SessionController extends AsyncNotifier<SessionData?> {
+  bool _refreshingCurrentUser = false;
+
+  Future<void> refreshCurrentUser() async {
+    final current = state.asData?.value;
+    if (current == null || AppConfig.isUiPreview || _refreshingCurrentUser) return;
+    _refreshingCurrentUser = true;
+    try {
+      final user = await ref.read(authRepositoryProvider).refreshCurrentUser();
+      final latest = state.asData?.value;
+      if (latest != null && latest.user.id == current.user.id) {
+        state = AsyncData(latest.copyWith(user: user));
+      }
+    } on ApiFailure catch (error) {
+      if (error.statusCode == 401) {
+        await ref.read(tokenStoreProvider).clear();
+        state = const AsyncData(null);
+        _afterSessionChanged();
+      }
+    } catch (_) {
+      // Keep the current session during a transient network failure.
+    } finally {
+      _refreshingCurrentUser = false;
+    }
+  }
+
   @override
   Future<SessionData?> build() async {
     if (AppConfig.isUiPreview) {
@@ -163,27 +199,29 @@ class SessionController extends AsyncNotifier<SessionData?> {
   /// تسجيل الخروج: API → حذف الرمز → مسح كل الحالة المرتبطة بالمستخدم →
   /// إعادة الواجهة لشاشة الدخول. كل ذلك فور نجاح العملية دون إعادة تشغيل.
   Future<void> logout() async {
-    Object? logoutError;
-    StackTrace? logoutStackTrace;
-    try {
-      if (AppConfig.isUiPreview) {
-        await ref.read(previewFixtureRepositoryProvider.future);
-      } else {
-        await ref.read(authRepositoryProvider).logout();
-      }
-    } catch (error, stackTrace) {
-      logoutError = error;
-      logoutStackTrace = stackTrace;
-    } finally {
-      await _clearAuthenticatedState();
+    // Update app state immediately; remote token revocation is best-effort and
+    // must never hold the user on a signed-in screen.
+    state = const AsyncData(null);
+    _afterSessionChanged();
+
+    if (AppConfig.isUiPreview) {
+      await ref.read(previewFixtureRepositoryProvider.future);
+      return;
     }
 
-    if (logoutError != null) {
-      Error.throwWithStackTrace(
-        logoutError,
-        logoutStackTrace ?? StackTrace.current,
-      );
+    try {
+      await ref.read(firebasePushMessagingServiceProvider)
+          .unregisterCurrentDevice()
+          .timeout(const Duration(seconds: 2));
+    } on Object {
+      // Do not delay sign-out if FCM or the network is unavailable.
     }
+
+    final token = await ref.read(tokenStoreProvider).read();
+    await ref.read(tokenStoreProvider).clear();
+    if (token == null || token.isEmpty) return;
+
+    await ref.read(authRepositoryProvider).logout(accessToken: token);
   }
 
   Future<void> clearExpiredSession() => _clearAuthenticatedState();
@@ -669,6 +707,15 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
     unawaited(refresh());
   }
 }
+
+// ---------------------------------------------------------------------------
+// البلاغات والدعم
+// ---------------------------------------------------------------------------
+final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
+  if (!AppConfig.isUiPreview && ref.watch(sessionProvider).asData?.value == null) return const [];
+  if (AppConfig.isUiPreview) return const [];
+  return ref.watch(supportTicketRepositoryProvider).list();
+});
 
 // ---------------------------------------------------------------------------
 // الإشعارات

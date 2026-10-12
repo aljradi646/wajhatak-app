@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/notice.dart' as util;
+import '../../../core/utils/responsive.dart';
 import '../../../data/api_client.dart';
 import '../../../data/models/models.dart';
 import '../../../state/providers.dart';
@@ -57,19 +58,20 @@ class AgentDashboardScreen extends ConsumerWidget {
     return Scaffold(
       appBar: (ModalRoute.of(context)?.canPop ?? false)
           ? WajhatakScreenHeader(
-              title: 'لوحة الوكيل',
-              subtitle: 'إدارة عقاراتك وطلباتك',
+              title: 'عقاراتي',
+              subtitle: 'إدارة العقارات وحالاتها وطلبات المعاينة',
             )
           : null,
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const CreateListingScreen())),
-        backgroundColor: WajhatakColors.emerald,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
+        heroTag: 'agent_workspace_add_property',
+        tooltip: 'إضافة عقار جديد',
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const CreateListingScreen()),
+        ),
+        icon: const Icon(Icons.add_home_work_rounded),
         label: const Text('إضافة عقار'),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: AwaitContent<void>(
         value: combined,
         onLoading: const _AgentWorkspaceSkeleton(),
@@ -109,10 +111,20 @@ class AgentDashboardScreen extends ConsumerWidget {
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverToBoxAdapter(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _AgentQuickAction(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columns = constraints.maxWidth >= 900
+                          ? 4
+                          : constraints.maxWidth >= 560
+                          ? 3
+                          : 2;
+                      final cellWidth =
+                          (constraints.maxWidth - (columns - 1) * 10) /
+                          columns;
+                      final cellHeight =
+                          (cellWidth * .46).clamp(64.0, 84.0).toDouble();
+                      final actions = <Widget>[
+                        _AgentQuickAction(
                           icon: Icons.calendar_month_outlined,
                           label: 'الطلبات',
                           onTap: () => Navigator.of(context).push(
@@ -121,46 +133,51 @@ class AgentDashboardScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _AgentQuickAction(
+                        _AgentQuickAction(
                           icon: Icons.chat_bubble_outline,
                           label: 'الرسائل',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const MessagesScreen(),
+                              builder: (_) =>
+                                  const MessagesScreen(standalone: true),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _AgentQuickAction(
+                        _AgentQuickAction(
                           icon: Icons.add_home_outlined,
-                          label: 'إضافة',
+                          label: 'إضافة عقار',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => const CreateListingScreen(),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverToBoxAdapter(
-                  child: _AgentQuickAction(
-                    icon: Icons.assessment_outlined,
-                    label: 'التقارير',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AgentReportsScreen(),
-                      ),
-                    ),
+                        _AgentQuickAction(
+                          icon: Icons.assessment_outlined,
+                          label: 'التقارير',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AgentReportsScreen(),
+                            ),
+                          ),
+                        ),
+                      ];
+
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        itemCount: actions.length,
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: columns,
+                              mainAxisExtent: cellHeight,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                            ),
+                        itemBuilder: (context, index) => actions[index],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -183,11 +200,19 @@ class AgentDashboardScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                   sliver: SliverLayoutBuilder(
                     builder: (context, constraints) {
-                      final columns = constraints.crossAxisExtent > 700 ? 3 : 2;
+                      final columns = Responsive.propertyGridColumns(
+                        constraints.crossAxisExtent,
+                      );
+                      final cardWidth =
+                          (constraints.crossAxisExtent -
+                              (columns - 1) * 12) /
+                          columns;
                       return SliverGrid.builder(
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: columns,
-                          childAspectRatio: .72,
+                          childAspectRatio: Responsive.propertyCardAspectRatio(
+                            cardWidth,
+                          ),
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
@@ -231,25 +256,45 @@ class _AgentWorkspaceSkeleton extends StatelessWidget {
   const _AgentWorkspaceSkeleton();
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(20),
-    children: [
-      const LuxSkeleton(height: 172, radius: 24),
-      const SizedBox(height: 16),
-      Row(
-        children: const [
-          Expanded(child: LuxSkeleton(height: 82)),
-          SizedBox(width: 10),
-          Expanded(child: LuxSkeleton(height: 82)),
-          SizedBox(width: 10),
-          Expanded(child: LuxSkeleton(height: 82)),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 900
+          ? 4
+          : constraints.maxWidth >= 560
+          ? 3
+          : 2;
+      final cellWidth =
+          (constraints.maxWidth - (columns - 1) * 10) / columns;
+      final cellHeight =
+          (cellWidth * .46).clamp(64.0, 84.0).toDouble();
+
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          const LuxSkeleton(height: 172, radius: 24),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 4,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              mainAxisExtent: cellHeight,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemBuilder: (_, _) => const LuxSkeleton(height: 64, radius: 18),
+          ),
+          const SizedBox(height: 28),
+          const LuxSkeleton(width: 110, height: 22),
+          const SizedBox(height: 12),
+          const PropertyGridSkeleton(
+            count: 4,
+            padding: EdgeInsets.zero,
+          ),
         ],
-      ),
-      const SizedBox(height: 28),
-      const LuxSkeleton(width: 110, height: 22),
-      const SizedBox(height: 12),
-      const PropertyGridSkeleton(count: 4),
-    ],
+      );
+    },
   );
 }
 
@@ -340,6 +385,8 @@ class _AgentMetric extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 11,
             color: Theme.of(
@@ -363,31 +410,64 @@ class _AgentQuickAction extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surface,
-    borderRadius: BorderRadius.circular(18),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
-        decoration: BoxDecoration(
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxWidth < 170;
+      final theme = Theme.of(context);
+      return Material(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Theme.of(context).colorScheme.outline),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: WajhatakColors.emerald),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              vertical: compact ? 7 : 12,
+              horizontal: compact ? 8 : 14,
             ),
-          ],
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: compact
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, color: WajhatakColors.emerald, size: 20),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: WajhatakColors.emerald),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
