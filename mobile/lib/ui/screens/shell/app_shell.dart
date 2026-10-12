@@ -47,6 +47,9 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void initState() {
     super.initState();
+    final realtime = ref.read(realtimeServiceProvider);
+    realtime.onEvent = _handleRealtimeEvent;
+    if (ref.read(sessionProvider).asData?.value != null) unawaited(realtime.start());
     final service = ref.read(localNotificationServiceProvider);
     service.onNotificationResponse = _openFromSystemNotification;
     unawaited(service.initialize());
@@ -56,13 +59,13 @@ class _AppShellState extends ConsumerState<AppShell> {
     unawaited(push.initializeAndRegister());
     // Polling محسوب للإشعارات والمحادثات — 25 ثانية، فقط عند وجود جلسة.
     _notificationTimer = Timer.periodic(const Duration(seconds: 25), (_) {
-      if (ref.read(sessionProvider).asData?.value != null) {
+      if (ref.read(sessionProvider).asData?.value != null && !ref.read(realtimeServiceProvider).isConnected) {
         ref.invalidate(notificationsProvider);
         ref.invalidate(unreadNotificationCountProvider);
         ref.invalidate(conversationsProvider);
       }
     });
-    _sessionRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _sessionRefreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (mounted && ref.read(sessionProvider).asData?.value != null) {
         unawaited(ref.read(sessionProvider.notifier).refreshCurrentUser());
       }
@@ -73,6 +76,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   void dispose() {
     _notificationTimer?.cancel();
     _sessionRefreshTimer?.cancel();
+    unawaited(ref.read(realtimeServiceProvider).stop());
     super.dispose();
   }
 
