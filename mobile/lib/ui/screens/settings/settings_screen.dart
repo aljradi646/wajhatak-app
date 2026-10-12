@@ -10,7 +10,7 @@ import '../../../state/appearance_controller.dart';
 import '../../../state/providers.dart';
 import '../../widgets.dart';
 import '../agent/agent_dashboard_screen.dart';
-import '../profile/profile_screen.dart';
+import '../profile/profile_screen.dart';\nimport '../support/legal_pages_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
