@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\PropertyStatus;
 use App\Enums\TransactionType;
+use App\Jobs\SendFcmPushNotification;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Agent;
@@ -15,6 +16,7 @@ use App\Models\PropertyType;
 use App\Notifications\PropertyModerationResult;
 use App\Mail\PropertyModerationMail;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Notifications\Notification as BaseNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -108,7 +110,9 @@ class PropertyController extends Controller
         $property->loadMissing('agent.user');
         $recipient = $property->agent?->user;
         if ($recipient) {
-            $recipient->notify(new PropertyModerationResult($property, 'approved'));
+            $notification = new PropertyModerationResult($property, 'approved');
+            $recipient->notify($notification);
+            $this->queuePushNotification($recipient, $notification);
             $this->queueModerationEmail($recipient, $property, 'approved');
         }
         ActivityLog::record('property', "تمت الموافقة على العقار «{$property->title}» ({$property->reference_code}) ونشره", $property);
@@ -127,7 +131,9 @@ class PropertyController extends Controller
         $property->loadMissing('agent.user');
         $recipient = $property->agent?->user;
         if ($recipient) {
-            $recipient->notify(new PropertyModerationResult($property, 'rejected', $reason));
+            $notification = new PropertyModerationResult($property, 'rejected', $reason);
+            $recipient->notify($notification);
+            $this->queuePushNotification($recipient, $notification);
             $this->queueModerationEmail($recipient, $property, 'rejected', $reason);
         }
         ActivityLog::record('property', "تم رفض العقار «{$property->title}» ({$property->reference_code})", $property, properties: ['reason' => $reason]);
@@ -294,6 +300,16 @@ class PropertyController extends Controller
         ActivityLog::record('property', "{$msg} ({$properties->count()} عنصر)", null, properties: ['action' => $data['action'], 'ids' => $properties->pluck('id')->all()]);
 
         return back()->with('status', $msg);
+    }
+
+    private function queuePushNotification(\App\Models\User $recipient, BaseNotification $notification): void
+    {
+        try {
+            SendFcmPushNotification::dispatch((int) $recipient->id, (string) $notification->id);
+        } catch (\Throwable $exception) {
+            // The database notification is already persisted; push outages must not fail moderation.
+            report($exception);
+        }
     }
 
     private function queueModerationEmail(\App\Models\User $recipient, Property $property, string $decision, ?string $reason = null): void
