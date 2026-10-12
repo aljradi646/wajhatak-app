@@ -48,7 +48,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
     // Polling خفيف للرسائل الجديدة كل 6 ثوان — تحديث خلفي بدون اهتزاز.
     _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (mounted) {
+      if (mounted && !ref.read(realtimeServiceProvider).isConnected) {
         ref.read(messagesProvider(widget.conversation.id).notifier).refresh();
         ref.invalidate(conversationsProvider);
       }
