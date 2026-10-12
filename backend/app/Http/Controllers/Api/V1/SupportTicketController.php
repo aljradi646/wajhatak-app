@@ -9,7 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupportTicketController extends Controller
 {
@@ -57,11 +57,12 @@ class SupportTicketController extends Controller
         ]);
 
         foreach ($request->file('attachments', []) as $file) {
-            $path = $file->store('support-tickets/'.$ticket->id, 'local');
+            $disk = config('support.tickets.disk', 'local');
+            $path = $file->store('support-tickets/'.$ticket->id, $disk);
             $ticket->attachments()->create([
                 'support_ticket_message_id' => $message->id,
                 'uploaded_by' => $request->user()->id,
-                'disk' => 'local',
+                'disk' => $disk,
                 'path' => $path,
                 'original_name' => Str::limit(preg_replace('/[^\pL\pN._ -]/u', '_', basename($file->getClientOriginalName())) ?: 'attachment', 255, ''),
                 'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
@@ -85,14 +86,14 @@ class SupportTicketController extends Controller
         ]);
     }
 
-    public function downloadAttachment(Request $request, SupportTicket $ticket, SupportTicketAttachment $attachment): BinaryFileResponse
+    public function downloadAttachment(Request $request, SupportTicket $ticket, SupportTicketAttachment $attachment): StreamedResponse
     {
         abort_unless((int) $ticket->user_id === (int) $request->user()->id, 404);
         abort_unless((int) $attachment->support_ticket_id === (int) $ticket->id, 404);
         abort_unless(Storage::disk($attachment->disk)->exists($attachment->path), 404);
 
-        return response()->download(
-            Storage::disk($attachment->disk)->path($attachment->path),
+        return Storage::disk($attachment->disk)->download(
+            $attachment->path,
             $attachment->original_name,
             ['X-Content-Type-Options' => 'nosniff']
         );
