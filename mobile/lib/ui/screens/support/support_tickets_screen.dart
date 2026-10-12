@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/icon_badges.dart';
 import '../../../data/api_client.dart';
 import '../../../data/models/models.dart';
@@ -48,13 +49,37 @@ class CreateSupportTicketScreen extends ConsumerStatefulWidget {
 }
 class _CreateSupportTicketScreenState extends ConsumerState<CreateSupportTicketScreen> {
   final _form=GlobalKey<FormState>();final _subject=TextEditingController();final _message=TextEditingController();
-  String _category='technical';bool _sending=false;
+  String _category='technical';bool _sending=false;final List<XFile> _attachments=[];
   @override void dispose(){_subject.dispose();_message.dispose();super.dispose();}
+  Future<void> _pickImages() async {
+    if (_sending) return;
+    try {
+      final picked = await ImagePicker().pickMultiImage(
+        imageQuality: 85,
+        maxWidth: 1800,
+      );
+      if (!mounted || picked.isEmpty) return;
+      final remaining = 5 - _attachments.length;
+      setState(() => _attachments.addAll(picked.take(remaining)));
+      if (picked.length > remaining && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('يمكن إرفاق خمس صور كحد أقصى.')),
+        );
+      }
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر اختيار الصور. حاول مرة أخرى.')),
+        );
+      }
+    }
+  }
+
   Future<void> _submit()async{
     if(!(_form.currentState?.validate()??false)||_sending)return;
     setState(()=>_sending=true);
     try{
-      final ticket=await ref.read(supportTicketRepositoryProvider).create(subject:_subject.text,category:_category,message:_message.text);
+      final ticket=await ref.read(supportTicketRepositoryProvider).create(subject:_subject.text,category:_category,message:_message.text,attachments:_attachments);
       ref.invalidate(supportTicketsProvider);if(!mounted)return;
       Navigator.of(context).pop(true);
       Navigator.of(context).push(MaterialPageRoute(builder:(_)=>SupportTicketDetailScreen(ticketId:ticket.id)));
@@ -78,6 +103,27 @@ class _CreateSupportTicketScreenState extends ConsumerState<CreateSupportTicketS
       ],onChanged:(v){if(v!=null)setState(()=>_category=v);}),
       const SizedBox(height:14),
       TextFormField(controller:_message,decoration:const InputDecoration(labelText:'تفاصيل المشكلة',hintText:'اشرح ما حدث وما الذي كنت تحاول فعله...',alignLabelWithHint:true),minLines:6,maxLines:12,maxLength:10000,validator:(v)=>(v??'').trim().length<10?'أضف تفاصيل أكثر (10 أحرف على الأقل).':null),
+      const SizedBox(height:14),
+      OutlinedButton.icon(
+        onPressed: _sending || _attachments.length >= 5 ? null : _pickImages,
+        icon: const Icon(Icons.attach_file_rounded),
+        label: Text('إرفاق صور (' + _attachments.length.toString() + '/5)'),
+      ),
+      if (_attachments.isNotEmpty) ...[
+        const SizedBox(height:8),
+        Wrap(
+          spacing:8,
+          runSpacing:8,
+          children: _attachments.asMap().entries.map((entry) => InputChip(
+            avatar: const Icon(Icons.image_outlined, size:18),
+            label: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth:180),
+              child: Text(entry.value.name, overflow: TextOverflow.ellipsis),
+            ),
+            onDeleted: _sending ? null : () => setState(() => _attachments.removeAt(entry.key)),
+          )).toList(),
+        ),
+      ],
       const SizedBox(height:10),
       Container(padding:const EdgeInsets.all(13),decoration:BoxDecoration(color:Theme.of(context).colorScheme.secondaryContainer.withValues(alpha:.45),borderRadius:BorderRadius.circular(14)),child:const Text('لا تكتب كلمة المرور أو رمز التحقق أو معلومات دفع حساسة في البلاغ.',style:TextStyle(height:1.5))),
       const SizedBox(height:22),FilledButton.icon(onPressed:_sending?null:_submit,icon:_sending?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.send_rounded),label:Padding(padding:const EdgeInsets.symmetric(vertical:13),child:Text(_sending?'جارٍ إرسال البلاغ…':'إرسال البلاغ'))),
