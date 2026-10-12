@@ -113,6 +113,7 @@ class UserController extends Controller
             'avatar_path' => ['nullable', 'string', 'max:500'],
             'is_active' => ['sometimes', 'boolean'],
             'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', Rule::exists('roles', 'name')],
         ]);
 
         $wantsInactive = ! $request->boolean('is_active');
