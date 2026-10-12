@@ -101,7 +101,7 @@ class SupportTicketController extends Controller
     public function reply(Request $request, SupportTicket $ticket): JsonResponse
     {
         abort_unless((int) $ticket->user_id === (int) $request->user()->id, 404);
-        abort_if($ticket->status === 'closed', 409, 'أُغلق هذا البلاغ. أنشئ بلاغًا جديدًا إذا استمرت المشكلة.');
+        abort_if(in_array($ticket->status, ['closed', 'rejected'], true), 409, 'أُغلق هذا البلاغ أو رُفض. أنشئ بلاغًا جديدًا إذا استمرت المشكلة.');
 
         $data = $request->validate([
             'message' => ['required', 'string', 'min:2', 'max:10000'],
