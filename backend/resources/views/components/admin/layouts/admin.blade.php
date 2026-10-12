@@ -125,6 +125,11 @@
                             البلاغات والدعم
                         </x-admin.nav-link>
 
+                        <x-admin.nav-link href="{{ route('admin.contact-submissions.index') }}" :active="request()->routeIs('admin.contact-submissions.*')" :badge="$newContactSubmissionsCount">
+                            <x-slot name="icon"><x-admin.icon name="messages" /></x-slot>
+                            رسائل الموقع العام
+                        </x-admin.nav-link>
+
                         <x-admin.nav-link href="{{ route('admin.activity-logs.index') }}" :active="request()->routeIs('admin.activity-logs.*')">
                             <x-slot name="icon"><x-admin.icon name="activity" /></x-slot>
                             سجل النشاطات
