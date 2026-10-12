@@ -23,7 +23,7 @@ class SupportTicketController extends Controller
     public function index(Request $request): View
     {
         $filters = $request->validate([
-            'status' => ['nullable', 'in:open,in_progress,waiting_user,resolved,closed'],
+            'status' => ['nullable', 'in:open,in_progress,waiting_user,resolved,closed,rejected,rejected'],
             'category' => ['nullable', 'in:account,property,agent,security,technical,other'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
@@ -67,6 +67,7 @@ class SupportTicketController extends Controller
             'toFilter' => $to,
             'counts' => [
                 'open' => SupportTicket::where('status', 'open')->count(),
+                'rejected' => SupportTicket::where('status', 'rejected')->count(),
                 'in_progress' => SupportTicket::where('status', 'in_progress')->count(),
                 'waiting_user' => SupportTicket::where('status', 'waiting_user')->count(),
                 'resolved' => SupportTicket::where('status', 'resolved')->count(),
@@ -96,7 +97,7 @@ class SupportTicketController extends Controller
     {
         $data = $request->validate([
             'message' => ['required', 'string', 'min:2', 'max:10000'],
-            'status' => ['nullable', 'in:in_progress,waiting_user,resolved,closed'],
+            'status' => ['nullable', 'in:in_progress,waiting_user,resolved,closed,rejected'],
             'send_email' => ['nullable', 'boolean'],
         ]);
         $sendEmail = $request->boolean('send_email');
