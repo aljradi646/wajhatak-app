@@ -24,12 +24,16 @@ class FcmPushService
         $data = [];
         foreach ($payload as $key => $value) {
             if (is_scalar($value) && $value !== '') {
-                $data[(string) $key] = (string) $value;
+                $stringValue = (string) $value;
+                if (in_array((string) $key, ['message', 'reason'], true)) {
+                    $stringValue = mb_substr($stringValue, 0, 500);
+                }
+                $data[(string) $key] = $stringValue;
             }
         }
 
         $title = (string) ($payload['title'] ?? 'وجهتك');
-        $body = (string) ($payload['message'] ?? 'لديك إشعار جديد في وجهتك.');
+        $body = mb_substr((string) ($payload['message'] ?? 'لديك إشعار جديد في وجهتك.'), 0, 500);
         $response = Http::withToken($accessToken)
             ->acceptJson()
             ->timeout(8)
