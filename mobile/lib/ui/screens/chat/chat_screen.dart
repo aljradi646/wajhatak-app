@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/navigation/active_chat_context.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/format_money.dart';
 import '../../../core/utils/notice.dart' as util;
@@ -37,6 +38,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    ActiveChatContext.conversationId = widget.conversation.id;
+    ref.invalidate(notificationsProvider);
     // تحديث فوري عند فتح المحادثة (لا يُستخدم الكاش القديم) —
     // بنفس صرامه تحديث جرس الإشعارات.
     if (ref.exists(messagesProvider(widget.conversation.id))) {
@@ -53,6 +56,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    if (ActiveChatContext.conversationId == widget.conversation.id) {
+      ActiveChatContext.conversationId = null;
+    }
     _refreshTimer?.cancel();
     _controller.dispose();
     super.dispose();
