@@ -2,6 +2,11 @@
 
 return [
 
+    'realtime' => [
+        'publish_url' => env('REALTIME_PUBLISH_URL'),
+        'shared_secret' => env('REALTIME_SHARED_SECRET'),
+    ],
+
     'firebase' => [
         'project_id' => env('FIREBASE_PROJECT_ID'),
         'client_email' => env('FIREBASE_CLIENT_EMAIL'),
