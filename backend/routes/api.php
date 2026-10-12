@@ -105,7 +105,7 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
         Route::get('support-tickets', [SupportTicketController::class, 'index'])->name('support-tickets.index');
         Route::post('support-tickets', [SupportTicketController::class, 'store'])->middleware('throttle:5,1')->name('support-tickets.store');
         Route::get('support-tickets/{ticket}', [SupportTicketController::class, 'show'])->whereNumber('ticket')->name('support-tickets.show');
-        Route::get('support-tickets/{ticket}/attachments/{attachment}', [SupportTicketController::class, 'downloadAttachment'])->whereNumber(['ticket', 'attachment'])->name('support-tickets.attachments.download');
+        Route::get('support-tickets/{ticket}/attachments/{attachment}', [SupportTicketController::class, 'downloadAttachment'])->whereNumber('ticket')->whereNumber('attachment')->name('support-tickets.attachments.download');
         Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->middleware('throttle:10,1')->whereNumber('ticket')->name('support-tickets.reply');
 
         // محادثات المساعد (تتطلب حسابًا) — عزل ملكية كامل داخل المتحكم.
