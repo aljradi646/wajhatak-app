@@ -197,13 +197,15 @@ class SettingsScreen extends ConsumerWidget {
                 ],
                 ListTile(
                   leading: const Icon(Icons.privacy_tip_outlined),
-                  title: const Text('الخصوصية والبيانات'),
+                  title: const Text('السياسات والخصوصية'),
                   subtitle: const Text(
-                    'تحفظ رموز الجلسة في التخزين الآمن على جهازك.',
+                    'سياسة الخصوصية وشروط الاستخدام ومعلومات المنصة.',
                   ),
-                  onTap: () => util.notice(
-                    context,
-                    'تُدار صلاحيات الوصول والبيانات الحساسة من الخادم.',
+                  trailing: const Icon(Icons.chevron_left_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const LegalPagesScreen(),
+                    ),
                   ),
                 ),
               ],
