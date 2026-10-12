@@ -96,7 +96,7 @@ class LoginRequest extends FormRequest
                 'user_agent' => substr((string) $this->userAgent(), 0, 1000),
                 'attempted_at' => now(),
             ]);
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             report($exception);
         }
     }
