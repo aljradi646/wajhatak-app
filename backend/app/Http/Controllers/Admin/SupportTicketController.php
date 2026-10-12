@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class SupportTicketController extends Controller
@@ -81,13 +81,13 @@ class SupportTicketController extends Controller
         return view('admin.support-tickets.show', compact('ticket'));
     }
 
-    public function downloadAttachment(SupportTicket $ticket, SupportTicketAttachment $attachment): BinaryFileResponse
+    public function downloadAttachment(SupportTicket $ticket, SupportTicketAttachment $attachment): StreamedResponse
     {
         abort_unless((int) $attachment->support_ticket_id === (int) $ticket->id, 404);
         abort_unless(Storage::disk($attachment->disk)->exists($attachment->path), 404);
 
-        return response()->download(
-            Storage::disk($attachment->disk)->path($attachment->path),
+        return Storage::disk($attachment->disk)->download(
+            $attachment->path,
             $attachment->original_name,
             ['X-Content-Type-Options' => 'nosniff']
         );
