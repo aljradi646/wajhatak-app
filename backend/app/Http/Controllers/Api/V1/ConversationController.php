@@ -83,6 +83,13 @@ class ConversationController extends Controller
         $this->ensureParticipant($request, $conversation);
         $conversation->messages()->where('sender_id', '!=', $request->user()->id)->whereNull('read_at')->update(['read_at' => now()]);
 
+        // Opening a conversation also marks its linked message notifications as read.
+        $request->user()->notifications()
+            ->where('type', MessageReceived::class)
+            ->whereNull('read_at')
+            ->where('data->conversation_id', $conversation->id)
+            ->update(['read_at' => now()]);
+
         return MessageResource::collection($conversation->messages()->with(['sender', 'property.images', 'property.location'])->latest()->paginate(30));
     }
 
