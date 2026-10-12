@@ -80,6 +80,22 @@ class _AppShellState extends ConsumerState<AppShell> {
     super.dispose();
   }
 
+  void _handleRealtimeEvent(String event, Map<String, dynamic> data) {
+    if (!mounted) return;
+    if (event == 'message.received' || event == 'notifications.updated') {
+      ref.invalidate(notificationsProvider);
+      ref.invalidate(unreadNotificationCountProvider);
+      ref.invalidate(conversationsProvider);
+      final id = int.tryParse(data['conversation_id']?.toString() ?? '');
+      if (id != null && id == ActiveChatContext.conversationId) {
+        ref.invalidate(messagesProvider(id));
+      }
+    } else if (event == 'conversation.read') {
+      ref.invalidate(conversationsProvider);
+      final id = int.tryParse(data['conversation_id']?.toString() ?? '');
+      if (id != null) ref.invalidate(messagesProvider(id));
+    }
+  }
   /// فتح المصدر من إشعار نظام (التطبيق في الخلفية).
   Future<void> _openFromSystemNotification(String? notificationId) async {
     if (notificationId == null) return;
