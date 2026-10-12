@@ -3,16 +3,14 @@
 namespace App\Notifications;
 
 use App\Models\Message;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Str;
 use Illuminate\Notifications\Notification;
 
-class MessageReceived extends Notification implements ShouldQueue
+class MessageReceived extends Notification
 {
-    use Queueable;
-
     public function __construct(private readonly Message $message)
     {
+        $this->id = (string) Str::uuid();
     }
 
     public function via(object $notifiable): array
