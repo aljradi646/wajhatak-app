@@ -6,6 +6,8 @@ const port = Number(process.env.PORT || 3001);
 const secret = String(process.env.REALTIME_SHARED_SECRET || '');
 const maxBodyBytes = 64 * 1024;
 const clients = new Map();
+const usedNonces = new Map();
+const maxConnectionsPerUser = 5;
 
 if (secret.length < 32) {
   throw new Error('REALTIME_SHARED_SECRET must be at least 32 characters.');
@@ -127,6 +129,18 @@ server.on('upgrade', (request, socket, head) => {
     socket.destroy();
     return;
   }
+
+  const now = Math.floor(Date.now() / 1000);
+  for (const [nonce, expiresAt] of usedNonces) {
+    if (expiresAt < now) usedNonces.delete(nonce);
+  }
+  const userRoom = clients.get(String(identity.userId));
+  if (usedNonces.has(identity.nonce) || (userRoom && userRoom.size >= maxConnectionsPerUser)) {
+    socket.write('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+  usedNonces.set(identity.nonce, identity.expiresAt);
 
   wss.handleUpgrade(request, socket, head, websocket => {
     websocket.userId = String(identity.userId);
