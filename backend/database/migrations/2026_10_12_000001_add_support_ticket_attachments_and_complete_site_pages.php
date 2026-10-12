@@ -59,25 +59,20 @@ return new class extends Migration {
         ];
 
         foreach ($pages as $page) {
-            DB::table('site_pages')->updateOrInsert(
-                ['slug' => $page['slug']],
-                [
-                    ...$page,
-                    'is_published' => true,
-                    'seo_title' => $page['title'],
-                    'seo_description' => $page['summary'],
-                    'updated_at' => $now,
-                    'created_at' => $now,
-                ]
-            );
+            DB::table('site_pages')->insertOrIgnore([
+                'slug' => $page['slug'],
+                ...$page,
+                'is_published' => true,
+                'seo_title' => $page['title'],
+                'seo_description' => $page['summary'],
+                'updated_at' => $now,
+                'created_at' => $now,
+            ]);
         }
     }
 
     public function down(): void
     {
         Schema::dropIfExists('support_ticket_attachments');
-        DB::table('site_pages')->whereIn('slug', [
-            'usage-policy', 'refund-cancellation', 'cookies', 'faq',
-        ])->delete();
     }
 };
