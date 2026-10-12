@@ -1,4 +1,4 @@
-@props(['name' => 'help', 'class' => 'h-5 w-5'])
+@props(['name' => 'help'])
 @php
 $paths = [
     'search' => '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path>',
@@ -23,4 +23,4 @@ $paths = [
     'alert' => '<path d="m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0z"></path><path d="M12 9v4M12 17h.01"></path>',
 ];
 @endphp
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="{{ $class }}" aria-hidden="true">{!! $paths[$name] ?? $paths['help'] !!}</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="{{ $attributes->get('class', 'h-5 w-5') }}" aria-hidden="true">{!! $paths[$name] ?? $paths['help'] !!}</svg>
