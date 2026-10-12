@@ -1,21 +1,21 @@
 <?php
 
-namespace App\\Http\\Controllers\\Admin;
+namespace App\Http\Controllers\Admin;
 
-use App\\Http\\Controllers\\Controller;
-use App\\Models\\ActivityLog;
-use App\\Models\\SupportTicket;
-use App\\Models\\SupportTicketAttachment;
-use App\\Models\\SupportTicketMessage;
-use App\\Services\\Mail\\UnifiedMailService;
-use App\\Services\\Notifications\\FirebasePushNotificationService;
-use Illuminate\\Http\\RedirectResponse;
-use Illuminate\\Http\\Request;
-use Illuminate\\Support\\Facades\\DB;
-use Illuminate\\Support\\Facades\\Storage;
-use Illuminate\\Support\\Str;
-use Illuminate\\View\\View;
-use Symfony\\Component\\HttpFoundation\\BinaryFileResponse;
+use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
+use App\Models\SupportTicket;
+use App\Models\SupportTicketAttachment;
+use App\Models\SupportTicketMessage;
+use App\Services\Mail\UnifiedMailService;
+use App\Services\Notifications\FirebasePushNotificationService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 class SupportTicketController extends Controller
