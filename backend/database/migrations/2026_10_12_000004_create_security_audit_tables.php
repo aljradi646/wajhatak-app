@@ -8,6 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::table('users', function (Blueprint $table): void {
+            $table->text('two_factor_secret')->nullable();
+            $table->timestamp('two_factor_enabled_at')->nullable();
+        });
+
         Schema::create('failed_login_attempts', function (Blueprint $table): void {
             $table->id();
             $table->char('email_hash', 64)->index();
@@ -55,6 +60,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        Schema::table('users', function (Blueprint $table): void {
+            $table->dropColumn(['two_factor_secret', 'two_factor_enabled_at']);
+        });
+
         Schema::table('notifications', function (Blueprint $table): void {
             $table->dropIndex('notifications_owner_read_created_idx');
             $table->dropIndex('notifications_ref_idx');
