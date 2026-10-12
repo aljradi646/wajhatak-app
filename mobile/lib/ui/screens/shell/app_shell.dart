@@ -51,6 +51,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     unawaited(service.initialize());
     unawaited(_handleLaunchNotification());
     final push = ref.read(firebasePushMessagingServiceProvider);
+    push.onRoleChanged = () async {
+      if (mounted) await ref.read(sessionProvider.notifier).refreshCurrentUser();
+    };
     push.onNotificationOpened = _openFromSystemNotification;
     unawaited(push.initializeAndRegister());
     // Polling محسوب للإشعارات والمحادثات — 25 ثانية، فقط عند وجود جلسة.
