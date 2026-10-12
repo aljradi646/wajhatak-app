@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/responsive.dart';
 import '../../../data/api_client.dart';
 import '../feedback/empty_state.dart';
 
@@ -29,7 +30,6 @@ abstract class _MinimumLoadingState<W extends StatefulWidget> extends State<W> {
 
   bool get _isMinimumLoadingActive => _minimumLoadingActive;
 
-  @override
   @override
   void initState() {
     super.initState();
@@ -409,6 +409,7 @@ class PropertyDetailsSkeleton extends StatelessWidget {
         : width >= 600
         ? 400.0
         : 330.0;
+    final contentWidth = (width - 40).clamp(0.0, width).toDouble();
 
     return _LuxShimmer(
       child: CustomScrollView(
@@ -427,21 +428,34 @@ class PropertyDetailsSkeleton extends StatelessWidget {
                 child: LuxSkeleton(width: 40, height: 40, radius: 20),
               ),
             ],
-            flexibleSpace: const FlexibleSpaceBar(
-              background: LuxSkeleton(height: 460, radius: 0),
+            flexibleSpace: FlexibleSpaceBar(
+              background: LuxSkeleton(height: expandedHeight, radius: 0),
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 150),
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
             sliver: SliverList.list(
               children: [
-                const LuxSkeleton(width: 260, height: 30, radius: 9),
+                LuxSkeleton(
+                  width: contentWidth * .92,
+                  height: 30,
+                  radius: 9,
+                ),
                 const SizedBox(height: 10),
-                Row(
-                  children: const [
-                    LuxSkeleton(width: 150, height: 38, radius: 14),
-                    SizedBox(width: 8),
-                    LuxSkeleton(width: 100, height: 30, radius: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    LuxSkeleton(
+                      width: contentWidth >= 260 ? 150 : contentWidth * .58,
+                      height: 38,
+                      radius: 14,
+                    ),
+                    LuxSkeleton(
+                      width: contentWidth >= 260 ? 100 : contentWidth * .34,
+                      height: 30,
+                      radius: 14,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -597,8 +611,24 @@ class ExploreSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final columns = constraints.maxWidth >= 700 ? 3 : 2;
-      return PropertyGridSkeleton(count: 6, columns: columns);
+      final columns = Responsive.propertyGridColumns(constraints.maxWidth);
+      final cardWidth =
+          (constraints.maxWidth - (columns - 1) * 14) / columns;
+
+      return _LuxShimmer(
+        child: GridView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          physics: const AlwaysScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: Responsive.propertyCardAspectRatio(cardWidth),
+          ),
+          itemCount: 6,
+          itemBuilder: (_, _) => const PropertyCardSkeleton(),
+        ),
+      );
     },
   );
 }
@@ -665,21 +695,83 @@ class AgentProfileSkeleton extends StatelessWidget {
     child: CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
-          child: Padding(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(8, 8, 8, 12),
             padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
             child: Column(
-              children: const [
-                LuxSkeleton(width: 92, height: 92, radius: 46),
-                SizedBox(height: 14),
-                LuxSkeleton(width: 180, height: 22, radius: 8),
-                SizedBox(height: 9),
-                LuxSkeleton(width: 240, height: 15, radius: 7),
-                SizedBox(height: 18),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const LuxSkeleton(width: 80, height: 80, radius: 40),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          FractionallySizedBox(
+                            widthFactor: .76,
+                            alignment: AlignmentDirectional.centerStart,
+                            child: const LuxSkeleton(height: 22, radius: 8),
+                          ),
+                          const SizedBox(height: 8),
+                          FractionallySizedBox(
+                            widthFactor: .48,
+                            alignment: AlignmentDirectional.centerStart,
+                            child: const LuxSkeleton(height: 15, radius: 7),
+                          ),
+                          const SizedBox(height: 8),
+                          FractionallySizedBox(
+                            widthFactor: .58,
+                            alignment: AlignmentDirectional.centerStart,
+                            child: const LuxSkeleton(height: 13, radius: 7),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
                 Row(
                   children: [
-                    Expanded(child: LuxSkeleton(height: 58, radius: 16)),
+                    Expanded(
+                      child: Row(
+                        children: const [
+                          LuxSkeleton(width: 24, height: 20, radius: 7),
+                          SizedBox(width: 7),
+                          LuxSkeleton(width: 52, height: 15, radius: 7),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Row(
+                        children: const [
+                          LuxSkeleton(width: 24, height: 20, radius: 7),
+                          SizedBox(width: 7),
+                          LuxSkeleton(width: 52, height: 15, radius: 7),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const SizedBox(
+                  width: double.infinity,
+                  child: LuxSkeleton(height: 60, radius: 12),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: const [
+                    Expanded(child: LuxSkeleton(height: 48, radius: 14)),
                     SizedBox(width: 10),
-                    Expanded(child: LuxSkeleton(height: 58, radius: 16)),
+                    Expanded(child: LuxSkeleton(height: 48, radius: 14)),
                   ],
                 ),
               ],
@@ -687,16 +779,28 @@ class AgentProfileSkeleton extends StatelessWidget {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          sliver: SliverGrid.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 14,
-              childAspectRatio: .72,
-            ),
-            itemCount: 4,
-            itemBuilder: (_, _) => const PropertyCardSkeleton(),
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+          sliver: SliverLayoutBuilder(
+            builder: (context, constraints) {
+              final columns = Responsive.propertyGridColumns(
+                constraints.crossAxisExtent,
+              );
+              final cardWidth =
+                  (constraints.crossAxisExtent - (columns - 1) * 10) /
+                  columns;
+              return SliverGrid.builder(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: Responsive.propertyCardAspectRatio(
+                    cardWidth,
+                  ),
+                ),
+                itemCount: 4,
+                itemBuilder: (_, _) => const PropertyCardSkeleton(),
+              );
+            },
           ),
         ),
       ],
@@ -710,23 +814,176 @@ class AgentReportSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _LuxShimmer(
-    child: Column(
-      children: [
-        const LuxSkeleton(height: 92),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        // The real KPI grid sits inside a Card with 14px padding per side.
+        final contentWidth =
+            (constraints.maxWidth - 28).clamp(0.0, constraints.maxWidth).toDouble();
+        final columns = contentWidth >= 1000
+            ? 4
+            : contentWidth >= 640
+                ? 3
+                : contentWidth >= 240
+                    ? 2
+                    : 1;
+        final cardWidth =
+            (contentWidth - (columns - 1) * 10) / columns;
+        final cardRatio = columns == 1 ? 2.7 : cardWidth < 150 ? 1.8 : 2.0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(width: 160, child: LuxSkeleton(height: 72)),
-            SizedBox(width: 160, child: LuxSkeleton(height: 72)),
-            SizedBox(width: 160, child: LuxSkeleton(height: 72)),
-            SizedBox(width: 160, child: LuxSkeleton(height: 72)),
+            // Matches the report summary card: title, description, filters,
+            // then KPI cards — all placeholders remain inside the same card.
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FractionallySizedBox(
+                      widthFactor: .62,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: const LuxSkeleton(height: 22, radius: 8),
+                    ),
+                    const SizedBox(height: 7),
+                    FractionallySizedBox(
+                      widthFactor: .94,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: const LuxSkeleton(height: 13, radius: 7),
+                    ),
+                    const SizedBox(height: 9),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: const [
+                        LuxSkeleton(width: 84, height: 24, radius: 12),
+                        LuxSkeleton(width: 106, height: 24, radius: 12),
+                        LuxSkeleton(width: 76, height: 24, radius: 12),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: 4,
+                      gridDelegate:
+                          SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: columns,
+                            childAspectRatio: cardRatio,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                          ),
+                      itemBuilder: (_, _) => Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withValues(alpha: .55),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            FractionallySizedBox(
+                              widthFactor: .78,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: const LuxSkeleton(height: 12, radius: 6),
+                            ),
+                            const Spacer(),
+                            FractionallySizedBox(
+                              widthFactor: .55,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: const LuxSkeleton(height: 18, radius: 7),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Report rows are a horizontally scrollable DataTable. Mirror its
+            // header and row heights, retaining horizontal scrolling on phones.
+            Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+                      child: Row(
+                        children: [
+                          for (var index = 0; index < 4; index++) ...[
+                            SizedBox(
+                              width: 112,
+                              child: LuxSkeleton(
+                                width: 76,
+                                height: 15,
+                                radius: 7,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Container(
+                      height: 1,
+                      width: 472,
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    for (var row = 0; row < 4; row++) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 13,
+                        ),
+                        child: Row(
+                          children: [
+                            for (var column = 0; column < 4; column++) ...[
+                              SizedBox(
+                                width: 112,
+                                child: LuxSkeleton(
+                                  width: column == 0 ? 86 : 64,
+                                  height: 13,
+                                  radius: 6,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Container(
+                        height: 1,
+                        width: 472,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant
+                            .withValues(alpha: .5),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FractionallySizedBox(
+                widthFactor: .58,
+                child: const LuxSkeleton(height: 12, radius: 6),
+              ),
+            ),
           ],
-        ),
-        const SizedBox(height: 12),
-        const LuxSkeleton(height: 300),
-      ],
+        );
+      },
     ),
   );
 }
@@ -778,29 +1035,49 @@ class LuxContentSkeleton extends StatelessWidget {
 /// ===============================================================
 
 class PropertyGridSkeleton extends StatelessWidget {
-  const PropertyGridSkeleton({super.key, this.count = 6, this.columns = 2});
+  const PropertyGridSkeleton({
+    super.key,
+    this.count = 6,
+    this.columns,
+    this.padding = const EdgeInsets.all(20),
+  });
 
   final int count;
-  final int columns;
+
+  /// Optional override for callers with a specific grid design.
+  /// When omitted, columns follow the actual content width.
+  final int? columns;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
-    final safeColumns = columns.clamp(1, 6);
-
     return _LuxShimmer(
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: safeColumns,
-          childAspectRatio: 0.70,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 14,
-        ),
-        itemCount: count,
-        itemBuilder: (context, index) {
-          return const PropertyCardSkeleton();
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final resolvedPadding = padding.resolve(Directionality.of(context));
+          final contentWidth = (constraints.maxWidth - resolvedPadding.horizontal)
+              .clamp(0.0, constraints.maxWidth)
+              .toDouble();
+          final safeColumns = (columns ??
+                  Responsive.propertyGridColumns(contentWidth))
+              .clamp(1, 6)
+              .toInt();
+          final cardWidth =
+              (contentWidth - (safeColumns - 1) * 14) / safeColumns;
+
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: resolvedPadding,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: safeColumns,
+              childAspectRatio: Responsive.propertyCardAspectRatio(cardWidth),
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+            ),
+            itemCount: count,
+            itemBuilder: (context, index) => const PropertyCardSkeleton(),
+          );
         },
       ),
     );
@@ -825,18 +1102,16 @@ class SliverPropertyGridSkeleton extends StatelessWidget {
           builder: (context, constraints) {
             final width = constraints.crossAxisExtent;
 
-            final columns = width >= 1100
-                ? 4
-                : width >= 700
-                ? 3
-                : 2;
+            final columns = Responsive.propertyGridColumns(width);
 
             return SliverGrid.builder(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
-                childAspectRatio: 0.70,
+                childAspectRatio: Responsive.propertyCardAspectRatio(
+                  (width - (columns - 1) * 14) / columns,
+                ),
               ),
               itemCount: count,
               itemBuilder: (context, index) {
@@ -850,6 +1125,31 @@ class SliverPropertyGridSkeleton extends StatelessWidget {
   }
 }
 
+/// Skeleton لقائمة المفضلة: عنوان وعدّاد ثم شبكة البطاقات الفعلية.
+class SavedScreenSkeleton extends StatelessWidget {
+  const SavedScreenSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => _LuxShimmer(
+    child: CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: const [
+                Expanded(child: LuxSkeleton(width: 150, height: 28, radius: 9)),
+                LuxSkeleton(width: 48, height: 30, radius: 15),
+              ],
+            ),
+          ),
+        ),
+        const SliverPropertyGridSkeleton(count: 6),
+      ],
+    ),
+  );
+}
+
 /// ===============================================================
 /// Advanced Property Card Skeleton
 /// ===============================================================
@@ -858,112 +1158,143 @@ class PropertyCardSkeleton extends StatelessWidget {
   const PropertyCardSkeleton({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final veryCompact =
+          constraints.maxWidth < 120 || constraints.maxHeight < 170;
+      final compact =
+          veryCompact || constraints.maxWidth < 180 || constraints.maxHeight < 250;
+      final priceWidth = compact
+          ? (constraints.maxWidth - (veryCompact ? 12 : 16))
+                .clamp(veryCompact ? 50.0 : 60.0, veryCompact ? 72.0 : 88.0)
+                .toDouble()
+          : 104.0;
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          /// =====================================================
-          /// Image / Hero area
-          /// =====================================================
-          Expanded(
-            flex: 10,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                const LuxSkeleton(
-                  width: double.infinity,
-                  height: double.infinity,
-                  radius: 0,
-                ),
-
-                /// top favorite
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: LuxSkeleton(width: 38, height: 38, radius: 19),
-                ),
-
-                /// status badge
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: LuxSkeleton(width: 76, height: 26, radius: 13),
-                ),
-
-                /// bottom media controls
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: 12,
-                  child: Row(
-                    children: [
-                      LuxSkeleton(width: 54, height: 20, radius: 10),
-                      const Spacer(),
-                      LuxSkeleton(width: 30, height: 20, radius: 10),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+      return Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
-
-          /// =====================================================
-          /// Property information
-          /// =====================================================
-          Expanded(
-            flex: 7,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(13, 10, 13, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: compact ? 8 : 10,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  /// price
-                  const LuxSkeleton(width: 104, height: 19, radius: 8),
-
-                  const SizedBox(height: 8),
-
-                  /// title
                   const LuxSkeleton(
                     width: double.infinity,
-                    height: 15,
-                    radius: 7,
+                    height: double.infinity,
+                    radius: 0,
                   ),
-
-                  const SizedBox(height: 6),
-
-                  /// second title line
-                  const LuxSkeleton(width: 155, height: 13, radius: 7),
-
-                  const Spacer(),
-
-                  /// metadata
-                  Row(
-                    children: [
-                      Expanded(child: LuxSkeleton(height: 22, radius: 11)),
-                      const SizedBox(width: 7),
-                      Expanded(child: LuxSkeleton(height: 22, radius: 11)),
-                      const SizedBox(width: 7),
-                      Expanded(child: LuxSkeleton(height: 22, radius: 11)),
-                    ],
+                  Positioned(
+                    top: compact ? 8 : 12,
+                    right: compact ? 8 : 12,
+                    child: LuxSkeleton(width: 38, height: 38, radius: 19),
+                  ),
+                  Positioned(
+                    top: compact ? 8 : 12,
+                    left: compact ? 8 : 12,
+                    child: LuxSkeleton(
+                      width: veryCompact ? 48 : (compact ? 60 : 76),
+                      height: 26,
+                      radius: 13,
+                    ),
+                  ),
+                  Positioned(
+                    left: compact ? 8 : 12,
+                    right: compact ? 8 : 12,
+                    bottom: compact ? 8 : 12,
+                    child: Row(
+                      children: [
+                        LuxSkeleton(
+                          width: veryCompact ? 28 : (compact ? 36 : 54),
+                          height: 20,
+                          radius: 10,
+                        ),
+                        const Spacer(),
+                        LuxSkeleton(
+                          width: veryCompact ? 20 : (compact ? 24 : 30),
+                          height: 20,
+                          radius: 10,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            Expanded(
+              flex: compact ? 5 : 8,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  veryCompact ? 6 : (compact ? 8 : 13),
+                  compact ? 6 : 10,
+                  veryCompact ? 6 : (compact ? 8 : 13),
+                  compact ? 6 : 10,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LuxSkeleton(
+                      width: priceWidth,
+                      height: compact ? 15 : 19,
+                      radius: 8,
+                    ),
+                    SizedBox(height: compact ? 4 : 8),
+                    LuxSkeleton(
+                      width: double.infinity,
+                      height: compact ? 12 : 15,
+                      radius: 7,
+                    ),
+                    if (!compact) ...[
+                      const SizedBox(height: 6),
+                      const LuxSkeleton(width: 155, height: 13, radius: 7),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: LuxSkeleton(height: 22, radius: 11),
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: LuxSkeleton(height: 22, radius: 11),
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: LuxSkeleton(height: 22, radius: 11),
+                          ),
+                        ],
+                      ),
+                    ] else if (!veryCompact) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: LuxSkeleton(height: 17, radius: 9),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: LuxSkeleton(height: 17, radius: 9),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 /// ===============================================================
@@ -1007,7 +1338,11 @@ class ListTileSkeleton extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const LuxSkeleton(width: 135, height: 15, radius: 7),
+                FractionallySizedBox(
+                  widthFactor: trailing ? .72 : .85,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: const LuxSkeleton(height: 15, radius: 7),
+                ),
                 const SizedBox(height: 8),
                 const LuxSkeleton(
                   width: double.infinity,
@@ -1015,10 +1350,11 @@ class ListTileSkeleton extends StatelessWidget {
                   radius: 7,
                 ),
                 const SizedBox(height: 9),
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
                     LuxSkeleton(width: 48, height: 18, radius: 9),
-                    const SizedBox(width: 6),
                     LuxSkeleton(width: 56, height: 18, radius: 9),
                   ],
                 ),
@@ -1097,12 +1433,24 @@ class AccountScreenSkeleton extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      LuxSkeleton(width: 155, height: 18, radius: 8),
-                      SizedBox(height: 9),
-                      LuxSkeleton(width: 180, height: 13, radius: 7),
-                      SizedBox(height: 11),
-                      LuxSkeleton(width: 100, height: 24, radius: 12),
+                    children: [
+                      FractionallySizedBox(
+                        widthFactor: .8,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: const LuxSkeleton(height: 18, radius: 8),
+                      ),
+                      const SizedBox(height: 9),
+                      FractionallySizedBox(
+                        widthFactor: .95,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: const LuxSkeleton(height: 13, radius: 7),
+                      ),
+                      const SizedBox(height: 11),
+                      FractionallySizedBox(
+                        widthFactor: .58,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: const LuxSkeleton(height: 24, radius: 12),
+                      ),
                     ],
                   ),
                 ),
@@ -1147,10 +1495,18 @@ class _AccountTileSkeleton extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                LuxSkeleton(width: 140, height: 15, radius: 7),
-                SizedBox(height: 8),
-                LuxSkeleton(width: 100, height: 12, radius: 6),
+              children: [
+                FractionallySizedBox(
+                  widthFactor: .8,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: const LuxSkeleton(height: 15, radius: 7),
+                ),
+                const SizedBox(height: 8),
+                FractionallySizedBox(
+                  widthFactor: .62,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: const LuxSkeleton(height: 12, radius: 6),
+                ),
               ],
             ),
           ),
