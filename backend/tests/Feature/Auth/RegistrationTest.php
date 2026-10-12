@@ -1,9 +1,9 @@
 <?php
 
-namespace Tests\\Feature\\Auth;
+namespace Tests\Feature\Auth;
 
-use Illuminate\\Foundation\\Testing\\RefreshDatabase;
-use Tests\\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class RegistrationTest extends TestCase
 {
@@ -26,6 +26,6 @@ class RegistrationTest extends TestCase
         $this->get('/login')
             ->assertOk()
             ->assertDontSee('إنشاء حساب جديد')
-            ->assertDontSee('route(\'register\')');
+            ->assertDontSee("route('register')");
     }
 }
