@@ -304,6 +304,10 @@ class PropertyController extends Controller
 
     private function queuePushNotification(\App\Models\User $recipient, BaseNotification $notification): void
     {
+        if (! ($recipient->notificationPreference?->property_updates ?? true)) {
+            return;
+        }
+
         try {
             SendFcmPushNotification::dispatch((int) $recipient->id, (string) $notification->id);
         } catch (\Throwable $exception) {
