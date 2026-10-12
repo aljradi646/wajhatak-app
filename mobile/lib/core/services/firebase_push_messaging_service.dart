@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+import '../navigation/active_chat_context.dart';
 import '../../data/api_client.dart';
 import '../../data/models/models.dart';
 import '../config/firebase_options.dart';
@@ -143,6 +144,10 @@ class FirebasePushMessagingService {
   Future<void> _showForegroundMessage(RemoteMessage message) async {
     final id = message.data['notification_id']?.toString();
     if (id == null || id.isEmpty) return;
+    final conversationId = int.tryParse(message.data['conversation_id']?.toString() ?? '');
+    if (conversationId != null && conversationId == ActiveChatContext.conversationId) {
+      return;
+    }
 
     final item = LuxNotification(
       id: id,
@@ -152,6 +157,8 @@ class FirebasePushMessagingService {
           'لديك إشعار جديد في وجهتك.',
       kind: message.data['kind']?.toString(),
       supportTicketId: int.tryParse(message.data['support_ticket_id']?.toString() ?? ''),
+      conversationId: conversationId,
+      propertyId: int.tryParse(message.data['property_id']?.toString() ?? ''),
       createdAt: DateTime.now(),
     );
     await _localNotifications.show(item);
