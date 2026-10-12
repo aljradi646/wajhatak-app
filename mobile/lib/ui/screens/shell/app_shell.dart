@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/navigation/active_chat_context.dart';
 import '../../../core/navigation/notification_navigation.dart';
 import '../../../core/services/lux_notification_service.dart';
 import '../../../core/theme/app_theme.dart';
@@ -103,7 +104,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
     for (final item in items.where((item) => !item.isRead)) {
       if (!_observedNotificationIds.add(item.id) ||
-          !_isNotificationEnabled(item, settings)) {
+          !_isNotificationEnabled(item, settings) ||
+          (item.isMessage && item.conversationId != null &&
+              item.conversationId == ActiveChatContext.conversationId)) {
         continue;
       }
       unawaited(ref.read(localNotificationServiceProvider).show(item));
