@@ -18,7 +18,7 @@ final class SupportTicketApiTest extends TestCase
         $this->getJson('/api/v1/pages')
             ->assertOk()
             ->assertJsonFragment(['slug' => 'privacy'])
-            ->assertJsonFragment(['slug' => 'terms']);
+            ->assertJsonFragment(['slug' => 'terms'])\n            ->assertJsonFragment(['slug' => 'usage-policy'])\n            ->assertJsonFragment(['slug' => 'refund-cancellation'])\n            ->assertJsonFragment(['slug' => 'cookies'])\n            ->assertJsonFragment(['slug' => 'faq']);
 
         $this->getJson('/api/v1/pages/privacy')
             ->assertOk()
