@@ -1,0 +1,17 @@
+{
+  "name": "wajhatak-realtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Authenticated WebSocket fan-out service for Wajhatak",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
