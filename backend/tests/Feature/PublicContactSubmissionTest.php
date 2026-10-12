@@ -36,7 +36,7 @@ final class PublicContactSubmissionTest extends TestCase
             ->assertOk()
             ->assertSee('أرسل رسالة إلى فريق وجهتك')
             ->assertSee('بلاغ عن عقار أو إعلان')
-            ->assertSee('public.contact.store', false);
+            ->assertSee(route('public.contact.store'), false);
     }
 
     public function test_public_contact_submission_is_persisted_with_follow_up_reference(): void
