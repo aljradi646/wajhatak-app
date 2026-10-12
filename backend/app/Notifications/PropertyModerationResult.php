@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Property;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Str;
 
 class PropertyModerationResult extends Notification
 {
@@ -12,6 +13,7 @@ class PropertyModerationResult extends Notification
         private readonly string $decision,
         private readonly ?string $reason = null,
     ) {
+        $this->id = (string) Str::uuid();
     }
 
     public function via(object $notifiable): array
