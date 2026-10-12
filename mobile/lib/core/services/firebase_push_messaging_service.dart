@@ -148,6 +148,7 @@ class FirebasePushMessagingService {
     if (conversationId != null && conversationId == ActiveChatContext.conversationId) {
       return;
     }
+    if (!ActiveChatContext.markNotificationShown(id)) return;
 
     final item = LuxNotification(
       id: id,
