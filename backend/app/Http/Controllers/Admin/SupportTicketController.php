@@ -114,7 +114,7 @@ class SupportTicketController extends Controller
             $ticket->forceFill([
                 'status' => $status,
                 'last_reply_at' => now(),
-                'closed_at' => in_array($status, ['resolved', 'closed'], true) ? now() : null,
+                'closed_at' => in_array($status, ['resolved', 'closed', 'rejected'], true) ? now() : null,
             ])->save();
 
             $databaseNotification = $ticket->user->notifications()->create([
@@ -173,7 +173,7 @@ class SupportTicketController extends Controller
         $data = $request->validate(['status' => ['required', 'in:open,in_progress,waiting_user,resolved,closed']]);
         $ticket->forceFill([
             'status' => $data['status'],
-            'closed_at' => in_array($data['status'], ['resolved', 'closed'], true) ? now() : null,
+            'closed_at' => in_array($data['status'], ['resolved', 'closed', 'rejected'], true) ? now() : null,
         ])->save();
         ActivityLog::record('support_ticket', 'تحديث حالة البلاغ '.$ticket->reference, $ticket);
 
