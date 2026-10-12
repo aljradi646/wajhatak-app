@@ -20,6 +20,15 @@ use App\Http\Controllers\Api\V1\ViewingRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->as('api.v1.')->group(function (): void {
+    Route::get('/', function () {
+        return response()->json([
+            'success' => true,
+            'service' => 'Wajhatak API',
+            'version' => 'v1',
+            'message' => 'واجهة برمجة تطبيقات وجهتك تعمل بنجاح.',
+        ]);
+    })->name('index');
+
     Route::middleware('throttle:6,1')->group(function (): void {
         Route::post('auth/register', [AuthController::class, 'register'])->name('auth.register');
         Route::post('auth/login', [AuthController::class, 'login'])->name('auth.login');
