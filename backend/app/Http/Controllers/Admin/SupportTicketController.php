@@ -134,7 +134,13 @@ class SupportTicketController extends Controller
         });
 
         if ($databaseNotification !== null) {
-            app(FirebasePushNotificationService::class)->sendDatabaseNotification($ticket->user, $databaseNotification);
+            try {
+                app(FirebasePushNotificationService::class)->sendDatabaseNotification($ticket->user, $databaseNotification);
+            } catch (Throwable $exception) {
+                // The database notification is durable; a push-provider outage must not
+                // prevent the email attempt or make the admin reply appear unsaved.
+                report($exception);
+            }
         }
 
         $mailState = null;
