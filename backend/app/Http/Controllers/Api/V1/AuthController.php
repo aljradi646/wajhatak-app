@@ -105,7 +105,7 @@ class AuthController extends Controller
                 'user_agent' => substr((string) $request->userAgent(), 0, 1000),
                 'attempted_at' => now(),
             ]);
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             report($exception);
         }
     }
