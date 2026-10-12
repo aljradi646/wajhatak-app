@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\MailSettingsController;
 use App\Http\Controllers\Admin\PropertyController;
+use App\Http\Controllers\Admin\PublicContactSubmissionController;
 use App\Http\Controllers\Admin\PropertyFeatureController;
 use App\Http\Controllers\Admin\PropertyTypeController;
 use App\Http\Controllers\Admin\ReportController;
