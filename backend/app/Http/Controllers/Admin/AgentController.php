@@ -9,13 +9,14 @@ use App\Models\Conversation;
 use App\Models\ReportLog;
 use App\Models\User;
 use App\Services\Mail\UnifiedMailService;
+use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 
 class AgentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Agent::query()->with('user')->withCount('properties');
+        $query = Agent::query()->whereHas('user', fn ($userQuery) => $userQuery->role('agent'))->with(['user.roles'])->withCount('properties');
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('license_number', 'like', "%{$search}%")
@@ -145,6 +146,11 @@ class AgentController extends Controller
             'verified_by' => $request->boolean('is_active') ? $request->user()->id : null,
         ]);
 
+        // Keep the role and agent domain profile consistent regardless of
+        // whether the admin used the Agents form or the Users role editor.
+        Role::findOrCreate('agent');
+        $agent->user->assignRole('agent');
+
         ActivityLog::record('agent', "تم إنشاء وكيل «{$agent->user->name}»", $agent);
 
         return redirect()->route('admin.agents.index')->with('status', 'تم إنشاء الوكيل بنجاح.');
@@ -233,8 +239,12 @@ class AgentController extends Controller
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
+        $previousUser = $agent->user;
+        $nextUser = User::query()->findOrFail($data['user_id']);
+        Role::findOrCreate('agent');
+
         $agent->update([
-            'user_id' => $data['user_id'],
+            'user_id' => $nextUser->id,
             'license_number' => $data['license_number'] ?? null,
             'bio' => $data['bio'] ?? null,
             'rating' => $data['rating'],
@@ -242,6 +252,20 @@ class AgentController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
+        // Keep role/profile mapping correct if the profile is reassigned. This
+        // changes neither favorites nor messages nor any other user-owned data.
+        $nextUser->assignRole('agent');
+        if ($previousUser && $previousUser->id !== $nextUser->id) {
+            $hasAnotherProfile = Agent::query()
+                ->where('user_id', $previousUser->id)
+                ->where('id', '!=', $agent->id)
+                ->exists();
+            if (! $hasAnotherProfile) {
+                $previousUser->removeRole('agent');
+            }
+        }
+
+        $agent->load('user');
         ActivityLog::record('agent', "تم تحديث وكيل «{$agent->user->name}»", $agent);
 
         return redirect()->route('admin.agents.index')->with('status', 'تم تحديث الوكيل بنجاح.');

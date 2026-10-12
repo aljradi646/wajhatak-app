@@ -1,0 +1,10 @@
+@extends('layouts.public')
+@section('title',$page->seo_title ?: $page->title)
+@section('meta_description',$page->seo_description ?: $page->summary)
+@section('content')
+<div class="mx-auto max-w-4xl"><a href="{{ route('public.pages.index') }}" class="inline-flex items-center gap-2 text-sm font-bold text-emerald-800">← الرجوع إلى مركز المعلومات</a>
+<article class="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"><header class="public-hero px-6 py-8 text-white md:px-10 md:py-10"><span class="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{{ $page->category==='legal'?'سياسة وشروط':($page->category==='help'?'مساعدة':'معلومات') }}</span><h1 class="mt-3 text-3xl font-black md:text-4xl">{{ $page->title }}</h1>@if($page->summary)<p class="mt-3 leading-8 text-emerald-50">{{ $page->summary }}</p>@endif<p class="mt-4 text-xs text-emerald-100">آخر تحديث: {{ $page->updated_at?->format('Y-m-d') }}</p></header>
+<div class="px-6 py-8 md:px-10 md:py-10"><div class="whitespace-pre-line break-words text-[15px] leading-9 text-slate-700">{{ $page->content }}</div>
+@if($page->slug==='contact')<div class="mt-8 grid gap-3 sm:grid-cols-2">@if($supportEmail)<a href="mailto:{{ $supportEmail }}" class="rounded-xl border bg-slate-50 p-4"><span class="block text-xs font-bold text-slate-500">بريد الدعم</span><span class="mt-1 block break-all font-extrabold text-emerald-800">{{ $supportEmail }}</span></a>@endif @if($supportPhone)<a href="tel:{{ $supportPhone }}" class="rounded-xl border bg-slate-50 p-4"><span class="block text-xs font-bold text-slate-500">هاتف الدعم</span><span class="mt-1 block font-extrabold text-emerald-800">{{ $supportPhone }}</span></a>@endif</div>@endif</div></article>
+@if(in_array($page->slug,['privacy','terms'],true))<p class="mt-4 rounded-xl bg-amber-50 p-4 text-sm leading-7 text-amber-900">ملاحظة: هذه صيغة تشغيلية قابلة للتحرير، وتحتاج اعتمادًا قانونيًا وفق بلد التشغيل والخدمات الفعلية قبل اعتبارها صيغة نهائية.</p>@endif</div>
+@endsection

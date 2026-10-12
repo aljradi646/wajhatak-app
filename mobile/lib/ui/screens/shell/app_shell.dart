@@ -36,6 +36,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   final _shellKey = GlobalKey<ScaffoldState>();
   final Set<String> _observedNotificationIds = <String>{};
   Timer? _notificationTimer;
+  Timer? _sessionRefreshTimer;
   bool _notificationsPrimed = false;
 
   void _openDrawer() => _shellKey.currentState?.openDrawer();
@@ -49,6 +50,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     service.onNotificationResponse = _openFromSystemNotification;
     unawaited(service.initialize());
     unawaited(_handleLaunchNotification());
+    final push = ref.read(firebasePushMessagingServiceProvider);
+    push.onNotificationOpened = _openFromSystemNotification;
+    unawaited(push.initializeAndRegister());
     // Polling محسوب للإشعارات والمحادثات — 25 ثانية، فقط عند وجود جلسة.
     _notificationTimer = Timer.periodic(const Duration(seconds: 25), (_) {
       if (ref.read(sessionProvider).asData?.value != null) {
@@ -56,11 +60,17 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref.invalidate(conversationsProvider);
       }
     });
+    _sessionRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && ref.read(sessionProvider).asData?.value != null) {
+        unawaited(ref.read(sessionProvider.notifier).refreshCurrentUser());
+      }
+    });
   }
 
   @override
   void dispose() {
     _notificationTimer?.cancel();
+    _sessionRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -104,6 +114,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     LuxNotification notification,
     AppSettings settings,
   ) => switch (notification.kind) {
+    'support_ticket_reply' => true,
     'message_received' ||
     'message' ||
     'message_sent' => settings.messageNotifications,
@@ -116,9 +127,20 @@ class _AppShellState extends ConsumerState<AppShell> {
   void _push(Widget page) =>
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
 
+  void _navigateToExplore() {
+    final isAgent =
+        ref.read(sessionProvider).asData?.value?.user.isAgent == true;
+    if (isAgent) {
+      // The agent's index 1 is the dashboard, not ExploreScreen.
+      _push(const ExploreScreen());
+      return;
+    }
+    setState(() => _index = 1);
+  }
+
   void _handleSearchFromHome(String term) {
     ref.read(exploreSearchProvider.notifier).setSearch(term);
-    setState(() => _index = 1);
+    _navigateToExplore();
   }
 
   @override
@@ -134,11 +156,19 @@ class _AppShellState extends ConsumerState<AppShell> {
       (_, next) =>
           next.whenData((items) => _handleNotifications(items, settings)),
     );
+    ref.listen<AsyncValue<SessionData?>>(
+      sessionProvider,
+      (_, next) {
+        if (next.asData?.value != null) {
+          unawaited(ref.read(firebasePushMessagingServiceProvider).initializeAndRegister());
+        }
+      },
+    );
     final isAgent = user?.isAgent ?? false;
     final pages = isAgent
         ? [
             HomeScreen(
-              onExplore: () => setState(() => _index = 1),
+              onExplore: _navigateToExplore,
               onSearchSubmit: _handleSearchFromHome,
             ),
             const AgentDashboardScreen(),
@@ -148,7 +178,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           ]
         : [
             HomeScreen(
-              onExplore: () => setState(() => _index = 1),
+              onExplore: _navigateToExplore,
               onSearchSubmit: _handleSearchFromHome,
             ),
             const ExploreScreen(),

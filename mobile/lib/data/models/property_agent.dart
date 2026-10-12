@@ -6,6 +6,7 @@ class PropertyAgent {
   const PropertyAgent({
     required this.id,
     required this.name,
+    this.userId,
     this.phone,
     this.rating,
     this.reviewsCount,
@@ -18,6 +19,9 @@ class PropertyAgent {
   });
 
   final int id;
+
+  /// ID of the owning users row; distinct from the Agent profile row ID.
+  final int? userId;
   final String name;
   final String? phone;
   final double? rating;
@@ -35,6 +39,7 @@ class PropertyAgent {
 
   factory PropertyAgent.fromJson(Map<String, dynamic> json) => PropertyAgent(
     id: json['id'] as int,
+    userId: (json['user_id'] as num?)?.toInt(),
     name: json['name'] as String? ?? '',
     phone: json['phone'] as String?,
     rating: (json['rating'] as num?)?.toDouble(),
@@ -47,8 +52,12 @@ class PropertyAgent {
     verificationStatus: json['verification_status'] as String?,
   );
 
+  bool belongsToUser(int? currentUserId) =>
+      currentUserId != null && userId != null && userId == currentUserId;
+
   Map<String, dynamic> toJson() => {
     'id': id,
+    'user_id': userId,
     'name': name,
     'phone': phone,
     'rating': rating,

@@ -9,12 +9,15 @@ class AgentResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $avatarPath = $this->user->avatar_path ?: $this->photo_path;
+
         return [
             'id' => $this->id,
+            'user_id' => $this->user_id,
             'name' => $this->user->name,
             'email' => $this->user->email,
             'phone' => $this->user->phone,
-            'avatar_url' => $this->user->avatar_path ? asset('storage/'.$this->user->avatar_path) : null,
+            'avatar_url' => $avatarPath ? asset('storage/'.$avatarPath) : null,
             'bio' => $this->bio,
             'rating' => (float) $this->rating,
             'reviews_count' => $this->reviews_count,

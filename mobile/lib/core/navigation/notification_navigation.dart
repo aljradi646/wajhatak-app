@@ -7,6 +7,7 @@ import '../../ui/screens/chat/chat_screen.dart';
 import '../../ui/screens/messages/messages_screen.dart';
 import '../../ui/screens/notifications/notifications_screen.dart';
 import '../../ui/screens/property/property_detail_screen.dart';
+import '../../ui/screens/support/support_tickets_screen.dart';
 import '../../ui/screens/viewing_requests/viewing_requests_screen.dart';
 
 /// المُلاحق الرئيسي للتطبيق — ضروري للتنقل من إشعار النظام وخارجه.
@@ -58,10 +59,7 @@ Future<void> _openNotificationSource(
     // المحادثة غير متاحة — نكفي بفتح صفحة الرسائل.
     await navigator.push(
       MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('الرسائل')),
-          body: const MessagesScreen(),
-        ),
+        builder: (_) => const MessagesScreen(standalone: true),
       ),
     );
     return;
@@ -72,6 +70,12 @@ Future<void> _openNotificationSource(
       MaterialPageRoute(builder: (_) => const ViewingRequestsScreen()),
     );
     container.invalidate(viewingRequestsProvider);
+    return;
+  }
+
+  if (item.supportTicketId != null) {
+    await navigator.push(MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(ticketId: item.supportTicketId!)));
+    container.invalidate(supportTicketsProvider);
     return;
   }
 

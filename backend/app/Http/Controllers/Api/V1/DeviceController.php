@@ -13,7 +13,7 @@ class DeviceController extends Controller
     {
         $data = $request->validate([
             'device_id' => ['required', 'string', 'min:8', 'max:128'],
-            'platform' => ['required', 'in:android'],
+            'platform' => ['required', 'in:android,ios'],
             'push_token' => ['required', 'string', 'min:16', 'max:512'],
         ]);
 

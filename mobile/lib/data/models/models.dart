@@ -16,3 +16,4 @@ export 'taxonomy_item.dart';
 export 'user.dart';
 export 'conversation.dart';
 export 'viewing_request.dart';
+export 'support_ticket.dart';
