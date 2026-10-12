@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicSitePageController;
+use App\Http\Controllers\PublicContactSubmissionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
