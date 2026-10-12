@@ -133,11 +133,13 @@ class ConversationController extends Controller
         $recipient = $conversation->client_id === $request->user()->id ? $conversation->agent : $conversation->client;
         $notification = new MessageReceived($message->load(['conversation', 'sender']));
         $recipient->notify($notification);
-        try {
-            SendFcmPushNotification::dispatch((int) $recipient->id, (string) $notification->id);
+        if ($recipient->notificationPreference?->message_notifications ?? true) {
+            try {
+                SendFcmPushNotification::dispatch((int) $recipient->id, (string) $notification->id);
         } catch (\Throwable $exception) {
             // A push queue outage must not turn a committed message into an HTTP failure.
-            report($exception);
+                report($exception);
+            }
         }
 
         return response()->json(['data' => new MessageResource($message->load('property'))], 201);
