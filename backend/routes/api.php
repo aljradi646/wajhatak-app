@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\MeController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\PropertyController;
+use App\Http\Controllers\Api\V1\RealtimeTicketController;
 use App\Http\Controllers\Api\V1\SitePageController;
 use App\Http\Controllers\Api\V1\SupportTicketController;
 use App\Http\Controllers\Api\V1\TaxonomyController;
@@ -54,6 +55,7 @@ Route::prefix('v1')->as('api.v1.')->group(function (): void {
     Route::middleware('inject.sanctum.token')->middleware('auth:sanctum')->group(function (): void {
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
         Route::get('me', [MeController::class, 'show'])->name('me.show');
+        Route::post('realtime/ticket', [RealtimeTicketController::class, 'store'])->middleware('throttle:30,1')->name('realtime.ticket');
         Route::patch('me', [MeController::class, 'update'])->name('me.update');
         Route::post('me/avatar', [MeController::class, 'uploadAvatar'])->name('me.avatar.store');
 
