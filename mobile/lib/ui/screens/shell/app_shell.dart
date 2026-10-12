@@ -107,7 +107,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (!_observedNotificationIds.add(item.id) ||
           !_isNotificationEnabled(item, settings) ||
           (item.isMessage && item.conversationId != null &&
-              item.conversationId == ActiveChatContext.conversationId)) {
+              item.conversationId == ActiveChatContext.conversationId) ||
+          !ActiveChatContext.markNotificationShown(item.id)) {
         continue;
       }
       unawaited(ref.read(localNotificationServiceProvider).show(item));
