@@ -13,6 +13,7 @@ import '../../../state/providers.dart';
 import '../../widgets.dart';
 import '../shared/toggle_favorite.dart';
 import '../agent/agent_profile_screen.dart';
+import '../listings/edit_listing_screen.dart';
 import 'property_map_screen.dart';
 import 'show_viewing_sheet.dart';
 
@@ -25,6 +26,9 @@ class PropertyDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final property = ref.watch(propertyDetailProvider(propertyId));
     final overrides = ref.watch(favoriteOverridesProvider);
+    final currentUser = ref.watch(sessionProvider).asData?.value?.user;
+    final currentUserId = currentUser?.id;
+    final isAgentAccount = currentUser?.isAgent == true;
     return Scaffold(
       body: LuxAsyncView<LuxProperty>(
         value: property,
@@ -85,7 +89,9 @@ class PropertyDetailScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     // 2) السعر + العملة
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -109,7 +115,6 @@ class PropertyDetailScreen extends ConsumerWidget {
                                 ),
                           ),
                         ),
-                        const SizedBox(width: 8),
                         if (item.typeName != null)
                           FactChip(
                             icon: Icons.category_rounded,
@@ -155,6 +160,10 @@ class PropertyDetailScreen extends ConsumerWidget {
                           ),
                       ],
                     ),
+                    if (item.agent?.belongsToUser(currentUserId) ?? false) ...[
+                      const SizedBox(height: 18),
+                      _OwnerPropertyActions(property: item),
+                    ],
                     const SizedBox(height: 20),
                     _FactsRow(property: item),
                     const SizedBox(height: 24),
@@ -192,7 +201,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                       ),
                     ],
                     const SizedBox(height: 24),
-                    _AgentPanel(agent: item.agent, propertyId: item.id),
+                    _AgentPanel(agent: item.agent, propertyId: item.id, isOwner: item.agent?.belongsToUser(currentUserId) ?? false),
                   ],
                 ),
               ),
@@ -201,44 +210,124 @@ class PropertyDetailScreen extends ConsumerWidget {
         },
       ),
       bottomNavigationBar: property.maybeWhen(
-        data: (item) => SafeArea(
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => startConversation(
-                      context,
-                      ref,
-                      item.id,
-                      agentId: item.agent?.id,
-                      pendingProperty: item,
+        data: (item) {
+          // AgentResource.id is the agent profile id; ownership must be checked
+          // against AgentResource.user_id, which is the authenticated user id.
+          if (item.agent?.belongsToUser(currentUserId) ?? false) {
+            return const SizedBox.shrink();
+          }
+
+          return SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 380;
+                final theme = Theme.of(context);
+
+                Widget messageButton() => OutlinedButton.icon(
+                  onPressed: () => startConversation(
+                    context,
+                    ref,
+                    item.id,
+                    agentId: item.agent?.id,
+                    pendingProperty: item,
+                  ),
+                  icon: const Icon(Icons.chat_bubble_rounded, size: 19),
+                  label: const Text(
+                    'مراسلة الوكيل',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+
+                Widget viewingButton() => FilledButton.icon(
+                  onPressed: () => showViewingSheet(context, ref, item.id),
+                  icon: const Icon(Icons.event_available_rounded, size: 19),
+                  label: const Text(
+                    'طلب معاينة',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+
+                return Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: constraints.maxWidth < 340 ? 12 : 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(
+                      top: BorderSide(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
-                    icon: const Icon(Icons.chat_bubble_rounded, size: 19),
-                    label: const Text('مراسلة الوكيل'),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => showViewingSheet(context, ref, item.id),
-                    icon: const Icon(Icons.event_available_rounded, size: 19),
-                    label: const Text('طلب معاينة'),
-                  ),
-                ),
-              ],
+                  child: compact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            messageButton(),
+                            const SizedBox(height: 8),
+                            viewingButton(),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(child: messageButton()),
+                            const SizedBox(width: 10),
+                            Expanded(child: viewingButton()),
+                          ],
+                        ),
+                );
+              },
             ),
-          ),
-        ),
+          );
+        },
+        loading: () {
+          // Ownership is not known until the detail response arrives.
+          // Avoid showing misleading action placeholders to agent accounts
+          // while loading; the real action bar is decided by agent.user_id below.
+          if (isAgentAccount) return const SizedBox.shrink();
+
+          return SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 380;
+                final theme = Theme.of(context);
+                return Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: constraints.maxWidth < 340 ? 12 : 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(
+                      top: BorderSide(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
+                    ),
+                  ),
+                  child: compact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: const [
+                            LuxSkeleton(height: 48, radius: 14),
+                            SizedBox(height: 8),
+                            LuxSkeleton(height: 48, radius: 14),
+                          ],
+                        )
+                      : Row(
+                          children: const [
+                            Expanded(child: LuxSkeleton(height: 52, radius: 14)),
+                            SizedBox(width: 10),
+                            Expanded(child: LuxSkeleton(height: 52, radius: 14)),
+                          ],
+                        ),
+                );
+              },
+            ),
+          );
+        },
         orElse: () => const SizedBox.shrink(),
       ),
     );
@@ -585,10 +674,111 @@ class _FeatureChip extends StatelessWidget {
   }
 }
 
+
+class _OwnerPropertyActions extends ConsumerStatefulWidget {
+  const _OwnerPropertyActions({required this.property});
+  final LuxProperty property;
+  @override
+  ConsumerState<_OwnerPropertyActions> createState() => _OwnerPropertyActionsState();
+}
+
+class _OwnerPropertyActionsState extends ConsumerState<_OwnerPropertyActions> {
+  bool _working = false;
+  String get _status => widget.property.status ?? 'draft';
+  String get _label => switch (_status) {
+    'published' => 'منشور', 'pending' => 'قيد المراجعة',
+    'rejected' => 'مرفوض', 'archived' => 'مؤرشف', _ => 'مسودة',
+  };
+  Color _color(ThemeData theme) => switch (_status) {
+    'published' => WajhatakColors.emerald,
+    'pending' => WajhatakColors.amberDeep,
+    'rejected' => theme.colorScheme.error,
+    _ => theme.colorScheme.onSurfaceVariant,
+  };
+
+  Future<void> _changeStatus() async {
+    if (_working || _status == 'pending') return;
+    final next = _status == 'published' ? 'draft' : 'pending';
+    setState(() => _working = true);
+    try {
+      await ref.read(propertyRepositoryProvider).update(widget.property.id, {'status': next});
+      if (!mounted) return;
+      ref.invalidate(propertyDetailProvider(widget.property.id));
+      ref.invalidate(myListingsProvider);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        next == 'draft'
+          ? 'تم إيقاف نشر العقار. يمكنك إرساله للمراجعة مجددًا لاحقًا.'
+          : 'تم إرسال العقار للمراجعة. النشر النهائي يحتاج اعتماد الإدارة.',
+      )));
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('تعذّر تحديث حالة العقار. تحقق من الاتصال ثم أعد المحاولة.'),
+      ));
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tone = _color(theme);
+    return Card(
+      elevation: 0, margin: EdgeInsets.zero,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Icon(Icons.manage_accounts_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 9),
+            Expanded(child: Text('إدارة عقارك', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900))),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(color: tone.withValues(alpha: .12), borderRadius: BorderRadius.circular(30)),
+              child: Text(_label, style: TextStyle(color: tone, fontWeight: FontWeight.w800, fontSize: 12)),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          Text('عدّل التفاصيل والصور، أو غيّر حالة الإعلان. إعادة النشر تمر بمراجعة الإدارة.',
+            style: theme.textTheme.bodySmall?.copyWith(height: 1.6, color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 14),
+          LayoutBuilder(builder: (context, c) {
+            final edit = FilledButton.icon(
+              onPressed: _working ? null : () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => EditListingScreen(propertyId: widget.property.id),
+              )),
+              icon: const Icon(Icons.edit_rounded, size: 18), label: const Text('تعديل العقار'),
+            );
+            final change = OutlinedButton.icon(
+              onPressed: _working || _status == 'pending' ? null : _changeStatus,
+              icon: _working
+                  ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(_status == 'published' ? Icons.visibility_off_rounded : Icons.send_rounded, size: 18),
+              label: Text(_status == 'published' ? 'إيقاف النشر' : _status == 'pending' ? 'قيد المراجعة' : 'إرسال للمراجعة'),
+            );
+            if (c.maxWidth < 380) return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [edit, const SizedBox(height: 8), change],
+            );
+            return Row(children: [Expanded(child: edit), const SizedBox(width: 9), Expanded(child: change)]);
+          }),
+        ]),
+      ),
+    );
+  }
+}
+
 class _AgentPanel extends StatelessWidget {
-  const _AgentPanel({this.agent, this.propertyId});
+  const _AgentPanel({this.agent, this.propertyId, this.isOwner = false});
   final PropertyAgent? agent;
   final int? propertyId;
+  final bool isOwner;
 
   @override
   Widget build(BuildContext context) {
@@ -596,7 +786,7 @@ class _AgentPanel extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: agent == null
+        onTap: agent == null || isOwner
             ? null
             : () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -634,7 +824,7 @@ class _AgentPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'وكيل العقار',
+                      isOwner ? 'إعلانك العقاري' : 'وكيل العقار',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w700,
@@ -671,7 +861,7 @@ class _AgentPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              if (agent != null) ...[
+              if (agent != null && !isOwner) ...[
                 const SizedBox(width: 8),
                 Icon(
                   Icons.chevron_left_rounded,
