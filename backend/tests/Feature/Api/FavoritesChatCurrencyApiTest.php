@@ -13,6 +13,7 @@ use App\Models\PropertyLocation;
 use App\Models\PropertyType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -158,7 +159,7 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $conversationId = $first->json('data.id');
 
         // Opening a chat from another property of the SAME agent returns the same conversation.
-        $second = $this->postJson('/api/v1/conversations', ['property_id' => $propertyB->id])->assertCreated();
+        $second = $this->postJson('/api/v1/conversations', ['property_id' => $propertyB->id])->assertOk();
         $this->assertSame($conversationId, $second->json('data.id'));
         $this->assertSame(1, Conversation::query()->where('client_id', $client->id)->count());
 
@@ -174,21 +175,49 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $this->postJson("/api/v1/conversations/{$conversationId}/messages", [
             'body' => 'أرغب في معرفة المزيد',
             'message_type' => 'property',
-            'property_id' => $propertyA->id,
+            'property_id' => $propertyB->id,
         ])->assertCreated();
 
         $this->assertDatabaseHas('messages', [
             'conversation_id' => $conversationId,
             'message_type' => 'property',
-            'property_id' => $propertyA->id,
+            'property_id' => $propertyB->id,
             'sender_id' => $client->id,
             'body' => 'أرغب في معرفة المزيد',
         ]);
+
+        // Notification deep-link metadata must use the attachment actually sent,
+        // not the conversation's original listing (property A).
+        $notification = DB::table('notifications')
+            ->where('notifiable_type', User::class)
+            ->where('notifiable_id', $agentUser->id)
+            ->orderByDesc('created_at')
+            ->first();
+
+        $this->assertNotNull($notification);
+        $notificationData = json_decode($notification->data, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame($propertyB->id, $notificationData['property_id']);
+        $this->assertSame($conversationId, $notificationData['conversation_id']);
     }
 
-    public function test_conversation_response_uses_agent_name_as_title(): void
+    public function test_property_resource_exposes_agent_owner_user_id(): void
     {
         [$agentUser, $agent] = $this->makeActiveAgent();
+        $property = $this->createPublishedProperty($agent);
+        Sanctum::actingAs($agentUser);
+
+        $this->getJson('/api/v1/properties/'.$property->id)
+            ->assertOk()
+            ->assertJsonPath('data.agent.id', $agent->id)
+            ->assertJsonPath('data.agent.user_id', $agentUser->id);
+    }
+
+    public function test_conversation_response_uses_agent_name_and_profile_photo(): void
+    {
+        [$agentUser, $agent] = $this->makeActiveAgent();
+        $profilePhoto = "agents/{$agent->id}/profile.jpg";
+        $agentUser->forceFill(['avatar_path' => null])->save();
+        $agent->forceFill(['photo_path' => $profilePhoto])->save();
         $property = $this->createPublishedProperty($agent);
         $client = User::factory()->create();
         $client->assignRole('user');
@@ -198,6 +227,7 @@ class FavoritesChatCurrencyApiTest extends TestCase
 
         $response->assertJsonPath('data.agent.id', $agentUser->id)
             ->assertJsonPath('data.agent.name', $agentUser->name)
+            ->assertJsonPath('data.agent.avatar_url', asset('storage/'.$profilePhoto))
             ->assertJsonPath('data.client.id', $client->id);
     }
 
@@ -210,7 +240,7 @@ class FavoritesChatCurrencyApiTest extends TestCase
         $this->postJson('/api/v1/conversations', ['property_id' => $property->id])->assertStatus(422);
     }
 
-    public function test_message_with_property_card_includes_property_payload(): void
+    public function test_text_message_accepts_explicit_text_type_without_property_id(): void
     {
         [$agentUser, $agent] = $this->makeActiveAgent();
         $property = $this->createPublishedProperty($agent);
@@ -225,8 +255,17 @@ class FavoritesChatCurrencyApiTest extends TestCase
         ]);
 
         Sanctum::actingAs($client);
+
+        // An attachment message must still require an actual property id.
+        $this->postJson("/api/v1/conversations/{$conversation->id}/messages", [
+            'body' => 'رسالة مع عقار بلا معرّف',
+            'message_type' => 'property',
+        ])->assertUnprocessable()->assertJsonValidationErrors('property_id');
+
+        // Explicit "text" must not trigger property_id validation.
         $response = $this->postJson("/api/v1/conversations/{$conversation->id}/messages", [
             'body' => 'السلام عليكم، هل العقار ما زال متاحًا؟',
+            'message_type' => 'text',
         ])->assertCreated();
 
         $response->assertJsonPath('data.body', 'السلام عليكم، هل العقار ما زال متاحًا؟')
