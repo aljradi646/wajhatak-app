@@ -37,6 +37,7 @@ Future<void> _openNotificationSource(
           .read(notificationRepositoryProvider)
           .markNotificationRead(item.id);
       container.invalidate(notificationsProvider);
+      container.invalidate(unreadNotificationCountProvider);
     } on Object {
       // القراءة تأكيدية؛ الفشل لا يمنع التنقل.
     }
