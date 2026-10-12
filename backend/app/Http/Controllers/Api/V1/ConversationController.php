@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendFcmPushNotification;
 use App\Http\Resources\ConversationResource;
 use App\Http\Resources\MessageResource;
 use App\Models\Conversation;
@@ -130,7 +131,14 @@ class ConversationController extends Controller
         });
 
         $recipient = $conversation->client_id === $request->user()->id ? $conversation->agent : $conversation->client;
-        $recipient->notify(new MessageReceived($message->load(['conversation', 'sender'])));
+        $notification = new MessageReceived($message->load(['conversation', 'sender']));
+        $recipient->notify($notification);
+        try {
+            SendFcmPushNotification::dispatch((int) $recipient->id, (string) $notification->id);
+        } catch (\Throwable $exception) {
+            // A push queue outage must not turn a committed message into an HTTP failure.
+            report($exception);
+        }
 
         return response()->json(['data' => new MessageResource($message->load('property'))], 201);
     }
