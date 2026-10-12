@@ -23,7 +23,7 @@ class SupportTicketController extends Controller
     public function index(Request $request): View
     {
         $filters = $request->validate([
-            'status' => ['nullable', 'in:open,in_progress,waiting_user,resolved,closed,rejected,rejected'],
+            'status' => ['nullable', 'in:open,in_progress,waiting_user,resolved,closed,rejected'],
             'category' => ['nullable', 'in:account,property,agent,security,technical,other'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
