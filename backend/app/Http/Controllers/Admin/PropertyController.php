@@ -12,6 +12,9 @@ use App\Services\AI\AiIndexSyncService;
 use App\Models\PropertyFeature;
 use App\Models\PropertyLocation;
 use App\Models\PropertyType;
+use App\Notifications\PropertyModerationResult;
+use App\Mail\PropertyModerationMail;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -95,20 +98,45 @@ class PropertyController extends Controller
         ]);
     }
 
-    public function approve(Property $property)
+    public function approve(Request $request, Property $property)
     {
-        $property->update(['status' => PropertyStatus::Published, 'published_at' => now()]);
+        DB::transaction(function () use ($request, $property): void {
+            $property->update(['status' => PropertyStatus::Published, 'published_at' => now()]);
+            DB::table('property_moderation_logs')->insert(['property_id' => $property->id, 'reviewer_id' => $request->user()->id, 'decision' => 'approved', 'reason' => null, 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('audit_log')->insert(['actor_id' => $request->user()->id, 'action' => 'property.approved', 'subject_type' => Property::class, 'subject_id' => $property->id, 'ip_address' => substr((string) $request->ip(), 0, 45), 'user_agent' => substr((string) $request->userAgent(), 0, 1000), 'metadata' => json_encode(['reference_code' => $property->reference_code], JSON_UNESCAPED_UNICODE), 'created_at' => now()]);
+        });
+        $property->loadMissing('agent.user');
+        $recipient = $property->agent?->user;
+        if ($recipient) {
+            $recipient->notify(new PropertyModerationResult($property, 'approved'));
+            if ($recipient->notificationPreference?->property_updates ?? true) {
+                Mail::to($recipient->email)->queue(new PropertyModerationMail($property, 'approved'));
+            }
+        }
         ActivityLog::record('property', "تمت الموافقة على العقار «{$property->title}» ({$property->reference_code}) ونشره", $property);
-        return back()->with('status', 'تم اعتماد العقار ونشره.');
+        return back()->with('status', 'تم اعتماد العقار وإشعار الوكيل.');
     }
 
-    public function reject(Property $property)
+    public function reject(Request $request, Property $property)
     {
-        $property->update(['status' => PropertyStatus::Rejected]);
-        ActivityLog::record('property', "تم رفض العقار «{$property->title}» ({$property->reference_code})", $property);
-        return back()->with('status', 'تم رفض العقار.');
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:2000']], ['reason.required' => 'سبب الرفض إلزامي.', 'reason.min' => 'سبب الرفض يجب ألا يقل عن 5 أحرف.', 'reason.max' => 'سبب الرفض طويل جدًا.']);
+        $reason = trim($data['reason']);
+        DB::transaction(function () use ($request, $property, $reason): void {
+            $property->update(['status' => PropertyStatus::Rejected]);
+            DB::table('property_moderation_logs')->insert(['property_id' => $property->id, 'reviewer_id' => $request->user()->id, 'decision' => 'rejected', 'reason' => $reason, 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('audit_log')->insert(['actor_id' => $request->user()->id, 'action' => 'property.rejected', 'subject_type' => Property::class, 'subject_id' => $property->id, 'ip_address' => substr((string) $request->ip(), 0, 45), 'user_agent' => substr((string) $request->userAgent(), 0, 1000), 'metadata' => json_encode(['reference_code' => $property->reference_code, 'reason' => $reason], JSON_UNESCAPED_UNICODE), 'created_at' => now()]);
+        });
+        $property->loadMissing('agent.user');
+        $recipient = $property->agent?->user;
+        if ($recipient) {
+            $recipient->notify(new PropertyModerationResult($property, 'rejected', $reason));
+            if ($recipient->notificationPreference?->property_updates ?? true) {
+                Mail::to($recipient->email)->queue(new PropertyModerationMail($property, 'rejected', $reason));
+            }
+        }
+        ActivityLog::record('property', "تم رفض العقار «{$property->title}» ({$property->reference_code})", $property, properties: ['reason' => $reason]);
+        return back()->with('status', 'تم رفض العقار وإشعار الوكيل بسبب الرفض.');
     }
-
     public function trash(Request $request)
     {
         $query = Property::query()->onlyTrashed()->with(['agent.user']);
