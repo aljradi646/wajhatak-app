@@ -8,6 +8,7 @@ use App\Models\Agent;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 
@@ -53,7 +54,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', Rule::unique('users', 'email')],
             'phone' => ['nullable', 'string', 'max:32', Rule::unique('users', 'phone')],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', Password::min(12)->mixedCase()->numbers()->symbols()],
             'locale' => ['required', 'in:ar,en'],
             'avatar_path' => ['nullable', 'string', 'max:500'],
             'is_active' => ['sometimes', 'boolean'],
@@ -106,7 +107,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:32', Rule::unique('users', 'phone')->ignore($user->id)],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', 'string', Password::min(12)->mixedCase()->numbers()->symbols()],
             'locale' => ['required', 'in:ar,en'],
             'avatar_path' => ['nullable', 'string', 'max:500'],
             'is_active' => ['sometimes', 'boolean'],
