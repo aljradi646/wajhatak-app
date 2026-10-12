@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Agent;
 use App\Models\User;
+use App\Services\Notifications\FirebasePushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Throwable;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 
@@ -139,6 +142,9 @@ class UserController extends Controller
             }
         }
 
+        $previousRoles = $user->getRoleNames()->sort()->values()->all();
+        $rolesWereSubmitted = array_key_exists('roles', $data);
+
         DB::transaction(function () use ($request, $data, $user): void {
             $user->fill([
                 'name' => $data['name'],
@@ -169,6 +175,29 @@ class UserController extends Controller
             ActivityLog::record('user', "تم تحديث المستخدم «{$user->name}»", $user);
         });
 
+        if ($rolesWereSubmitted) {
+            $user->refresh()->load('roles');
+            $currentRoles = $user->getRoleNames()->sort()->values()->all();
+
+            if ($previousRoles !== $currentRoles) {
+                $notification = $user->notifications()->create([
+                    'id' => (string) Str::uuid(),
+                    'type' => 'user_role_changed',
+                    'data' => [
+                        'kind' => 'user_role_changed',
+                        'title' => 'تم تحديث صلاحيات حسابك',
+                        'message' => 'تم تحديث صلاحيات حسابك، وستتحدث واجهة التطبيق تلقائيًا.',
+                    ],
+                ]);
+
+                try {
+                    app(FirebasePushNotificationService::class)->sendDatabaseNotification($user, $notification);
+                } catch (Throwable $exception) {
+                    // Role changes are already persisted; push is best-effort.
+                    report($exception);
+                }
+            }
+        }
 
         return redirect()->route('admin.users.index')->with('status', 'تم تحديث المستخدم بنجاح.');
     }
