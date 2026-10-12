@@ -82,7 +82,6 @@ class PublicContactSubmissionController extends Controller
                 'email_status' => $request->boolean('send_email') ? 'pending' : 'not_sent',
             ])->save();
 
-            ActivityLog::record('public_contact', 'الرد على رسالة التواصل '.$submission->reference, $submission);
         });
 
         $mailState = 'not_requested';
