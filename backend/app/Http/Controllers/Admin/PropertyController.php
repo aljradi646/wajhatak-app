@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\PropertyStatus;
 use App\Enums\TransactionType;
 use App\Jobs\SendFcmPushNotification;
+use App\Jobs\PublishRealtimeEvent;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Agent;
@@ -304,18 +305,29 @@ class PropertyController extends Controller
 
     private function queuePushNotification(\App\Models\User $recipient, BaseNotification $notification): void
     {
+        try {
+            $data = method_exists($notification, 'toArray') ? $notification->toArray($recipient) : [];
+            PublishRealtimeEvent::dispatch((int) $recipient->id, 'notifications.updated', [
+                'notification_id' => (string) $notification->id,
+                'unread_count' => $recipient->unreadNotifications()->count(),
+                'property_id' => (int) ($data['property_id'] ?? 0),
+                'status' => (string) ($data['status'] ?? ''),
+            ]);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
         if (! ($recipient->notificationPreference?->property_updates ?? true)) {
             return;
         }
 
         try {
             SendFcmPushNotification::dispatch((int) $recipient->id, (string) $notification->id);
-        } catch (\Throwable $exception) {
+        } catch (\\Throwable $exception) {
             // The database notification is already persisted; push outages must not fail moderation.
             report($exception);
         }
     }
-
     private function queueModerationEmail(\App\Models\User $recipient, Property $property, string $decision, ?string $reason = null): void
     {
         if (! ($recipient->notificationPreference?->property_updates ?? true)) {
