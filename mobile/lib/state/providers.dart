@@ -360,8 +360,20 @@ abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
   }
 
   Future<void> refresh() async {
+    if (_refreshInFlight) return;
+
+    // If an event arrives during the first load, wait for that request before
+    // issuing a background refresh so the event cannot be lost to a stale read.
+    if (state.value == null) {
+      try {
+        await future;
+      } catch (_) {
+        return; // The normal first-load error UI owns retry behavior.
+      }
+    }
+
     final previous = state.value;
-    if (_refreshInFlight || previous == null) return;
+    if (previous == null || _refreshInFlight) return;
     _refreshInFlight = true;
     try {
       state = AsyncData(await loadValue());
