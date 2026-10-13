@@ -28,6 +28,7 @@ class FirebasePushMessagingService {
   bool _launchMessageHandled = false;
 
   Future<void> Function(String? notificationId)? onNotificationOpened;
+  Future<void> Function(Map<String, dynamic> data)? onMessageReceived;
 
   bool get _isSupported =>
       !kIsWeb &&
@@ -68,6 +69,8 @@ class FirebasePushMessagingService {
       await messaging.requestPermission(alert: true, badge: true, sound: true);
 
       _foregroundSubscription ??= FirebaseMessaging.onMessage.listen((message) {
+        final callback = onMessageReceived;
+        if (callback != null) unawaited(callback(message.data));
         unawaited(_showForegroundMessage(message));
       });
       _openedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen((message) {
