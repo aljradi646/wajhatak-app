@@ -55,6 +55,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     unawaited(_handleLaunchNotification());
     final push = ref.read(firebasePushMessagingServiceProvider);
     push.onNotificationOpened = _openFromSystemNotification;
+    push.onMessageReceived = _handlePushMessage;
     unawaited(push.initializeAndRegister());
     // Notifications refresh from push/WebSocket events; avoid global polling
     // that repeatedly invalidates whole screens and destroys their state.
@@ -80,7 +81,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       unawaited(ref.read(conversationsProvider.notifier).refresh());
       final id = int.tryParse(data['conversation_id']?.toString() ?? '');
       if (id != null && id == ActiveChatContext.conversationId) {
-        ref.invalidate(messagesProvider(id));
+        unawaited(ref.read(messagesProvider(id).notifier).refresh());
       }
     } else if (event == 'conversation.read') {
       unawaited(ref.read(conversationsProvider.notifier).refresh());
@@ -88,6 +89,18 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (id != null) ref.invalidate(messagesProvider(id));
     }
   }
+  Future<void> _handlePushMessage(Map<String, dynamic> data) async {
+    if (!mounted) return;
+    unawaited(ref.read(notificationsProvider.notifier).refresh());
+    unawaited(ref.read(unreadNotificationCountProvider.notifier).refresh());
+    unawaited(ref.read(conversationsProvider.notifier).refresh());
+    final conversationId = int.tryParse(data['conversation_id']?.toString() ?? '');
+    if (conversationId != null &&
+        conversationId == ActiveChatContext.conversationId) {
+      unawaited(ref.read(messagesProvider(conversationId).notifier).refresh());
+    }
+  }
+
   /// فتح المصدر من إشعار نظام (التطبيق في الخلفية).
   Future<void> _openFromSystemNotification(String? notificationId) async {
     if (notificationId == null) return;
