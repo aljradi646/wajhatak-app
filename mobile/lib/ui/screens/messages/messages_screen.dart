@@ -60,18 +60,30 @@ class MessagesScreen extends ConsumerWidget {
             ),
           ),
         Expanded(
-          child: LuxAsyncView<List<ConversationItem>>(
+          child: standalone
+              ? RefreshIndicator(
+                  onRefresh: () => ref.read(conversationsProvider.notifier).refresh(),
+                  child: LuxAsyncView<List<ConversationItem>>(
             value: conversations,
             loading: const ConversationListSkeleton(showTitle: false),
             errorRetry: () => ref.invalidate(conversationsProvider),
             data: (data) => data.isEmpty
-                ? const EmptyState(
-                    title: 'لا توجد محادثات',
-                    body:
-                        'ابدأ محادثة من صفحة تفاصيل أي عقار عبر "مراسلة الوكيل".',
-                    icon: Icons.chat_bubble_outline_rounded,
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(20),
+                    children: const [
+                      SizedBox(
+                        height: 280,
+                        child: EmptyState(
+                          title: 'لا توجد محادثات',
+                          body: 'ابدأ محادثة من صفحة تفاصيل أي عقار عبر "مراسلة الوكيل".',
+                          icon: Icons.chat_bubble_outline_rounded,
+                        ),
+                      ),
+                    ],
                   )
                 : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                     itemCount: data.length,
                     separatorBuilder: (context, index) =>
