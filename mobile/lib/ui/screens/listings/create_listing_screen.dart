@@ -135,6 +135,30 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     setState(() => _images.removeAt(index));
   }
 
+  void _retryInitialLookups() {
+    if (!ref.read(propertyTypesProvider).hasValue) {
+      ref.invalidate(propertyTypesProvider);
+    }
+    if (!ref.read(featuresProvider).hasValue) {
+      ref.invalidate(featuresProvider);
+    }
+    if (!ref.read(currenciesProvider).hasValue) {
+      ref.invalidate(currenciesProvider);
+    }
+    if (!ref.read(countriesProvider).hasValue) {
+      ref.invalidate(countriesProvider);
+    }
+  }
+
+  Future<void> _warmLocationData<T>(Future<T> request) async {
+    try {
+      await request;
+    } on Object {
+      // The relevant dropdown renders its own recoverable error state.
+    }
+  }
+
+
   Future<void> _submit() async {
     if (!(_form.currentState?.validate() ?? false) || _typeId == null) {
       if (_typeId == null) util.notice(context, 'اختر نوع العقار.');
@@ -176,7 +200,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
         },
       }, _images);
       unawaited(ref.read(myListingsProvider.notifier).refresh());
-      ref.invalidate(propertiesProvider);
+      ref.read(propertyCatalogRevisionProvider.notifier).bump();
       if (mounted) {
         Navigator.of(context).pop();
         util.notice(context, 'تم إرسال العقار للمراجعة قبل النشر.');
@@ -194,13 +218,26 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     final features = ref.watch(featuresProvider);
     final currencies = ref.watch(currenciesProvider);
     final countries = ref.watch(countriesProvider);
+    final initialCatalogsReady = types.hasValue &&
+        features.hasValue &&
+        currencies.hasValue &&
+        countries.hasValue;
+    final initialCatalogError =
+        (types.hasError && !types.hasValue) ||
+        (features.hasError && !features.hasValue) ||
+        (currencies.hasError && !currencies.hasValue) ||
+        (countries.hasError && !countries.hasValue);
 
     return Scaffold(
       appBar: WajhatakScreenHeader(
         title: 'إضافة عقار',
         subtitle: 'أدخل تفاصيل عقارك وسيراجعها فريقنا قبل النشر',
       ),
-      body: Form(
+      body: !initialCatalogsReady
+          ? initialCatalogError
+              ? _CreateListingCatalogError(onRetry: _retryInitialLookups)
+              : const _CreateListingScreenSkeleton()
+          : Form(
         key: _form,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
@@ -495,6 +532,13 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                         _city = null;
                         _areaLocation = null;
                       });
+                      if (value != null) {
+                        unawaited(
+                          _warmLocationData(
+                            ref.read(regionsProvider(value.id).future),
+                          ),
+                        );
+                      }
                     },
                   ),
                   loading: () => const Padding(
@@ -522,6 +566,13 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                               _city = null;
                               _areaLocation = null;
                             });
+                            if (value != null) {
+                              unawaited(
+                                _warmLocationData(
+                                  ref.read(citiesProvider(value.id).future),
+                                ),
+                              );
+                            }
                           },
                         ),
                         loading: () => const Padding(
@@ -550,6 +601,13 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                               _city = value;
                               _areaLocation = null;
                             });
+                            if (value != null) {
+                              unawaited(
+                                _warmLocationData(
+                                  ref.read(areasProvider(value.id).future),
+                                ),
+                              );
+                            }
                           },
                         ),
                         loading: () => const Padding(
@@ -811,6 +869,179 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
 }
 
 /// قسم نموذج بحدود ناعمة وأيقونة ملونة.
+class _CreateListingCatalogError extends StatelessWidget {
+  const _CreateListingCatalogError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.cloud_off_rounded,
+              size: 44,
+              color: theme.colorScheme.error,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'تعذر تجهيز بيانات نموذج العقار',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'لم نعرض نموذجًا ناقصًا. تحقق من الاتصال ثم أعد تحميل أنواع العقارات والمزايا والعملات والمواقع.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateListingScreenSkeleton extends StatelessWidget {
+  const _CreateListingScreenSkeleton();
+
+  Widget _field({double? width, double height = 52}) =>
+      LuxSkeleton(width: width, height: height, radius: 12);
+
+  Widget _section({
+    required double titleWidth,
+    required List<Widget> fields,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0x00000000),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0x332D7562)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const LuxSkeleton(width: 36, height: 36, radius: 12),
+              const SizedBox(width: 10),
+              _field(width: titleWidth, height: 20),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...fields.expand((field) => [field, const SizedBox(height: 12)]),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+      children: [
+        _section(
+          titleWidth: 144,
+          fields: [
+            _field(),
+            _field(),
+            Row(
+              children: [
+                Expanded(child: _field()),
+                const SizedBox(width: 10),
+                Expanded(child: _field()),
+              ],
+            ),
+            _field(height: 112),
+            Row(
+              children: [
+                Expanded(child: _field()),
+                const SizedBox(width: 10),
+                Expanded(child: _field()),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _section(
+          titleWidth: 112,
+          fields: [
+            Row(
+              children: [
+                Expanded(child: _field()),
+                const SizedBox(width: 10),
+                Expanded(child: _field()),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _field()),
+                const SizedBox(width: 10),
+                Expanded(child: _field()),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _section(
+          titleWidth: 82,
+          fields: [
+            _field(),
+            _field(),
+            _field(),
+            _field(),
+            _field(),
+            _field(),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _section(
+          titleWidth: 72,
+          fields: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _field(width: 88, height: 32),
+                _field(width: 104, height: 32),
+                _field(width: 92, height: 32),
+                _field(width: 108, height: 32),
+                _field(width: 82, height: 32),
+                _field(width: 96, height: 32),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _section(
+          titleWidth: 92,
+          fields: [
+            _field(height: 92),
+            _field(height: 56),
+          ],
+        ),
+        const SizedBox(height: 18),
+        _field(height: 54),
+      ],
+    );
+  }
+}
+
 class _FormSection extends StatelessWidget {
   const _FormSection({
     required this.icon,
