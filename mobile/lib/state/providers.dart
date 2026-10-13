@@ -412,11 +412,27 @@ abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
   }
 }
 
+/// Bump after a successful property mutation or authoritative realtime event.
+/// Active catalog/detail queries revalidate in place; their previous value stays
+/// visible through LuxAsyncView/SliverAsyncView, preserving scroll and form state.
+class PropertyCatalogRevisionController extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
+final propertyCatalogRevisionProvider =
+    NotifierProvider<PropertyCatalogRevisionController, int>(
+  PropertyCatalogRevisionController.new,
+);
+
 // ---------------------------------------------------------------------------
 // العقارات
 // ---------------------------------------------------------------------------
 
 final propertiesProvider = FutureProvider<List<LuxProperty>>((ref) async {
+  ref.watch(propertyCatalogRevisionProvider);
   if (AppConfig.isUiPreview) return (await _preview(ref)).list();
   ref.watch(sessionUserIdProvider);
   return ref.read(propertyRepositoryProvider).list();
@@ -424,6 +440,7 @@ final propertiesProvider = FutureProvider<List<LuxProperty>>((ref) async {
 
 final propertySearchProvider =
     FutureProvider.family<List<LuxProperty>, PropertyQuery>((ref, query) async {
+      ref.watch(propertyCatalogRevisionProvider);
       if (AppConfig.isUiPreview) return (await _preview(ref)).list(query);
       ref.watch(sessionUserIdProvider);
       return ref.read(propertyRepositoryProvider).list(query);
@@ -469,6 +486,7 @@ class ExplorePropertySearchController
 
   @override
   Future<ExploreSearchResult> build() async {
+    ref.watch(propertyCatalogRevisionProvider);
     if (AppConfig.isUiPreview) {
       final items = await (await _preview(ref)).list(_query);
       return ExploreSearchResult(items: items, hasMore: false, nextPage: 1);
