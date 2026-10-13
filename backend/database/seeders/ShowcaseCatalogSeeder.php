@@ -18,6 +18,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Idempotent showcase catalog. These 100 records and their images are examples
@@ -104,17 +106,34 @@ class ShowcaseCatalogSeeder extends Seeder
 
     public function run(): void
     {
+        $password = trim((string) env('WAJHATAK_SHOWCASE_AGENT_PASSWORD', ''));
+        if ($password !== '' && mb_strlen($password) < 20) {
+            throw new RuntimeException(
+                'WAJHATAK_SHOWCASE_AGENT_PASSWORD must contain at least 20 characters.',
+            );
+        }
+
         if ((string) Setting::get(self::SEED_MARKER, '0') === '1') {
+            // Operators can intentionally enable demo logins after initial
+            // provisioning by setting this secret in Railway. It is never
+            // read from a committed default or printed into deployment logs.
+            if ($password !== '') {
+                $this->applyConfiguredShowcasePassword($password);
+            }
             $this->command?->info('ShowcaseCatalogSeeder: already provisioned; nothing changed.');
             return;
         }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        Role::findOrCreate('agent');
+        Role::findOrCreate('user');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         // Use the same authoritative location hierarchy as the mobile form.
         $this->call(LocationSeeder::class);
         $this->ensureTaxonomy();
         $this->markLegacySeededRowsAsDemo();
 
-        $password = trim((string) env('WAJHATAK_SHOWCASE_AGENT_PASSWORD', ''));
         $agents = [];
         for ($n = 1; $n <= 5; $n++) {
             $agents[] = $this->ensureShowcaseAgent($n, $password);
@@ -169,31 +188,41 @@ class ShowcaseCatalogSeeder extends Seeder
                 ],
             );
 
-            $record = Property::withTrashed()->updateOrCreate(
-                ['reference_code' => $code],
-                [
-                    'agent_id' => $agents[($i - 1) % count($agents)]->id,
-                    'property_type_id' => $typeIds[$typeSlug],
-                    'property_location_id' => $location->id,
-                    'title' => $title,
-                    'slug' => 'wajhatak-showcase-'.$number,
-                    'description' => $description,
-                    'transaction_type' => $transaction,
-                    'status' => 'published',
-                    'price' => $price,
-                    'currency' => 'YER',
-                    'area' => $squareMeters,
-                    'bedrooms' => $bedrooms,
-                    'bathrooms' => $bathrooms,
-                    'parking_spaces' => $bedrooms === null ? 0 : ($i % 3),
-                    'is_furnished' => $furnished,
-                    'is_new' => $new,
-                    'is_featured' => $i % 10 === 0,
-                    'is_demo' => true,
-                    'published_at' => now()->subDays($i % 60),
-                    'deleted_at' => null,
-                ],
-            );
+            $attributes = [
+                'agent_id' => $agents[($i - 1) % count($agents)]->id,
+                'property_type_id' => $typeIds[$typeSlug],
+                'property_location_id' => $location->id,
+                'title' => $title,
+                'slug' => 'wajhatak-showcase-'.$number,
+                'description' => $description,
+                'transaction_type' => $transaction,
+                'status' => 'published',
+                'price' => $price,
+                'currency' => 'YER',
+                'area' => $squareMeters,
+                'bedrooms' => $bedrooms,
+                'bathrooms' => $bathrooms,
+                'parking_spaces' => $bedrooms === null ? 0 : ($i % 3),
+                'is_furnished' => $furnished,
+                'is_new' => $new,
+                'is_featured' => $i % 10 === 0,
+                'is_demo' => true,
+                'published_at' => now()->subDays($i % 60),
+            ];
+
+            if ($existing) {
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+                $existing->fill($attributes);
+                $existing->save();
+                $record = $existing;
+            } else {
+                $record = Property::query()->create([
+                    ...$attributes,
+                    'reference_code' => $code,
+                ]);
+            }
 
             $selectedFeatures = collect($type['features'])
                 ->filter(fn (string $slug) => isset($featureIds[$slug]))
@@ -282,6 +311,23 @@ class ShowcaseCatalogSeeder extends Seeder
                 'is_demo' => true,
             ],
         );
+    }
+
+    private function applyConfiguredShowcasePassword(string $password): void
+    {
+        $emails = [
+            'showcase.agent01@example.test',
+            'showcase.agent02@example.test',
+            'showcase.agent03@example.test',
+            'showcase.agent04@example.test',
+            'showcase.agent05@example.test',
+            'agent.demo@lux.local',
+            'client.demo@lux.local',
+        ];
+
+        foreach (User::query()->whereIn('email', $emails)->get() as $user) {
+            $user->forceFill(['password' => Hash::make($password)])->save();
+        }
     }
 
     private function rotateLegacyDemoPasswords(string $sharedPassword): void
