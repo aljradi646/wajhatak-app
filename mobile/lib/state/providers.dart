@@ -390,13 +390,20 @@ abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
 
     final previous = state.value;
     if (previous == null || _refreshInFlight) return;
+    final requestedUserId = ref.read(sessionUserIdProvider);
     _refreshInFlight = true;
     try {
       final refreshed = await loadValue();
-      if (ref.mounted) state = AsyncData(refreshed);
+      if (ref.mounted &&
+          requestedUserId == ref.read(sessionUserIdProvider)) {
+        state = AsyncData(refreshed);
+      }
     } catch (_) {
       // A transient refresh failure must not erase usable on-screen data.
-      if (ref.mounted) state = AsyncData(previous);
+      if (ref.mounted &&
+          requestedUserId == ref.read(sessionUserIdProvider)) {
+        state = AsyncData(previous);
+      }
     } finally {
       _refreshInFlight = false;
       if (ref.mounted && _refreshQueued) {
@@ -769,10 +776,14 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
   /// تحديث خلفي للرسائل الجديدة دون إظهار شاشة تحميل (يبقي القائمة الحالية).
   Future<void> refresh() async {
     if (_refreshInFlight) return;
+    final requestedUserId = ref.read(sessionUserIdProvider);
     _refreshInFlight = true;
     try {
       final latest = await _load();
-      if (ref.mounted) state = AsyncData(latest);
+      if (ref.mounted &&
+          requestedUserId == ref.read(sessionUserIdProvider)) {
+        state = AsyncData(latest);
+      }
     } on Object {
       // A transient refresh failure must not erase visible messages.
     } finally {
@@ -798,6 +809,7 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
       unawaited(ref.read(conversationsProvider.notifier).refresh());
       return;
     }
+    final senderUserId = ref.read(sessionUserIdProvider);
     final message = await ref
         .read(conversationRepositoryProvider)
         .sendMessage(
@@ -806,6 +818,9 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
           messageType: messageType,
           propertyId: propertyId,
         );
+    if (!ref.mounted || senderUserId != ref.read(sessionUserIdProvider)) {
+      return;
+    }
     state = AsyncData([
       message,
       ...(state.value ?? const <ChatMessage>[]).where(
