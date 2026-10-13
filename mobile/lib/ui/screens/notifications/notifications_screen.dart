@@ -34,7 +34,14 @@ class NotificationsScreen extends ConsumerWidget {
     final notifications = ref.watch(notificationsProvider);
     return Scaffold(
       appBar: WajhatakScreenHeader(title: 'الإشعارات'),
-      body: LuxAsyncView<List<LuxNotification>>(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await Future.wait<void>([
+            ref.read(notificationsProvider.notifier).refresh(),
+            ref.read(unreadNotificationCountProvider.notifier).refresh(),
+          ]);
+        },
+        child: LuxAsyncView<List<LuxNotification>>(
         value: notifications,
         loading: const NotificationListSkeleton(),
         errorRetry: () => ref.invalidate(notificationsProvider),
@@ -47,6 +54,7 @@ class NotificationsScreen extends ConsumerWidget {
             );
           }
           return ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(20),
             itemCount: items.length,
             separatorBuilder: (context, index) => const SizedBox(height: 10),
@@ -60,7 +68,7 @@ class NotificationsScreen extends ConsumerWidget {
             ),
           );
         },
-      ),
+      )),
     );
   }
 }
