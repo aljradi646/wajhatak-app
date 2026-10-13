@@ -273,7 +273,6 @@ class SessionController extends AsyncNotifier<SessionData?> {
   }) async {
     final current = state.asData?.value;
     if (current == null || AppConfig.isUiPreview) return;
-    state = const AsyncLoading();
     try {
       final result = await ref
           .read(authRepositoryProvider)
@@ -285,7 +284,6 @@ class SessionController extends AsyncNotifier<SessionData?> {
           );
       state = AsyncData(result);
     } on ApiFailure {
-      state = AsyncData(current);
       rethrow;
     }
   }
@@ -295,14 +293,12 @@ class SessionController extends AsyncNotifier<SessionData?> {
     if (current == null || AppConfig.isUiPreview) {
       return;
     }
-    state = const AsyncLoading();
     try {
       final result = await ref
           .read(authRepositoryProvider)
           .uploadAvatar(session: current, imagePath: imagePath);
       state = AsyncData(result);
     } on ApiFailure {
-      state = AsyncData(current);
       rethrow;
     }
   }
@@ -311,6 +307,11 @@ class SessionController extends AsyncNotifier<SessionData?> {
 final sessionProvider = AsyncNotifierProvider<SessionController, SessionData?>(
   SessionController.new,
 );
+
+/// Stable auth dependency for data providers. Profile refreshes must not
+/// invalidate every screen; only a change of authenticated user ID does.
+final sessionUserIdProvider = Provider<int?>((ref) =>
+    ref.watch(sessionProvider.select((session) => session.asData?.value?.user.id)));
 
 // ---------------------------------------------------------------------------
 // مساعدات داخلية
@@ -327,8 +328,8 @@ Future<T> _readForSession<T>(
   T fallback,
   Future<T> Function() request,
 ) async {
-  final session = ref.watch(sessionProvider).asData?.value;
-  if (session == null) return fallback;
+  final sessionUserId = ref.watch(sessionUserIdProvider);
+  if (sessionUserId == null) return fallback;
   try {
     return await request();
   } on ApiFailure catch (error) {
@@ -350,7 +351,7 @@ Future<T> _readForSession<T>(
 
 final propertiesProvider = FutureProvider<List<LuxProperty>>((ref) async {
   if (AppConfig.isUiPreview) return (await _preview(ref)).list();
-  ref.watch(sessionProvider);
+  ref.watch(sessionUserIdProvider);
   return ref.read(propertyRepositoryProvider).list();
 });
 
@@ -719,7 +720,7 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
 // البلاغات والدعم
 // ---------------------------------------------------------------------------
 final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
-  if (!AppConfig.isUiPreview && ref.watch(sessionProvider).asData?.value == null) return const [];
+  if (!AppConfig.isUiPreview && ref.watch(sessionUserIdProvider) == null) return const [];
   if (AppConfig.isUiPreview) return const [];
   return ref.watch(supportTicketRepositoryProvider).list();
 });
