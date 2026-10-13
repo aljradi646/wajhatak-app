@@ -13,6 +13,7 @@ use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
@@ -151,6 +152,7 @@ class RealDataSeeder extends Seeder
                 'is_furnished' => $p['furnished'],
                 'is_new' => $p['new'],
                 'is_featured' => $p['featured'],
+                'is_demo' => true,
                 'published_at' => $p['published'] ? now() : null,
             ]);
 
@@ -182,15 +184,21 @@ class RealDataSeeder extends Seeder
 
     private function ensureAgent(string $email, string $name, string $phone, string $license): Agent
     {
-        $user = User::query()->updateOrCreate(
+        $configuredPassword = trim((string) env('WAJHATAK_SHOWCASE_AGENT_PASSWORD', ''));
+        $user = User::query()->firstOrCreate(
             ['email' => $email],
             [
                 'name' => $name,
                 'phone' => $phone,
-                'password' => Hash::make('agent123'),
+                'password' => Hash::make($configuredPassword !== '' ? $configuredPassword : Str::random(64)),
                 'is_active' => true,
             ],
         );
+        $user->forceFill([
+            'name' => $name,
+            'phone' => $phone,
+            'is_active' => true,
+        ])->save();
         $user->forceFill(['email_verified_at' => now()])->save();
         $user->syncRoles(['agent', 'user']);
 
@@ -202,6 +210,8 @@ class RealDataSeeder extends Seeder
                 'rating' => 4.8,
                 'reviews_count' => 37,
                 'is_active' => true,
+                'verification_status' => 'pending',
+                'is_demo' => true,
             ],
         );
     }
