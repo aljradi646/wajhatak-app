@@ -723,6 +723,7 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
   ChatMessagesNotifier(this._conversationId);
 
   final int _conversationId;
+  bool _refreshInFlight = false;
 
   @override
   Future<List<ChatMessage>> build() {
@@ -743,10 +744,15 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
 
   /// تحديث خلفي للرسائل الجديدة دون إظهار شاشة تحميل (يبقي القائمة الحالية).
   Future<void> refresh() async {
+    if (_refreshInFlight) return;
+    _refreshInFlight = true;
     try {
-      state = AsyncData(await _load());
+      final latest = await _load();
+      if (ref.mounted) state = AsyncData(latest);
     } on Object {
-      // فشل التحديث الخلفي لا يُسقط الرسائل المعروضة.
+      // A transient refresh failure must not erase visible messages.
+    } finally {
+      _refreshInFlight = false;
     }
   }
 
