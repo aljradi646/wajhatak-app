@@ -345,6 +345,32 @@ Future<T> _readForSession<T>(
   }
 }
 
+/// Async controller that refreshes in place, retaining the last successful
+/// value during network revalidation. Use invalidation only for first-load
+/// recovery or when the identity/query itself changes.
+abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
+  bool _refreshInFlight = false;
+
+  Future<T> loadValue();
+
+  @override
+  Future<T> build() => loadValue();
+
+  Future<void> refresh() async {
+    final previous = state.value;
+    if (_refreshInFlight || previous == null) return;
+    _refreshInFlight = true;
+    try {
+      state = AsyncData(await loadValue());
+    } catch (_) {
+      // A transient refresh failure must not erase usable on-screen data.
+      state = AsyncData(previous);
+    } finally {
+      _refreshInFlight = false;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // العقارات
 // ---------------------------------------------------------------------------
@@ -477,14 +503,22 @@ final favoritesProvider = FutureProvider<List<LuxProperty>>((ref) async {
   );
 });
 
-final myListingsProvider = FutureProvider<List<LuxProperty>>((ref) async {
-  if (AppConfig.isUiPreview) return (await _preview(ref)).mine();
-  return _readForSession(
-    ref,
-    const <LuxProperty>[],
-    () => ref.read(propertyRepositoryProvider).mine(),
-  );
-});
+class MyListingsController extends BackgroundRefreshController<List<LuxProperty>> {
+  @override
+  Future<List<LuxProperty>> loadValue() async {
+    if (AppConfig.isUiPreview) return (await _preview(ref)).mine();
+    return _readForSession(
+      ref,
+      const <LuxProperty>[],
+      () => ref.read(propertyRepositoryProvider).mine(),
+    );
+  }
+}
+
+final myListingsProvider =
+    AsyncNotifierProvider<MyListingsController, List<LuxProperty>>(
+  MyListingsController.new,
+);
 
 // ---------------------------------------------------------------------------
 // ملف الوكيل
@@ -622,27 +656,39 @@ final areasProvider = FutureProvider.family<List<LocationItem>, int>(
 // المحادثات والرسائل وطلبات المعاينة
 // ---------------------------------------------------------------------------
 
-final conversationsProvider = FutureProvider<List<ConversationItem>>((
-  ref,
-) async {
-  if (AppConfig.isUiPreview) return (await _preview(ref)).conversations();
-  return _readForSession(
-    ref,
-    const <ConversationItem>[],
-    () => ref.read(conversationRepositoryProvider).conversations(),
-  );
-});
+class ConversationsController extends BackgroundRefreshController<List<ConversationItem>> {
+  @override
+  Future<List<ConversationItem>> loadValue() async {
+    if (AppConfig.isUiPreview) return (await _preview(ref)).conversations();
+    return _readForSession(
+      ref,
+      const <ConversationItem>[],
+      () => ref.read(conversationRepositoryProvider).conversations(),
+    );
+  }
+}
 
-final viewingRequestsProvider = FutureProvider<List<ViewingRequestItem>>((
-  ref,
-) async {
-  if (AppConfig.isUiPreview) return (await _preview(ref)).viewingRequests();
-  return _readForSession(
-    ref,
-    const <ViewingRequestItem>[],
-    () => ref.read(viewingRequestRepositoryProvider).viewingRequests(),
-  );
-});
+final conversationsProvider =
+    AsyncNotifierProvider<ConversationsController, List<ConversationItem>>(
+  ConversationsController.new,
+);
+
+class ViewingRequestsController extends BackgroundRefreshController<List<ViewingRequestItem>> {
+  @override
+  Future<List<ViewingRequestItem>> loadValue() async {
+    if (AppConfig.isUiPreview) return (await _preview(ref)).viewingRequests();
+    return _readForSession(
+      ref,
+      const <ViewingRequestItem>[],
+      () => ref.read(viewingRequestRepositoryProvider).viewingRequests(),
+    );
+  }
+}
+
+final viewingRequestsProvider =
+    AsyncNotifierProvider<ViewingRequestsController, List<ViewingRequestItem>>(
+  ViewingRequestsController.new,
+);
 
 final messagesProvider =
     AsyncNotifierProvider.family<ChatMessagesNotifier, List<ChatMessage>, int>(
@@ -729,29 +775,41 @@ final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
 // الإشعارات
 // ---------------------------------------------------------------------------
 
-final notificationsProvider = FutureProvider<List<LuxNotification>>((
-  ref,
-) async {
-  if (!AppConfig.isUiPreview &&
-      ref.watch(sessionUserIdProvider) == null) {
-    return const [];
+class NotificationsController extends BackgroundRefreshController<List<LuxNotification>> {
+  @override
+  Future<List<LuxNotification>> loadValue() async {
+    if (!AppConfig.isUiPreview && ref.watch(sessionUserIdProvider) == null) {
+      return const [];
+    }
+    return AppConfig.isUiPreview
+        ? (await _preview(ref)).notifications()
+        : ref.read(notificationRepositoryProvider).notifications();
   }
-  return AppConfig.isUiPreview
-      ? (await _preview(ref)).notifications()
-      : ref.watch(notificationRepositoryProvider).notifications();
-});
+}
 
-final unreadNotificationCountProvider = FutureProvider<int>((ref) async {
-  if (!AppConfig.isUiPreview &&
-      ref.watch(sessionUserIdProvider) == null) {
-    return 0;
+final notificationsProvider =
+    AsyncNotifierProvider<NotificationsController, List<LuxNotification>>(
+  NotificationsController.new,
+);
+
+class UnreadNotificationCountController extends BackgroundRefreshController<int> {
+  @override
+  Future<int> loadValue() async {
+    if (!AppConfig.isUiPreview && ref.watch(sessionUserIdProvider) == null) {
+      return 0;
+    }
+    if (AppConfig.isUiPreview) {
+      final items = await (await _preview(ref)).notifications();
+      return items.where((item) => !item.isRead).length;
+    }
+    return ref.read(notificationRepositoryProvider).unreadCount();
   }
-  if (AppConfig.isUiPreview) {
-    final items = await (await _preview(ref)).notifications();
-    return items.where((item) => !item.isRead).length;
-  }
-  return ref.watch(notificationRepositoryProvider).unreadCount();
-});
+}
+
+final unreadNotificationCountProvider =
+    AsyncNotifierProvider<UnreadNotificationCountController, int>(
+  UnreadNotificationCountController.new,
+);
 
 // ---------------------------------------------------------------------------
 // البحث وحالة المفضلة
