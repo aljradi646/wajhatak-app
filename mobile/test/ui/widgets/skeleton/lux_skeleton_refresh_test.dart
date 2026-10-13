@@ -6,7 +6,7 @@ import 'package:wajhatak/ui/widgets/skeleton/lux_skeleton.dart';
 void main() {
   testWidgets('LuxAsyncView keeps the last successful content during refresh',
       (tester) async {
-    var value = const AsyncData<int>(7);
+    AsyncValue<int> value = const AsyncData<int>(7);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -46,7 +46,7 @@ void main() {
 
   testWidgets('SliverAsyncView keeps the last successful slivers during refresh',
       (tester) async {
-    var value = const AsyncData<int>(9);
+    AsyncValue<int> value = const AsyncData<int>(9);
 
     await tester.pumpWidget(
       ProviderScope(
