@@ -373,7 +373,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 bottomStart: Radius.circular(user ? 5 : 19), bottomEnd: Radius.circular(user ? 19 : 5),
               ),
               child: InkWell(
-                onTap: _toggleCopy, onLongPress: _copy,
+                onTap: _revealCopy, onLongPress: _copy,
                 borderRadius: BorderRadius.circular(19),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
