@@ -39,8 +39,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     ActiveChatContext.conversationId = widget.conversation.id;
-    unawaited(ref.read(notificationsProvider.notifier).refresh());
-    unawaited(ref.read(unreadNotificationCountProvider.notifier).refresh());
+    unawaited(_syncReadStateAfterOpening());
     // تحديث فوري عند فتح المحادثة (لا يُستخدم الكاش القديم) —
     // بنفس صرامه تحديث جرس الإشعارات.
     if (ref.exists(messagesProvider(widget.conversation.id))) {
@@ -50,7 +49,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (mounted && !ref.read(realtimeServiceProvider).isConnected) {
         ref.read(messagesProvider(widget.conversation.id).notifier).refresh();
-
+        unawaited(ref.read(conversationsProvider.notifier).refresh());
       }
     });
   }
@@ -63,6 +62,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _refreshTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncReadStateAfterOpening() async {
+    // The messages endpoint marks incoming messages and their linked
+    // notifications as read. Refresh dependent badges only after that commit.
+    try {
+      await ref.read(messagesProvider(widget.conversation.id).future);
+    } on Object {
+      // The conversation UI owns the visible load/retry error.
+    }
+    if (!mounted) return;
+    await Future.wait<void>([
+      ref.read(notificationsProvider.notifier).refresh(),
+      ref.read(unreadNotificationCountProvider.notifier).refresh(),
+      ref.read(conversationsProvider.notifier).refresh(),
+    ]);
   }
 
   Future<void> _send() async {
