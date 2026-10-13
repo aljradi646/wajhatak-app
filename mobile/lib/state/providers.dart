@@ -394,14 +394,12 @@ abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
     _refreshInFlight = true;
     try {
       final refreshed = await loadValue();
-      if (ref.mounted &&
-          requestedUserId == ref.read(sessionUserIdProvider)) {
+      if (ref.mounted && requestedUserId == ref.read(sessionUserIdProvider)) {
         state = AsyncData(refreshed);
       }
     } catch (_) {
       // A transient refresh failure must not erase usable on-screen data.
-      if (ref.mounted &&
-          requestedUserId == ref.read(sessionUserIdProvider)) {
+      if (ref.mounted && requestedUserId == ref.read(sessionUserIdProvider)) {
         state = AsyncData(previous);
       }
     } finally {
@@ -780,8 +778,7 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
     _refreshInFlight = true;
     try {
       final latest = await _load();
-      if (ref.mounted &&
-          requestedUserId == ref.read(sessionUserIdProvider)) {
+      if (ref.mounted && requestedUserId == ref.read(sessionUserIdProvider)) {
         state = AsyncData(latest);
       }
     } on Object {
