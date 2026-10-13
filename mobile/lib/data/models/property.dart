@@ -23,6 +23,7 @@ class LuxProperty {
     this.isFurnished = false,
     this.isNew = false,
     this.isFeatured = false,
+    this.isDemo = false,
     this.isFavorited = false,
     this.status,
     this.publishedAt,
@@ -50,6 +51,7 @@ class LuxProperty {
   final bool isFurnished;
   final bool isNew;
   final bool isFeatured;
+  final bool isDemo;
   final bool isFavorited;
   final String? status;
   final DateTime? publishedAt;
@@ -88,6 +90,7 @@ class LuxProperty {
     isFurnished: isFurnished,
     isNew: isNew,
     isFeatured: isFeatured,
+    isDemo: isDemo,
     isFavorited: isFavorited ?? this.isFavorited,
     status: status,
     publishedAt: publishedAt,
@@ -136,6 +139,7 @@ class LuxProperty {
       isFurnished: json['is_furnished'] as bool? ?? false,
       isNew: json['is_new'] as bool? ?? false,
       isFeatured: json['is_featured'] as bool? ?? false,
+      isDemo: json['is_demo'] as bool? ?? false,
       isFavorited: json['is_favorited'] as bool? ?? false,
       status: json['status'] as String?,
       publishedAt: DateTime.tryParse(json['published_at'] as String? ?? ''),
@@ -166,6 +170,7 @@ class LuxProperty {
     'is_furnished': isFurnished,
     'is_new': isNew,
     'is_favorited': isFavorited,
+    'is_demo': isDemo,
     'status': status,
     'type_id': typeId,
     'type_name': typeName,
