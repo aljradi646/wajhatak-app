@@ -193,8 +193,12 @@ class _AppShellState extends ConsumerState<AppShell> {
       (_, next) =>
           next.whenData((items) => _handleNotifications(items, settings)),
     );
-    ref.listen<AsyncValue<SessionData?>>(sessionProvider, (_, next) {
-      if (next.asData?.value != null) {
+    ref.listen<AsyncValue<SessionData?>>(sessionProvider, (previous, next) {
+      final previousUserId = previous?.asData?.value?.user.id;
+      final nextUserId = next.asData?.value?.user.id;
+      if (previousUserId == nextUserId) return;
+
+      if (nextUserId != null) {
         unawaited(
           ref
               .read(firebasePushMessagingServiceProvider)
