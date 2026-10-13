@@ -323,14 +323,20 @@ class _MessageBubbleState extends State<_MessageBubble> {
   @override
   void dispose() { _timer?.cancel(); super.dispose(); }
 
-  void _toggleCopy() {
+  void _revealCopy() {
+    if (widget.message.isUser || widget.message.content.trim().isEmpty) return;
     _timer?.cancel();
-    setState(() => _showCopy = !_showCopy);
-    if (_showCopy) {
-      _timer = Timer(const Duration(milliseconds: 2400), () {
-        if (mounted) setState(() => _showCopy = false);
-      });
-    }
+    if (!_showCopy && mounted) setState(() => _showCopy = true);
+    _timer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _showCopy = false);
+    });
+  }
+
+  void _scheduleCopyHide() {
+    _timer?.cancel();
+    _timer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _showCopy = false);
+    });
   }
 
   Future<void> _copy() async {
@@ -349,10 +355,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
     final user = widget.message.isUser;
     final items = widget.message.properties;
     final content = widget.message.content.trim();
-    return SizedBox(width: double.infinity, child: Padding(
+    return MouseRegion(
+      onEnter: (_) => _revealCopy(),
+      onExit: (_) => _scheduleCopyHide(),
+      child: SizedBox(width: double.infinity, child: Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (widget.isWelcome) GestureDetector(onTap: _toggleCopy, onLongPress: _copy, child: _WelcomeMessage(content: content))
+        if (widget.isWelcome) GestureDetector(onTap: _revealCopy, onLongPress: _copy, child: _WelcomeMessage(content: content))
         else Align(
           alignment: user ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
           child: ConstrainedBox(
@@ -387,13 +396,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
           LayoutBuilder(
             builder: (context, constraints) {
               final cardWidth = constraints.maxWidth < 380
-                  ? constraints.maxWidth * .82
+                  ? constraints.maxWidth * .72
                   : constraints.maxWidth < 640
-                      ? 300.0
-                      : (constraints.maxWidth / 3).clamp(300.0, 360.0).toDouble();
+                      ? 244.0
+                      : (constraints.maxWidth / 4).clamp(220.0, 248.0).toDouble();
               return SizedBox(
                 width: double.infinity,
-                height: 330,
+                height: 286,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
@@ -404,7 +413,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
                     final property = items[index];
                     return SizedBox(
                       width: cardWidth,
-                      height: 322,
+                      height: 278,
                       child: _AiPropertyMiniCard(
                         property: property,
                         onTap: () => widget.onPropertyTap(property.propertyId),
@@ -420,7 +429,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
           ),
         ],
       ]),
-    ));
+    )));
   }
 }
 
@@ -520,15 +529,15 @@ class _AiPropertyMiniCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 child: SizedBox(
                   width: double.infinity,
-                  height: 96,
+                  height: 80,
                   child:
                       property.imageUrl != null && property.imageUrl!.isNotEmpty
                       ? CachedNetworkImage(
@@ -544,7 +553,7 @@ class _AiPropertyMiniCard extends StatelessWidget {
                       : _imageFallback(theme),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -554,10 +563,12 @@ class _AiPropertyMiniCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             property.title,
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w800,
+                              height: 1.15,
+                              fontSize: 12.5,
                             ),
                           ),
                         ),
@@ -732,6 +743,8 @@ class _AiPropertyMiniCard extends StatelessWidget {
                             property.referenceCode!,
                           ),
                         ],
+                        if (property.isDemo)
+                          _chip(context, 'تجريبي', WajhatakColors.amber),
                         if (!property.available)
                           _chip(context, 'غير متاح', WajhatakColors.terracotta)
                         else if (property.isFurnished)
