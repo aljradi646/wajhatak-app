@@ -16,7 +16,7 @@ class Agent extends Model
         'agency_name', 'job_title', 'phone', 'whatsapp', 'city', 'national_id',
         'id_document_path', 'license_document_path', 'experience_years', 'address',
         'website', 'facebook', 'instagram', 'twitter', 'photo_path',
-        'rejection_reason', 'verification_status', 'verified_at', 'verified_by',
+        'rejection_reason', 'verification_status', 'verified_at', 'verified_by', 'is_demo',
     ];
 
     protected function casts(): array
@@ -24,6 +24,7 @@ class Agent extends Model
         return [
             'rating' => 'decimal:2',
             'is_active' => 'boolean',
+            'is_demo' => 'boolean',
             'verified_at' => 'datetime',
             'experience_years' => 'integer',
         ];
