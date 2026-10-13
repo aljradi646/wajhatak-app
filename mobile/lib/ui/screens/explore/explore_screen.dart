@@ -177,7 +177,9 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       appBar: (ModalRoute.of(context)?.canPop ?? false)
           ? WajhatakScreenHeader(title: 'استكشف العقارات')
           : null,
-      body: Column(
+      body: RefreshIndicator(
+        onRefresh: _refreshExploreResults,
+        child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
@@ -342,12 +344,21 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               loading: const ExploreSkeleton(),
               errorRetry: () => ref.invalidate(explorePropertySearchProvider(query)),
               data: (page) => page.items.isEmpty
-                  ? EmptyState(
-                      title: 'لا توجد نتائج مطابقة',
-                      body: 'لم نجد عقارات تطابق البحث والفلاتر الحالية. امسحها للعودة إلى جميع العقارات.',
-                      icon: Icons.search_off_rounded,
-                      actionLabel: 'عرض جميع العقارات',
-                      onAction: _resetExplore,
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      children: [
+                        SizedBox(
+                          height: 320,
+                          child: EmptyState(
+                            title: 'لا توجد نتائج مطابقة',
+                            body: 'لم نجد عقارات تطابق البحث والفلاتر الحالية. امسحها للعودة إلى جميع العقارات.',
+                            icon: Icons.search_off_rounded,
+                            actionLabel: 'عرض جميع العقارات',
+                            onAction: _resetExplore,
+                          ),
+                        ),
+                      ],
                     )
                   : LayoutBuilder(
                       builder: (_, constraints) => GridView.builder(
@@ -412,7 +423,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }
