@@ -358,7 +358,7 @@ final propertiesProvider = FutureProvider<List<LuxProperty>>((ref) async {
 final propertySearchProvider =
     FutureProvider.family<List<LuxProperty>, PropertyQuery>((ref, query) async {
       if (AppConfig.isUiPreview) return (await _preview(ref)).list(query);
-      ref.watch(sessionProvider);
+      ref.watch(sessionUserIdProvider);
       return ref.read(propertyRepositoryProvider).list(query);
     });
 
@@ -406,7 +406,7 @@ class ExplorePropertySearchController extends AsyncNotifier<ExploreSearchResult>
       return ExploreSearchResult(items: items, hasMore: false, nextPage: 1);
     }
 
-    ref.watch(sessionProvider);
+    ref.watch(sessionUserIdProvider);
     final page = await ref.read(propertyRepositoryProvider).searchPage(_query);
     return ExploreSearchResult(
       items: page.items,
@@ -464,7 +464,7 @@ final propertyDetailProvider = FutureProvider.family<LuxProperty, int>((
   id,
 ) async {
   if (AppConfig.isUiPreview) return (await _preview(ref)).detail(id);
-  ref.watch(sessionProvider);
+  ref.watch(sessionUserIdProvider);
   return ref.read(propertyRepositoryProvider).detail(id);
 });
 
@@ -733,7 +733,7 @@ final notificationsProvider = FutureProvider<List<LuxNotification>>((
   ref,
 ) async {
   if (!AppConfig.isUiPreview &&
-      ref.watch(sessionProvider).asData?.value == null) {
+      ref.watch(sessionUserIdProvider) == null) {
     return const [];
   }
   return AppConfig.isUiPreview
@@ -743,7 +743,7 @@ final notificationsProvider = FutureProvider<List<LuxNotification>>((
 
 final unreadNotificationCountProvider = FutureProvider<int>((ref) async {
   if (!AppConfig.isUiPreview &&
-      ref.watch(sessionProvider).asData?.value == null) {
+      ref.watch(sessionUserIdProvider) == null) {
     return 0;
   }
   if (AppConfig.isUiPreview) {
