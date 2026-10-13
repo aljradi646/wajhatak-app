@@ -145,6 +145,15 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     ));
   }
 
+  Future<void> _refreshExploreResults() async {
+    ref.read(propertyCatalogRevisionProvider.notifier).bump();
+    try {
+      await ref.read(explorePropertySearchProvider(_activeQuery).future);
+    } on Object {
+      // Keep current cards and position during temporary network failures.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<String?>(exploreSearchProvider, (prev, next) {
@@ -343,6 +352,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   : LayoutBuilder(
                       builder: (_, constraints) => GridView.builder(
                         controller: _resultsScrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: Responsive.propertyGridColumns(
