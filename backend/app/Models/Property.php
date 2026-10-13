@@ -18,7 +18,7 @@ class Property extends Model
     protected $fillable = [
         'agent_id', 'property_type_id', 'property_location_id', 'title', 'slug', 'reference_code',
         'description', 'transaction_type', 'status', 'price', 'currency', 'area', 'bedrooms',
-        'bathrooms', 'parking_spaces', 'is_furnished', 'is_new', 'is_featured', 'published_at',
+        'bathrooms', 'parking_spaces', 'is_furnished', 'is_new', 'is_featured', 'is_demo', 'published_at',
     ];
 
     protected function casts(): array
@@ -31,6 +31,7 @@ class Property extends Model
             'is_furnished' => 'boolean',
             'is_new' => 'boolean',
             'is_featured' => 'boolean',
+            'is_demo' => 'boolean',
             'published_at' => 'datetime',
         ];
     }
