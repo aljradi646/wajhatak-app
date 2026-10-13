@@ -42,6 +42,7 @@ function readBody(request) {
 }
 
 const server = http.createServer(async (request, response) => {
+  const requestStartedAt = process.hrtime.bigint();
   const url = new URL(request.url, 'http://' + (request.headers.host || 'localhost'));
   if (request.method === 'GET' && url.pathname === '/health') {
     return sendJson(response, 200, { ok: true, service: 'wajhatak-realtime' });
@@ -94,7 +95,20 @@ const server = http.createServer(async (request, response) => {
     }
   }
 
-  return sendJson(response, 202, { accepted: true, delivered });
+  const processingMs = Number(process.hrtime.bigint() - requestStartedAt) / 1e6;
+  process.stdout.write(JSON.stringify({
+    level: 'info',
+    event: 'realtime.publish',
+    event_name: event.event,
+    queued_connections: delivered,
+    processing_ms: Number(processingMs.toFixed(2)),
+  }) + '\n');
+
+  return sendJson(response, 202, {
+    accepted: true,
+    delivered,
+    processing_ms: Number(processingMs.toFixed(2)),
+  });
 });
 
 const wss = new WebSocketServer({
