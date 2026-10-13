@@ -37,6 +37,7 @@ class SavedScreen extends ConsumerWidget {
           ? WajhatakScreenHeader(title: 'مفضلاتك')
           : null,
       body: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           const SliverPadding(
             padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
