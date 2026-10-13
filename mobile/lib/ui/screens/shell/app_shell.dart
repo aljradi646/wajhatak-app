@@ -280,7 +280,7 @@ class _AppShellState extends ConsumerState<AppShell> {
               onExplore: _navigateToExplore,
               onSearchSubmit: _handleSearchFromHome,
             ),
-            const AgentDashboardScreen(),
+            const AgentDashboardScreen(enablePullToRefresh: false),
             const ViewingRequestsScreen(),
             const MessagesScreen(),
             const AccountScreen(),
@@ -323,14 +323,20 @@ class _AppShellState extends ConsumerState<AppShell> {
         index: _index,
         children: [
           for (final entry in pages.indexed)
-            RefreshIndicator(
-              onRefresh: () => _refreshTab(entry.$1, isAgent),
-              child: MediaQuery(
-                // Preserve each tab subtree (and its scroll/form state).
+            if (!isAgent && entry.$1 == 1)
+              MediaQuery(
                 data: MediaQuery.of(context),
                 child: entry.$2,
+              )
+            else
+              RefreshIndicator(
+                onRefresh: () => _refreshTab(entry.$1, isAgent),
+                child: MediaQuery(
+                  // Preserve each tab subtree (and its scroll/form state).
+                  data: MediaQuery.of(context),
+                  child: entry.$2,
+                ),
               ),
-            ),
         ],
       ),
       // الزر العائم للمساعد الذكي — أيقونة فقط بدون نص، واضع فوق الشريط
