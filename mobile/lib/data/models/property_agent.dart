@@ -14,6 +14,7 @@ class PropertyAgent {
     this.bio,
     this.avatarUrl,
     this.isActive = true,
+    this.isDemo = false,
     this.isVerified = false,
     this.verificationStatus,
   });
@@ -30,6 +31,7 @@ class PropertyAgent {
   final String? bio;
   final String? avatarUrl;
   final bool isActive;
+  final bool isDemo;
 
   /// هل اعتمدت الإدارة توثيق هذا الوكيل فعليًا؟ (تُقرأ من الخادم، لا تُفترض)
   final bool isVerified;
@@ -48,6 +50,7 @@ class PropertyAgent {
     bio: json['bio'] as String?,
     avatarUrl: json['avatar_url'] as String?,
     isActive: json['is_active'] as bool? ?? true,
+    isDemo: json['is_demo'] as bool? ?? false,
     isVerified: json['is_verified'] as bool? ?? false,
     verificationStatus: json['verification_status'] as String?,
   );
@@ -66,6 +69,7 @@ class PropertyAgent {
     'bio': bio,
     'avatar_url': avatarUrl,
     'is_active': isActive,
+    'is_demo': isDemo,
     'is_verified': isVerified,
     'verification_status': verificationStatus,
   };
