@@ -386,13 +386,14 @@ abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
     if (previous == null || _refreshInFlight) return;
     _refreshInFlight = true;
     try {
-      state = AsyncData(await loadValue());
+      final refreshed = await loadValue();
+      if (ref.mounted) state = AsyncData(refreshed);
     } catch (_) {
       // A transient refresh failure must not erase usable on-screen data.
-      state = AsyncData(previous);
+      if (ref.mounted) state = AsyncData(previous);
     } finally {
       _refreshInFlight = false;
-      if (_refreshQueued) {
+      if (ref.mounted && _refreshQueued) {
         _refreshQueued = false;
         unawaited(refresh());
       }
