@@ -60,10 +60,7 @@ class MessagesScreen extends ConsumerWidget {
             ),
           ),
         Expanded(
-          child: standalone
-              ? RefreshIndicator(
-                  onRefresh: () => ref.read(conversationsProvider.notifier).refresh(),
-                  child: LuxAsyncView<List<ConversationItem>>(
+          child: LuxAsyncView<List<ConversationItem>>(
             value: conversations,
             loading: const ConversationListSkeleton(showTitle: false),
             errorRetry: () => ref.invalidate(conversationsProvider),
@@ -95,7 +92,16 @@ class MessagesScreen extends ConsumerWidget {
         ),
       ],
     );
-    return _wrap(context, body);
+    return _wrap(
+      context,
+      standalone
+          ? RefreshIndicator(
+              onRefresh: () =>
+                  ref.read(conversationsProvider.notifier).refresh(),
+              child: body,
+            )
+          : body,
+    );
   }
 }
 
