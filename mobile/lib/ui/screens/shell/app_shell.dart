@@ -280,7 +280,7 @@ class _AppShellState extends ConsumerState<AppShell> {
               onExplore: _navigateToExplore,
               onSearchSubmit: _handleSearchFromHome,
             ),
-            const AgentDashboardScreen(enablePullToRefresh: false),
+            const AgentDashboardScreen(),
             const ViewingRequestsScreen(),
             const MessagesScreen(),
             const AccountScreen(),
@@ -323,7 +323,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         index: _index,
         children: [
           for (final entry in pages.indexed)
-            if (!isAgent && entry.$1 == 1)
+            if (entry.$1 == 1)
               MediaQuery(
                 data: MediaQuery.of(context),
                 child: entry.$2,
