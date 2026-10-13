@@ -743,7 +743,7 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
         createdAt: DateTime.now(),
       );
       state = AsyncData([message, ...(state.value ?? const <ChatMessage>[])]);
-      ref.invalidate(conversationsProvider);
+      unawaited(ref.read(conversationsProvider.notifier).refresh());
       return;
     }
     final message = await ref
@@ -760,7 +760,7 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
         (existing) => existing.id != message.id,
       ),
     ]);
-    ref.invalidate(conversationsProvider);
+    unawaited(ref.read(conversationsProvider.notifier).refresh());
     unawaited(refresh());
   }
 }
