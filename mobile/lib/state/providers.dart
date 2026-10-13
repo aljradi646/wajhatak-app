@@ -356,6 +356,7 @@ Future<T> _readForSession<T>(
 /// recovery or when the identity/query itself changes.
 abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
   bool _refreshInFlight = false;
+  bool _refreshQueued = false;
 
   Future<T> loadValue();
 
@@ -366,7 +367,10 @@ abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
   }
 
   Future<void> refresh() async {
-    if (_refreshInFlight) return;
+    if (_refreshInFlight) {
+      _refreshQueued = true;
+      return;
+    }
 
     // If an event arrives during the first load, wait for that request before
     // issuing a background refresh so the event cannot be lost to a stale read.
@@ -388,6 +392,10 @@ abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
       state = AsyncData(previous);
     } finally {
       _refreshInFlight = false;
+      if (_refreshQueued) {
+        _refreshQueued = false;
+        unawaited(refresh());
+      }
     }
   }
 }
