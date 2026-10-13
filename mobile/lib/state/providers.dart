@@ -781,7 +781,7 @@ final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
 class NotificationsController extends BackgroundRefreshController<List<LuxNotification>> {
   @override
   Future<List<LuxNotification>> loadValue() async {
-    if (!AppConfig.isUiPreview && ref.watch(sessionUserIdProvider) == null) {
+    if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null {
       return const [];
     }
     return AppConfig.isUiPreview
@@ -798,7 +798,7 @@ final notificationsProvider =
 class UnreadNotificationCountController extends BackgroundRefreshController<int> {
   @override
   Future<int> loadValue() async {
-    if (!AppConfig.isUiPreview && ref.watch(sessionUserIdProvider) == null) {
+    if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null {
       return 0;
     }
     if (AppConfig.isUiPreview) {
