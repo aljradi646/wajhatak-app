@@ -46,12 +46,22 @@ class ViewingRequestsScreen extends ConsumerWidget {
       errorRetry: () => ref.invalidate(viewingRequestsProvider),
       data: (data) {
         if (data.isEmpty) {
-          return const EmptyState(
-            title: 'لا توجد طلبات',
-            body: 'ستظهر طلبات المعاينة الخاصة بك هنا.',
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            children: const [
+              SizedBox(
+                height: 280,
+                child: EmptyState(
+                  title: 'لا توجد طلبات',
+                  body: 'ستظهر طلبات المعاينة الخاصة بك هنا.',
+                ),
+              ),
+            ],
           );
         }
         return ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           itemCount: data.length,
           separatorBuilder: (context, index) => const SizedBox(height: 10),
@@ -81,7 +91,11 @@ class ViewingRequestsScreen extends ConsumerWidget {
                 Expanded(child: content),
               ],
             )
-          : content,
+          : RefreshIndicator(
+              onRefresh: () =>
+                  ref.read(viewingRequestsProvider.notifier).refresh(),
+              child: content,
+            ),
     );
   }
 }
