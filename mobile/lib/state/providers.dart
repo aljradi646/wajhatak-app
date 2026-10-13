@@ -282,7 +282,10 @@ class SessionController extends AsyncNotifier<SessionData?> {
             phone: phone,
             locale: locale,
           );
-      state = AsyncData(result);
+      final latest = state.asData?.value;
+      if (latest != null && latest.user.id == current.user.id) {
+        state = AsyncData(result);
+      }
     } on ApiFailure {
       rethrow;
     }
@@ -297,7 +300,10 @@ class SessionController extends AsyncNotifier<SessionData?> {
       final result = await ref
           .read(authRepositoryProvider)
           .uploadAvatar(session: current, imagePath: imagePath);
-      state = AsyncData(result);
+      final latest = state.asData?.value;
+      if (latest != null && latest.user.id == current.user.id) {
+        state = AsyncData(result);
+      }
     } on ApiFailure {
       rethrow;
     }
