@@ -323,6 +323,13 @@ $properties = $query->limit($limit)->get();
 logLine('Total properties to process: '.$properties->count(), $quiet);
 
 foreach ($properties as $property) {
+    // Showcase photos are properly categorized hotlinked stock images. Keep
+    // their HTTPS URLs intact; only user/legacy local-upload assets are repaired.
+    if ((bool) $property->is_demo && str_starts_with((string) $property->reference_code, 'WJ-SHOWCASE-')) {
+        logLine('--- skipping hotlinked showcase photos for '.$property->reference_code, $quiet);
+        continue;
+    }
+
     $stats['properties']++;
     $label = propertyLabel($property);
     logLine("--- {$label} (id={$property->id})", $quiet);
