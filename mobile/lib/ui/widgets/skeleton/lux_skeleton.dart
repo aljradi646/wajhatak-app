@@ -215,6 +215,8 @@ class LuxAsyncView<T> extends StatefulWidget {
 }
 
 class _LuxAsyncViewState<T> extends _MinimumLoadingState<LuxAsyncView<T>> {
+  T? _lastData;
+  bool _hasLastData = false;
   @override
   AsyncValue<dynamic> get _loadingValue => widget.value;
 
@@ -226,20 +228,18 @@ class _LuxAsyncViewState<T> extends _MinimumLoadingState<LuxAsyncView<T>> {
   @override
   Widget build(BuildContext context) {
     final value = widget.value;
-
-    /// التحميل الأول أو retry بدون بيانات.
-    if (_isMinimumLoadingActive) {
-      return _skeleton;
+    if (value.hasValue) {
+      _lastData = value.requireValue;
+      _hasLastData = true;
     }
 
-    /// البيانات الحالية لها الأولوية.
-    ///
-    /// حتى لو كان Riverpod يعيد تحميلها في الخلفية،
-    /// لا نستبدل الصفحة كاملة بالـSkeleton.
-    if (value.hasValue) {
-      final content = widget.data(value.requireValue);
+    // Stale-while-revalidate: render the last successful content while a
+    // refresh is pending or fails. Skeletons are reserved for first load.
+    if (_hasLastData && (value.hasValue || value.isLoading || value.hasError)) {
+      final data = value.hasValue ? value.requireValue : _lastData as T;
+      final content = widget.data(data);
 
-      if (_isBackgroundUpdating(value)) {
+      if (value.isLoading || value.isRefreshing || value.isReloading || value.retrying) {
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -262,7 +262,11 @@ class _LuxAsyncViewState<T> extends _MinimumLoadingState<LuxAsyncView<T>> {
       return content;
     }
 
-    /// تحميل بدون بيانات.
+    /// Loading without any previously successful data (first visit only).
+    if (_isMinimumLoadingActive) {
+      return _skeleton;
+    }
+
     if (value.isLoading || value.retrying) {
       return _skeleton;
     }
@@ -1698,6 +1702,8 @@ class SliverAsyncView<T> extends StatefulWidget {
 
 class _SliverAsyncViewState<T>
     extends _MinimumLoadingState<SliverAsyncView<T>> {
+  T? _lastData;
+  bool _hasLastData = false;
   @override
   AsyncValue<dynamic> get _loadingValue => widget.value;
 
@@ -1709,14 +1715,17 @@ class _SliverAsyncViewState<T>
   @override
   Widget build(BuildContext context) {
     final value = widget.value;
-
-    if (_isMinimumLoadingActive) {
-      return _skeleton;
+    if (value.hasValue) {
+      _lastData = value.requireValue;
+      _hasLastData = true;
     }
 
-    if (value.hasValue) {
-      final data = value.requireValue;
-
+    // Keep the last successful page visible during invalidation/revalidation.
+    // A refresh must never replace an already usable screen with a skeleton.
+    if (_hasLastData && (value.hasValue || value.isLoading || value.hasError)) {
+      final data = value.hasValue ? value.requireValue : _lastData as T;
+      final updating = value.isLoading || value.isRefreshing ||
+          value.isReloading || value.retrying;
       final empty = widget.emptyOverride != null && _isEmptyCollection(data);
 
       if (empty) {
@@ -1725,7 +1734,7 @@ class _SliverAsyncViewState<T>
           child: widget.emptyOverride!,
         );
 
-        if (_isBackgroundUpdating(value)) {
+        if (updating) {
           return SliverMainAxisGroup(slivers: [_refreshProgressSliver, sliver]);
         }
 
@@ -1734,13 +1743,17 @@ class _SliverAsyncViewState<T>
 
       final contentSlivers = widget.data(data);
 
-      if (_isBackgroundUpdating(value)) {
+      if (updating) {
         return SliverMainAxisGroup(
           slivers: [_refreshProgressSliver, ...contentSlivers],
         );
       }
 
       return SliverMainAxisGroup(slivers: contentSlivers);
+    }
+
+    if (_isMinimumLoadingActive) {
+      return _skeleton;
     }
 
     if (value.isLoading || value.retrying) {

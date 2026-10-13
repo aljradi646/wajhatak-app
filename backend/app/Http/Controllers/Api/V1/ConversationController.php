@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendFcmPushNotification;
+use App\Jobs\PublishRealtimeEvent;
 use App\Http\Resources\ConversationResource;
 use App\Http\Resources\MessageResource;
 use App\Models\Conversation;
@@ -81,7 +83,33 @@ class ConversationController extends Controller
     public function messages(Request $request, Conversation $conversation)
     {
         $this->ensureParticipant($request, $conversation);
-        $conversation->messages()->where('sender_id', '!=', $request->user()->id)->whereNull('read_at')->update(['read_at' => now()]);
+        $messagesMarkedRead = $conversation->messages()
+            ->where('sender_id', '!=', $request->user()->id)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        // Opening a conversation also marks its linked message notifications as read.
+        $notificationsMarkedRead = $request->user()->notifications()
+            ->where('type', MessageReceived::class)
+            ->whereNull('read_at')
+            ->where('data->conversation_id', $conversation->id)
+            ->update(['read_at' => now()]);
+
+        if ($messagesMarkedRead > 0 || $notificationsMarkedRead > 0) {
+            $this->queueRealtimeEvent((int) $request->user()->id, 'notifications.updated', [
+                'unread_count' => $request->user()->unreadNotifications()->count(),
+                'conversation_id' => (int) $conversation->id,
+            ]);
+            $otherUserId = (int) ($conversation->client_id === $request->user()->id
+                ? $conversation->agent_id
+                : $conversation->client_id);
+            if ($messagesMarkedRead > 0) {
+                $this->queueRealtimeEvent($otherUserId, 'conversation.read', [
+                    'conversation_id' => (int) $conversation->id,
+                    'reader_id' => (int) $request->user()->id,
+                ]);
+            }
+        }
 
         return MessageResource::collection($conversation->messages()->with(['sender', 'property.images', 'property.location'])->latest()->paginate(30));
     }
@@ -123,9 +151,33 @@ class ConversationController extends Controller
         });
 
         $recipient = $conversation->client_id === $request->user()->id ? $conversation->agent : $conversation->client;
-        $recipient->notify(new MessageReceived($message->load(['conversation', 'sender'])));
+        $notification = new MessageReceived($message->load(['conversation', 'sender']));
+        $recipient->notify($notification);
+        if ($recipient->notificationPreference?->message_notifications ?? true) {
+            try {
+                SendFcmPushNotification::dispatch((int) $recipient->id, (string) $notification->id);
+        } catch (\Throwable $exception) {
+            // A push queue outage must not turn a committed message into an HTTP failure.
+                report($exception);
+            }
+        }
+
+        $this->queueRealtimeEvent((int) $recipient->id, 'message.received', [
+            'conversation_id' => (int) $conversation->id,
+            'message_id' => (int) $message->id,
+            'notification_id' => (string) $notification->id,
+        ]);
 
         return response()->json(['data' => new MessageResource($message->load('property'))], 201);
+    }
+
+    private function queueRealtimeEvent(int $userId, string $event, array $data): void
+    {
+        try {
+            PublishRealtimeEvent::dispatch($userId, $event, $data);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function ensureParticipant(Request $request, Conversation $conversation): void

@@ -54,6 +54,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'ui_preferences' => 'array',
             'is_active' => 'boolean',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_enabled_at' => 'datetime',
         ];
     }
 

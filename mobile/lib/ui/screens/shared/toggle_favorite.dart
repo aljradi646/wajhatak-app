@@ -146,7 +146,7 @@ Future<void> startConversation(
 
     Navigator.of(context, rootNavigator: true).pop();
     loadingDialogOpen = false;
-    ref.invalidate(conversationsProvider);
+    unawaited(ref.read(conversationsProvider.notifier).refresh());
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ChatScreen(

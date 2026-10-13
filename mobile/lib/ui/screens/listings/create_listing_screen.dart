@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -174,7 +175,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
           if (_pinLongitude != null) 'longitude': _pinLongitude,
         },
       }, _images);
-      ref.invalidate(myListingsProvider);
+      unawaited(ref.read(myListingsProvider.notifier).refresh());
       ref.invalidate(propertiesProvider);
       if (mounted) {
         Navigator.of(context).pop();

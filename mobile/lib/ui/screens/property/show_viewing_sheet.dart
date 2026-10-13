@@ -134,7 +134,7 @@ Future<void> showViewingSheet(
                                     '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
                                 notes: notes.text,
                               );
-                          ref.invalidate(viewingRequestsProvider);
+                          await ref.read(viewingRequestsProvider.notifier).refresh();
                           if (sheetContext.mounted) {
                             Navigator.pop(sheetContext);
                           }

@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+import '../navigation/active_chat_context.dart';
 import '../../data/api_client.dart';
 import '../../data/models/models.dart';
 import '../config/firebase_options.dart';
@@ -27,6 +28,7 @@ class FirebasePushMessagingService {
   bool _launchMessageHandled = false;
 
   Future<void> Function(String? notificationId)? onNotificationOpened;
+  Future<void> Function(Map<String, dynamic> data)? onMessageReceived;
 
   bool get _isSupported =>
       !kIsWeb &&
@@ -67,6 +69,8 @@ class FirebasePushMessagingService {
       await messaging.requestPermission(alert: true, badge: true, sound: true);
 
       _foregroundSubscription ??= FirebaseMessaging.onMessage.listen((message) {
+        final callback = onMessageReceived;
+        if (callback != null) unawaited(callback(message.data));
         unawaited(_showForegroundMessage(message));
       });
       _openedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen((message) {
@@ -143,6 +147,11 @@ class FirebasePushMessagingService {
   Future<void> _showForegroundMessage(RemoteMessage message) async {
     final id = message.data['notification_id']?.toString();
     if (id == null || id.isEmpty) return;
+    final conversationId = int.tryParse(message.data['conversation_id']?.toString() ?? '');
+    if (conversationId != null && conversationId == ActiveChatContext.conversationId) {
+      return;
+    }
+    if (!ActiveChatContext.markNotificationShown(id)) return;
 
     final item = LuxNotification(
       id: id,
@@ -152,6 +161,8 @@ class FirebasePushMessagingService {
           'لديك إشعار جديد في وجهتك.',
       kind: message.data['kind']?.toString(),
       supportTicketId: int.tryParse(message.data['support_ticket_id']?.toString() ?? ''),
+      conversationId: conversationId,
+      propertyId: int.tryParse(message.data['property_id']?.toString() ?? ''),
       createdAt: DateTime.now(),
     );
     await _localNotifications.show(item);

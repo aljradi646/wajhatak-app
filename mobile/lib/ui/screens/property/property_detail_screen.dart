@@ -704,7 +704,7 @@ class _OwnerPropertyActionsState extends ConsumerState<_OwnerPropertyActions> {
       await ref.read(propertyRepositoryProvider).update(widget.property.id, {'status': next});
       if (!mounted) return;
       ref.invalidate(propertyDetailProvider(widget.property.id));
-      ref.invalidate(myListingsProvider);
+      unawaited(ref.read(myListingsProvider.notifier).refresh());
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
         next == 'draft'
           ? 'تم إيقاف نشر العقار. يمكنك إرساله للمراجعة مجددًا لاحقًا.'

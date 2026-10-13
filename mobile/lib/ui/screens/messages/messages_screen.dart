@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -111,7 +113,7 @@ class _ConversationTile extends ConsumerWidget {
           await Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => ChatScreen(conversation: item)),
           );
-          ref.invalidate(conversationsProvider);
+          unawaited(ref.read(conversationsProvider.notifier).refresh());
         },
         borderRadius: BorderRadius.circular(20),
         child: Container(

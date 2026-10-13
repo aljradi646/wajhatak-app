@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/navigation/active_chat_context.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/format_money.dart';
 import '../../../core/utils/notice.dart' as util;
@@ -37,25 +38,46 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // تحديث فوري عند فتح المحادثة (لا يُستخدم الكاش القديم) —
-    // بنفس صرامه تحديث جرس الإشعارات.
-    if (ref.exists(messagesProvider(widget.conversation.id))) {
-      ref.read(messagesProvider(widget.conversation.id).notifier).refresh();
-    }
+    ActiveChatContext.conversationId = widget.conversation.id;
+    unawaited(_syncReadStateAfterOpening());
     // Polling خفيف للرسائل الجديدة كل 6 ثوان — تحديث خلفي بدون اهتزاز.
     _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (mounted) {
+      if (mounted && !ref.read(realtimeServiceProvider).isConnected) {
         ref.read(messagesProvider(widget.conversation.id).notifier).refresh();
-        ref.invalidate(conversationsProvider);
+        unawaited(ref.read(conversationsProvider.notifier).refresh());
       }
     });
   }
 
   @override
   void dispose() {
+    if (ActiveChatContext.conversationId == widget.conversation.id) {
+      ActiveChatContext.conversationId = null;
+    }
     _refreshTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncReadStateAfterOpening() async {
+    // The messages endpoint marks incoming messages and their linked
+    // notifications as read. Refresh dependent badges only after that commit.
+    final provider = messagesProvider(widget.conversation.id);
+    try {
+      if (ref.exists(provider)) {
+        await ref.read(provider.notifier).refresh();
+      } else {
+        await ref.read(provider.future);
+      }
+    } on Object {
+      // The conversation UI owns the visible load/retry error.
+    }
+    if (!mounted) return;
+    await Future.wait<void>([
+      ref.read(notificationsProvider.notifier).refresh(),
+      ref.read(unreadNotificationCountProvider.notifier).refresh(),
+      ref.read(conversationsProvider.notifier).refresh(),
+    ]);
   }
 
   Future<void> _send() async {
@@ -73,7 +95,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           );
       _controller.clear();
       if (mounted) setState(() => _pendingProperty = null);
-      ref.invalidate(conversationsProvider);
+      unawaited(ref.read(conversationsProvider.notifier).refresh());
     } on ApiFailure catch (error) {
       if (mounted) util.notice(context, error.message);
     } finally {
