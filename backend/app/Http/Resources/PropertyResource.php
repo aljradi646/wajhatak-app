@@ -28,6 +28,7 @@ class PropertyResource extends JsonResource
             'is_furnished' => $this->is_furnished,
             'is_new' => $this->is_new,
             'is_featured' => $this->is_featured,
+            'is_demo' => (bool) $this->is_demo,
             'published_at' => optional($this->published_at)->toISOString(),
             'type' => $this->whenLoaded('type', fn () => [
                 'id' => $this->type->id,
@@ -54,7 +55,7 @@ class PropertyResource extends JsonResource
             'agent' => $this->whenLoaded('agent', fn () => new AgentResource($this->agent)),
             'images' => $this->whenLoaded('images', fn () => $this->images->map(fn ($image) => [
                 'id' => $image->id,
-                'url' => asset('storage/'.$image->path),
+                'url' => $image->image_url,
                 'alt_text' => $image->alt_text,
                 'is_cover' => $image->is_cover,
             ])),
