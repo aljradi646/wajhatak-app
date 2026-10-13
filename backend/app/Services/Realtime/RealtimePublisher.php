@@ -17,6 +17,7 @@ class RealtimePublisher
         }
 
         try {
+            $startedAt = microtime(true);
             $timestamp = (string) now()->timestamp;
             $body = json_encode([
                 'user_id' => $userId,
@@ -33,12 +34,21 @@ class RealtimePublisher
                 ->withBody($body, 'application/json')
                 ->post($url);
 
+            $durationMs = round((microtime(true) - $startedAt) * 1000, 2);
             if (! $response->successful()) {
                 Log::warning('Realtime publish request was rejected', [
                     'event' => $event,
                     'status' => $response->status(),
+                    'duration_ms' => $durationMs,
                 ]);
+                return;
             }
+
+            Log::debug('Realtime publish request completed', [
+                'event' => $event,
+                'status' => $response->status(),
+                'duration_ms' => $durationMs,
+            ]);
         } catch (Throwable $exception) {
             Log::warning('Realtime publish unavailable', [
                 'event' => $event,
