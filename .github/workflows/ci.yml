@@ -54,8 +54,6 @@ jobs:
 
   mobile:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     defaults:
       run:
         working-directory: mobile
@@ -92,19 +90,7 @@ jobs:
             exit 0
           fi
 
-          printf '%s\n' "$files" | xargs dart format
-          if ! git diff --quiet -- $files; then
-            if [ "${{ github.event_name }}" != "pull_request" ] || [ "${{ github.head_ref }}" != "fix/production-security-realtime-20261012" ]; then
-              echo "Dart files need formatting; refusing to auto-commit outside the maintenance branch."
-              git diff --unified=2 -- $files
-              exit 1
-            fi
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -- $files
-            git commit -m "style: format Flutter session listener"
-            git push origin "HEAD:${{ github.head_ref }}"
-          fi
+          printf '%s\n' "$files" | xargs dart format --output=none --set-exit-if-changed
 
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
