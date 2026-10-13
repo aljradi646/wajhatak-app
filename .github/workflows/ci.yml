@@ -82,6 +82,9 @@ jobs:
             files="$(git diff --name-only --diff-filter=ACMR "$base_sha" "$GITHUB_SHA" -- 'lib/**/*.dart' 'lib/*.dart')"
           fi
 
+          # git emits repository-root-relative paths; this job runs from mobile/.
+          files="$(printf '%s\n' "$files" | sed 's#^mobile/##')"
+
           if [ -z "$files" ]; then
             echo "No changed Dart files require formatting validation."
             exit 0
