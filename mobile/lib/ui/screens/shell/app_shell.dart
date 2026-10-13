@@ -193,7 +193,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       (_, next) =>
           next.whenData((items) => _handleNotifications(items, settings)),
     );
-    ref.listen<AsyncValue<SessionData?>>(sessionProvider, (previous, next) {
+    ref.listen<AsyncValue<SessionData?>>(
+      sessionProvider,
+      (previous, next) {
       final previousUserId = previous?.asData?.value?.user.id;
       final nextUserId = next.asData?.value?.user.id;
       if (previousUserId == nextUserId) return;
@@ -208,7 +210,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       } else {
         unawaited(ref.read(realtimeServiceProvider).stop());
       }
-    });
+      },
+    );
     final isAgent = user?.isAgent ?? false;
     final pages = isAgent
         ? [
