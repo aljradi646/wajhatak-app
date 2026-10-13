@@ -134,7 +134,9 @@ Future<void> showViewingSheet(
                                     '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
                                 notes: notes.text,
                               );
-                          ref.invalidate(viewingRequestsProvider);
+                          await ref
+                              .read(viewingRequestsProvider.notifier)
+                              .refresh();
                           if (sheetContext.mounted) {
                             Navigator.pop(sheetContext);
                           }
@@ -161,9 +163,7 @@ Future<void> showViewingSheet(
                         ),
                       )
                     : const Icon(Icons.send_rounded, size: 19),
-                label: Text(
-                  submitting ? 'جارٍ الإرسال…' : 'إرسال الطلب',
-                ),
+                label: Text(submitting ? 'جارٍ الإرسال…' : 'إرسال الطلب'),
               ),
             ),
           ],

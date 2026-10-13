@@ -19,10 +19,30 @@ class AdminUserSeeder extends Seeder
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $email = env('ADMIN_EMAIL', 'admin@wajhatak.app');
-        $name = env('ADMIN_NAME', 'مدير النظام');
-        $password = env('ADMIN_PASSWORD', 'admin123');
+        $email = trim((string) env('ADMIN_EMAIL', ''));
+        $name = trim((string) env('ADMIN_NAME', 'مدير النظام'));
+        $password = (string) env('ADMIN_PASSWORD', '');
 
+        // Never ship or silently create an administrator with a public default password.
+        // On a fresh installation, provide ADMIN_EMAIL and ADMIN_PASSWORD as server secrets.
+        if ($email === '' || $password === '') {
+            $this->command?->warn('Admin account was not created: set ADMIN_EMAIL and ADMIN_PASSWORD explicitly, then run AdminUserSeeder.');
+            return;
+        }
+
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->command?->error('Admin account was not created: ADMIN_EMAIL is not a valid email address.');
+            return;
+        }
+
+        if (strlen($password) < 12
+            || ! preg_match('/[a-z]/', $password)
+            || ! preg_match('/[A-Z]/', $password)
+            || ! preg_match('/[0-9]/', $password)
+            || ! preg_match('/[^A-Za-z0-9]/', $password)) {
+            $this->command?->error('Admin account was not created: ADMIN_PASSWORD must be at least 12 characters and include upper/lowercase letters, a number, and a symbol.');
+            return;
+        }
         $user = User::query()->updateOrCreate(
             ['email' => $email],
             [
@@ -43,6 +63,6 @@ class AdminUserSeeder extends Seeder
 
         $user->syncRoles(['admin']);
 
-        $this->command?->info("Admin account ready: {$email} (password from ADMIN_PASSWORD or 'admin123')");
+        $this->command?->info("Admin account ready for {$email}; credentials were supplied through server environment.");
     }
 }

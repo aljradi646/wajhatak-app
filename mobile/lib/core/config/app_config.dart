@@ -8,6 +8,11 @@ class AppConfig {
     defaultValue: 'https://wajhatak-app-production.up.railway.app/api/v1',
   );
 
+  static const realtimeWebSocketUrl = String.fromEnvironment(
+    'WAJHATAK_WS_URL',
+    defaultValue: '',
+  );
+
   static const connectTimeout = Duration(seconds: 12);
   static const receiveTimeout = Duration(seconds: 20);
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -39,9 +41,9 @@ class AgentDashboardScreen extends ConsumerWidget {
         : const AsyncValue<void>.data(null);
 
     void refreshAll() {
-      ref.invalidate(myListingsProvider);
-      ref.invalidate(viewingRequestsProvider);
-      ref.invalidate(conversationsProvider);
+      unawaited(ref.read(myListingsProvider.notifier).refresh());
+      unawaited(ref.read(viewingRequestsProvider.notifier).refresh());
+      unawaited(ref.read(conversationsProvider.notifier).refresh());
     }
 
     if (user == null || !user.isAgent) {
@@ -82,9 +84,9 @@ class AgentDashboardScreen extends ConsumerWidget {
         ),
         onData: (_) => RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(myListingsProvider);
-            ref.invalidate(viewingRequestsProvider);
-            ref.invalidate(conversationsProvider);
+            unawaited(ref.read(myListingsProvider.notifier).refresh());
+            unawaited(ref.read(viewingRequestsProvider.notifier).refresh());
+            unawaited(ref.read(conversationsProvider.notifier).refresh());
             await Future.wait([
               ref.read(myListingsProvider.future),
               ref.read(viewingRequestsProvider.future),
@@ -119,10 +121,10 @@ class AgentDashboardScreen extends ConsumerWidget {
                           ? 3
                           : 2;
                       final cellWidth =
-                          (constraints.maxWidth - (columns - 1) * 10) /
-                          columns;
-                      final cellHeight =
-                          (cellWidth * .46).clamp(64.0, 84.0).toDouble();
+                          (constraints.maxWidth - (columns - 1) * 10) / columns;
+                      final cellHeight = (cellWidth * .46)
+                          .clamp(64.0, 84.0)
+                          .toDouble();
                       final actions = <Widget>[
                         _AgentQuickAction(
                           icon: Icons.calendar_month_outlined,
@@ -168,13 +170,12 @@ class AgentDashboardScreen extends ConsumerWidget {
                         physics: const NeverScrollableScrollPhysics(),
                         padding: EdgeInsets.zero,
                         itemCount: actions.length,
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: columns,
-                              mainAxisExtent: cellHeight,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                            ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          mainAxisExtent: cellHeight,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
                         itemBuilder: (context, index) => actions[index],
                       );
                     },
@@ -204,8 +205,7 @@ class AgentDashboardScreen extends ConsumerWidget {
                         constraints.crossAxisExtent,
                       );
                       final cardWidth =
-                          (constraints.crossAxisExtent -
-                              (columns - 1) * 12) /
+                          (constraints.crossAxisExtent - (columns - 1) * 12) /
                           columns;
                       return SliverGrid.builder(
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -263,10 +263,8 @@ class _AgentWorkspaceSkeleton extends StatelessWidget {
           : constraints.maxWidth >= 560
           ? 3
           : 2;
-      final cellWidth =
-          (constraints.maxWidth - (columns - 1) * 10) / columns;
-      final cellHeight =
-          (cellWidth * .46).clamp(64.0, 84.0).toDouble();
+      final cellWidth = (constraints.maxWidth - (columns - 1) * 10) / columns;
+      final cellHeight = (cellWidth * .46).clamp(64.0, 84.0).toDouble();
 
       return ListView(
         padding: const EdgeInsets.all(20),
@@ -288,10 +286,7 @@ class _AgentWorkspaceSkeleton extends StatelessWidget {
           const SizedBox(height: 28),
           const LuxSkeleton(width: 110, height: 22),
           const SizedBox(height: 12),
-          const PropertyGridSkeleton(
-            count: 4,
-            padding: EdgeInsets.zero,
-          ),
+          const PropertyGridSkeleton(count: 4, padding: EdgeInsets.zero),
         ],
       );
     },
@@ -509,7 +504,7 @@ class _ListingActionsMenu extends ConsumerWidget {
     }
     try {
       await ref.read(propertyRepositoryProvider).delete(property.id);
-      ref.invalidate(myListingsProvider);
+      unawaited(ref.read(myListingsProvider.notifier).refresh());
       ref.invalidate(propertiesProvider);
       if (context.mounted) {
         util.notice(context, 'تم حذف العقار.');

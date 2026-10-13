@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -174,7 +175,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
           if (_pinLongitude != null) 'longitude': _pinLongitude,
         },
       }, _images);
-      ref.invalidate(myListingsProvider);
+      unawaited(ref.read(myListingsProvider.notifier).refresh());
       ref.invalidate(propertiesProvider);
       if (mounted) {
         Navigator.of(context).pop();
@@ -405,8 +406,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                   builder: (context, constraints) {
                     final columns = constraints.maxWidth < 320 ? 1 : 2;
                     final fieldWidth =
-                        (constraints.maxWidth - (columns - 1) * 10) /
-                        columns;
+                        (constraints.maxWidth - (columns - 1) * 10) / columns;
                     return Wrap(
                       spacing: 10,
                       runSpacing: 12,
@@ -442,8 +442,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                   builder: (context, constraints) {
                     final columns = constraints.maxWidth < 320 ? 1 : 2;
                     final fieldWidth =
-                        (constraints.maxWidth - (columns - 1) * 10) /
-                        columns;
+                        (constraints.maxWidth - (columns - 1) * 10) / columns;
                     return Wrap(
                       spacing: 10,
                       runSpacing: 12,
@@ -531,9 +530,8 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                         ),
                         error: (_error, _stackTrace) => ErrorState(
                           message: 'تعذر تحميل المحافظات والمناطق.',
-                          onRetry: () => ref.invalidate(
-                            regionsProvider(_country!.id),
-                          ),
+                          onRetry: () =>
+                              ref.invalidate(regionsProvider(_country!.id)),
                         ),
                       ),
                 ],
@@ -560,9 +558,8 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                         ),
                         error: (_error, _stackTrace) => ErrorState(
                           message: 'تعذر تحميل المدن.',
-                          onRetry: () => ref.invalidate(
-                            citiesProvider(_region!.id),
-                          ),
+                          onRetry: () =>
+                              ref.invalidate(citiesProvider(_region!.id)),
                         ),
                       ),
                 ],
@@ -585,9 +582,8 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                         ),
                         error: (_error, _stackTrace) => ErrorState(
                           message: 'تعذر تحميل الأحياء.',
-                          onRetry: () => ref.invalidate(
-                            areasProvider(_city!.id),
-                          ),
+                          onRetry: () =>
+                              ref.invalidate(areasProvider(_city!.id)),
                         ),
                       ),
                 ],

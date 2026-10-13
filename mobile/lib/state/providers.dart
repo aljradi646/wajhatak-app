@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/config/app_config.dart';
 import '../core/services/firebase_push_messaging_service.dart';
 import '../core/services/lux_notification_service.dart';
+import '../core/services/realtime_service.dart';
 import '../data/api_client.dart';
 import '../data/models/models.dart';
 import '../data/preview_fixtures.dart';
@@ -53,13 +54,20 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => NotificationRepository(ref.watch(apiClientProvider)),
 );
 
-final firebasePushMessagingServiceProvider = Provider<FirebasePushMessagingService>(
-  (ref) => FirebasePushMessagingService(
-    ref.watch(apiClientProvider),
-    ref.watch(tokenStoreProvider),
-    ref.watch(localNotificationServiceProvider),
-  ),
-);
+final realtimeServiceProvider = Provider<RealtimeService>((ref) {
+  final service = RealtimeService(ref.watch(apiClientProvider));
+  ref.onDispose(() => unawaited(service.stop()));
+  return service;
+});
+
+final firebasePushMessagingServiceProvider =
+    Provider<FirebasePushMessagingService>(
+      (ref) => FirebasePushMessagingService(
+        ref.watch(apiClientProvider),
+        ref.watch(tokenStoreProvider),
+        ref.watch(localNotificationServiceProvider),
+      ),
+    );
 
 final supportTicketRepositoryProvider = Provider<SupportTicketRepository>(
   (ref) => SupportTicketRepository(ref.watch(apiClientProvider)),
@@ -87,7 +95,8 @@ class SessionController extends AsyncNotifier<SessionData?> {
 
   Future<void> refreshCurrentUser() async {
     final current = state.asData?.value;
-    if (current == null || AppConfig.isUiPreview || _refreshingCurrentUser) return;
+    if (current == null || AppConfig.isUiPreview || _refreshingCurrentUser)
+      return;
     _refreshingCurrentUser = true;
     try {
       final user = await ref.read(authRepositoryProvider).refreshCurrentUser();
@@ -210,7 +219,8 @@ class SessionController extends AsyncNotifier<SessionData?> {
     }
 
     try {
-      await ref.read(firebasePushMessagingServiceProvider)
+      await ref
+          .read(firebasePushMessagingServiceProvider)
           .unregisterCurrentDevice()
           .timeout(const Duration(seconds: 2));
     } on Object {
@@ -266,7 +276,6 @@ class SessionController extends AsyncNotifier<SessionData?> {
   }) async {
     final current = state.asData?.value;
     if (current == null || AppConfig.isUiPreview) return;
-    state = const AsyncLoading();
     try {
       final result = await ref
           .read(authRepositoryProvider)
@@ -276,9 +285,11 @@ class SessionController extends AsyncNotifier<SessionData?> {
             phone: phone,
             locale: locale,
           );
-      state = AsyncData(result);
+      final latest = state.asData?.value;
+      if (latest != null && latest.user.id == current.user.id) {
+        state = AsyncData(result);
+      }
     } on ApiFailure {
-      state = AsyncData(current);
       rethrow;
     }
   }
@@ -288,14 +299,15 @@ class SessionController extends AsyncNotifier<SessionData?> {
     if (current == null || AppConfig.isUiPreview) {
       return;
     }
-    state = const AsyncLoading();
     try {
       final result = await ref
           .read(authRepositoryProvider)
           .uploadAvatar(session: current, imagePath: imagePath);
-      state = AsyncData(result);
+      final latest = state.asData?.value;
+      if (latest != null && latest.user.id == current.user.id) {
+        state = AsyncData(result);
+      }
     } on ApiFailure {
-      state = AsyncData(current);
       rethrow;
     }
   }
@@ -303,6 +315,14 @@ class SessionController extends AsyncNotifier<SessionData?> {
 
 final sessionProvider = AsyncNotifierProvider<SessionController, SessionData?>(
   SessionController.new,
+);
+
+/// Stable auth dependency for data providers. Profile refreshes must not
+/// invalidate every screen; only a change of authenticated user ID does.
+final sessionUserIdProvider = Provider<int?>(
+  (ref) => ref.watch(
+    sessionProvider.select((session) => session.asData?.value?.user.id),
+  ),
 );
 
 // ---------------------------------------------------------------------------
@@ -320,8 +340,8 @@ Future<T> _readForSession<T>(
   T fallback,
   Future<T> Function() request,
 ) async {
-  final session = ref.watch(sessionProvider).asData?.value;
-  if (session == null) return fallback;
+  final sessionUserId = ref.read(sessionUserIdProvider);
+  if (sessionUserId == null) return fallback;
   try {
     return await request();
   } on ApiFailure catch (error) {
@@ -337,20 +357,77 @@ Future<T> _readForSession<T>(
   }
 }
 
+/// Async controller that refreshes in place, retaining the last successful
+/// value during network revalidation. Use invalidation only for first-load
+/// recovery or when the identity/query itself changes.
+abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
+  bool _refreshInFlight = false;
+  bool _refreshQueued = false;
+
+  Future<T> loadValue();
+
+  @override
+  Future<T> build() {
+    ref.watch(sessionUserIdProvider);
+    return loadValue();
+  }
+
+  Future<void> refresh() async {
+    if (_refreshInFlight) {
+      _refreshQueued = true;
+      return;
+    }
+
+    // If an event arrives during the first load, wait for that request before
+    // issuing a background refresh so the event cannot be lost to a stale read.
+    if (state.value == null) {
+      try {
+        await future;
+      } catch (_) {
+        return; // The normal first-load error UI owns retry behavior.
+      }
+    }
+
+    final previous = state.value;
+    if (previous == null || _refreshInFlight) return;
+    final requestedUserId = ref.read(sessionUserIdProvider);
+    _refreshInFlight = true;
+    try {
+      final refreshed = await loadValue();
+      if (ref.mounted &&
+          requestedUserId == ref.read(sessionUserIdProvider)) {
+        state = AsyncData(refreshed);
+      }
+    } catch (_) {
+      // A transient refresh failure must not erase usable on-screen data.
+      if (ref.mounted &&
+          requestedUserId == ref.read(sessionUserIdProvider)) {
+        state = AsyncData(previous);
+      }
+    } finally {
+      _refreshInFlight = false;
+      if (ref.mounted && _refreshQueued) {
+        _refreshQueued = false;
+        unawaited(refresh());
+      }
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // العقارات
 // ---------------------------------------------------------------------------
 
 final propertiesProvider = FutureProvider<List<LuxProperty>>((ref) async {
   if (AppConfig.isUiPreview) return (await _preview(ref)).list();
-  ref.watch(sessionProvider);
+  ref.watch(sessionUserIdProvider);
   return ref.read(propertyRepositoryProvider).list();
 });
 
 final propertySearchProvider =
     FutureProvider.family<List<LuxProperty>, PropertyQuery>((ref, query) async {
       if (AppConfig.isUiPreview) return (await _preview(ref)).list(query);
-      ref.watch(sessionProvider);
+      ref.watch(sessionUserIdProvider);
       return ref.read(propertyRepositoryProvider).list(query);
     });
 
@@ -385,7 +462,8 @@ class ExploreSearchResult {
   );
 }
 
-class ExplorePropertySearchController extends AsyncNotifier<ExploreSearchResult> {
+class ExplorePropertySearchController
+    extends AsyncNotifier<ExploreSearchResult> {
   ExplorePropertySearchController(this._query);
 
   final PropertyQuery _query;
@@ -398,7 +476,7 @@ class ExplorePropertySearchController extends AsyncNotifier<ExploreSearchResult>
       return ExploreSearchResult(items: items, hasMore: false, nextPage: 1);
     }
 
-    ref.watch(sessionProvider);
+    ref.watch(sessionUserIdProvider);
     final page = await ref.read(propertyRepositoryProvider).searchPage(_query);
     return ExploreSearchResult(
       items: page.items,
@@ -419,7 +497,9 @@ class ExplorePropertySearchController extends AsyncNotifier<ExploreSearchResult>
     }
 
     _requestInFlight = true;
-    state = AsyncData(current.copyWith(isLoadingMore: true, loadMoreError: false));
+    state = AsyncData(
+      current.copyWith(isLoadingMore: true, loadMoreError: false),
+    );
     try {
       final more = await ref
           .read(propertyRepositoryProvider)
@@ -427,41 +507,45 @@ class ExplorePropertySearchController extends AsyncNotifier<ExploreSearchResult>
       final latest = state.asData?.value ?? current;
       final seenIds = latest.items.map((item) => item.id).toSet();
       final appended = more.items.where((item) => seenIds.add(item.id));
-      state = AsyncData(latest.copyWith(
-        items: [...latest.items, ...appended],
-        hasMore: more.hasMore,
-        nextPage: more.nextPage,
-        isLoadingMore: false,
-        loadMoreError: false,
-      ));
+      state = AsyncData(
+        latest.copyWith(
+          items: [...latest.items, ...appended],
+          hasMore: more.hasMore,
+          nextPage: more.nextPage,
+          isLoadingMore: false,
+          loadMoreError: false,
+        ),
+      );
     } on Object {
       final latest = state.asData?.value ?? current;
-      state = AsyncData(latest.copyWith(
-        isLoadingMore: false,
-        loadMoreError: true,
-      ));
+      state = AsyncData(
+        latest.copyWith(isLoadingMore: false, loadMoreError: true),
+      );
     } finally {
       _requestInFlight = false;
     }
   }
 }
 
-final explorePropertySearchProvider = AsyncNotifierProvider.family<
-    ExplorePropertySearchController, ExploreSearchResult, PropertyQuery>(
-  (query) => ExplorePropertySearchController(query),
-);
+final explorePropertySearchProvider =
+    AsyncNotifierProvider.family<
+      ExplorePropertySearchController,
+      ExploreSearchResult,
+      PropertyQuery
+    >((query) => ExplorePropertySearchController(query));
 
 final propertyDetailProvider = FutureProvider.family<LuxProperty, int>((
   ref,
   id,
 ) async {
   if (AppConfig.isUiPreview) return (await _preview(ref)).detail(id);
-  ref.watch(sessionProvider);
+  ref.watch(sessionUserIdProvider);
   return ref.read(propertyRepositoryProvider).detail(id);
 });
 
 final favoritesProvider = FutureProvider<List<LuxProperty>>((ref) async {
   if (AppConfig.isUiPreview) return (await _preview(ref)).favorites();
+  ref.watch(sessionUserIdProvider);
   return _readForSession(
     ref,
     const <LuxProperty>[],
@@ -469,14 +553,23 @@ final favoritesProvider = FutureProvider<List<LuxProperty>>((ref) async {
   );
 });
 
-final myListingsProvider = FutureProvider<List<LuxProperty>>((ref) async {
-  if (AppConfig.isUiPreview) return (await _preview(ref)).mine();
-  return _readForSession(
-    ref,
-    const <LuxProperty>[],
-    () => ref.read(propertyRepositoryProvider).mine(),
-  );
-});
+class MyListingsController
+    extends BackgroundRefreshController<List<LuxProperty>> {
+  @override
+  Future<List<LuxProperty>> loadValue() async {
+    if (AppConfig.isUiPreview) return (await _preview(ref)).mine();
+    return _readForSession(
+      ref,
+      const <LuxProperty>[],
+      () => ref.read(propertyRepositoryProvider).mine(),
+    );
+  }
+}
+
+final myListingsProvider =
+    AsyncNotifierProvider<MyListingsController, List<LuxProperty>>(
+      MyListingsController.new,
+    );
 
 // ---------------------------------------------------------------------------
 // ملف الوكيل
@@ -614,27 +707,41 @@ final areasProvider = FutureProvider.family<List<LocationItem>, int>(
 // المحادثات والرسائل وطلبات المعاينة
 // ---------------------------------------------------------------------------
 
-final conversationsProvider = FutureProvider<List<ConversationItem>>((
-  ref,
-) async {
-  if (AppConfig.isUiPreview) return (await _preview(ref)).conversations();
-  return _readForSession(
-    ref,
-    const <ConversationItem>[],
-    () => ref.read(conversationRepositoryProvider).conversations(),
-  );
-});
+class ConversationsController
+    extends BackgroundRefreshController<List<ConversationItem>> {
+  @override
+  Future<List<ConversationItem>> loadValue() async {
+    if (AppConfig.isUiPreview) return (await _preview(ref)).conversations();
+    return _readForSession(
+      ref,
+      const <ConversationItem>[],
+      () => ref.read(conversationRepositoryProvider).conversations(),
+    );
+  }
+}
 
-final viewingRequestsProvider = FutureProvider<List<ViewingRequestItem>>((
-  ref,
-) async {
-  if (AppConfig.isUiPreview) return (await _preview(ref)).viewingRequests();
-  return _readForSession(
-    ref,
-    const <ViewingRequestItem>[],
-    () => ref.read(viewingRequestRepositoryProvider).viewingRequests(),
-  );
-});
+final conversationsProvider =
+    AsyncNotifierProvider<ConversationsController, List<ConversationItem>>(
+      ConversationsController.new,
+    );
+
+class ViewingRequestsController
+    extends BackgroundRefreshController<List<ViewingRequestItem>> {
+  @override
+  Future<List<ViewingRequestItem>> loadValue() async {
+    if (AppConfig.isUiPreview) return (await _preview(ref)).viewingRequests();
+    return _readForSession(
+      ref,
+      const <ViewingRequestItem>[],
+      () => ref.read(viewingRequestRepositoryProvider).viewingRequests(),
+    );
+  }
+}
+
+final viewingRequestsProvider =
+    AsyncNotifierProvider<ViewingRequestsController, List<ViewingRequestItem>>(
+      ViewingRequestsController.new,
+    );
 
 final messagesProvider =
     AsyncNotifierProvider.family<ChatMessagesNotifier, List<ChatMessage>, int>(
@@ -647,9 +754,13 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
   ChatMessagesNotifier(this._conversationId);
 
   final int _conversationId;
+  bool _refreshInFlight = false;
 
   @override
-  Future<List<ChatMessage>> build() => _load();
+  Future<List<ChatMessage>> build() {
+    ref.watch(sessionUserIdProvider);
+    return _load();
+  }
 
   Future<List<ChatMessage>> _load() async {
     if (AppConfig.isUiPreview) {
@@ -664,10 +775,19 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
 
   /// تحديث خلفي للرسائل الجديدة دون إظهار شاشة تحميل (يبقي القائمة الحالية).
   Future<void> refresh() async {
+    if (_refreshInFlight) return;
+    final requestedUserId = ref.read(sessionUserIdProvider);
+    _refreshInFlight = true;
     try {
-      state = AsyncData(await _load());
+      final latest = await _load();
+      if (ref.mounted &&
+          requestedUserId == ref.read(sessionUserIdProvider)) {
+        state = AsyncData(latest);
+      }
     } on Object {
-      // فشل التحديث الخلفي لا يُسقط الرسائل المعروضة.
+      // A transient refresh failure must not erase visible messages.
+    } finally {
+      _refreshInFlight = false;
     }
   }
 
@@ -686,9 +806,10 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
         createdAt: DateTime.now(),
       );
       state = AsyncData([message, ...(state.value ?? const <ChatMessage>[])]);
-      ref.invalidate(conversationsProvider);
+      unawaited(ref.read(conversationsProvider.notifier).refresh());
       return;
     }
+    final senderUserId = ref.read(sessionUserIdProvider);
     final message = await ref
         .read(conversationRepositoryProvider)
         .sendMessage(
@@ -697,13 +818,16 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
           messageType: messageType,
           propertyId: propertyId,
         );
+    if (!ref.mounted || senderUserId != ref.read(sessionUserIdProvider)) {
+      return;
+    }
     state = AsyncData([
       message,
       ...(state.value ?? const <ChatMessage>[]).where(
         (existing) => existing.id != message.id,
       ),
     ]);
-    ref.invalidate(conversationsProvider);
+    unawaited(ref.read(conversationsProvider.notifier).refresh());
     unawaited(refresh());
   }
 }
@@ -712,7 +836,8 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
 // البلاغات والدعم
 // ---------------------------------------------------------------------------
 final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
-  if (!AppConfig.isUiPreview && ref.watch(sessionProvider).asData?.value == null) return const [];
+  if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null)
+    return const [];
   if (AppConfig.isUiPreview) return const [];
   return ref.watch(supportTicketRepositoryProvider).list();
 });
@@ -721,17 +846,43 @@ final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
 // الإشعارات
 // ---------------------------------------------------------------------------
 
-final notificationsProvider = FutureProvider<List<LuxNotification>>((
-  ref,
-) async {
-  if (!AppConfig.isUiPreview &&
-      ref.watch(sessionProvider).asData?.value == null) {
-    return const [];
+class NotificationsController
+    extends BackgroundRefreshController<List<LuxNotification>> {
+  @override
+  Future<List<LuxNotification>> loadValue() async {
+    if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null) {
+      return const [];
+    }
+    return AppConfig.isUiPreview
+        ? (await _preview(ref)).notifications()
+        : ref.read(notificationRepositoryProvider).notifications();
   }
-  return AppConfig.isUiPreview
-      ? (await _preview(ref)).notifications()
-      : ref.watch(notificationRepositoryProvider).notifications();
-});
+}
+
+final notificationsProvider =
+    AsyncNotifierProvider<NotificationsController, List<LuxNotification>>(
+      NotificationsController.new,
+    );
+
+class UnreadNotificationCountController
+    extends BackgroundRefreshController<int> {
+  @override
+  Future<int> loadValue() async {
+    if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null) {
+      return 0;
+    }
+    if (AppConfig.isUiPreview) {
+      final items = await (await _preview(ref)).notifications();
+      return items.where((item) => !item.isRead).length;
+    }
+    return ref.read(notificationRepositoryProvider).unreadCount();
+  }
+}
+
+final unreadNotificationCountProvider =
+    AsyncNotifierProvider<UnreadNotificationCountController, int>(
+      UnreadNotificationCountController.new,
+    );
 
 // ---------------------------------------------------------------------------
 // البحث وحالة المفضلة

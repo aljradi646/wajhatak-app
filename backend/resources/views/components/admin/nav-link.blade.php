@@ -6,7 +6,7 @@
         : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white';
 @endphp
 
-<a href="{{ $href }}" {{ $attributes->merge(['class' => 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ' . $classes]) }} :class="collapsed ? 'justify-center px-2' : ''">
+<a href="{{ $href }}" data-sidebar-active="{{ $active ? 'true' : 'false' }}" x-init="$nextTick(() => { if ($el.dataset.sidebarActive === 'true') $el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' }); })" {{ $attributes->merge(['class' => 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ' . $classes]) }} :class="collapsed ? 'justify-center px-2' : ''">
     @isset($icon)
         <span class="shrink-0">{{ $icon }}</span>
     @endisset

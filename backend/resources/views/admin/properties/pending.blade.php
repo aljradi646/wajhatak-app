@@ -64,9 +64,14 @@
                                     @if ($property->status->value !== 'rejected')
                                         <form method="POST" action="{{ route('admin.properties.reject', $property) }}" onsubmit="return confirm('رفض هذا العقار وإرجاعه للوكيل؟');">
                                             @csrf
+                                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300" for="reject-reason-{{ $property->id }}">سبب الرفض (إلزامي)</label>
+                                            <textarea id="reject-reason-{{ $property->id }}" name="reason" required minlength="5" maxlength="2000" rows="2" class="w-full rounded-lg border-gray-300 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" placeholder="اكتب سببًا واضحًا ليستطيع الوكيل تصحيح العقار..."></textarea>
+                                            @error('reason')
+                                                <p class="text-xs text-red-600">{{ $message }}</p>
+                                            @enderror
                                             <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 ring-1 ring-red-200 transition hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
                                                 <x-admin.icon name="x-circle" class="h-4 w-4" />
-                                                رفض
+                                                رفض وإرسال السبب
                                             </button>
                                         </form>
                                     @endif

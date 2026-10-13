@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -131,7 +133,7 @@ class _ViewingRequestCardState extends ConsumerState<_ViewingRequestCard> {
                 '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
             notes: item.notes,
           );
-      ref.invalidate(viewingRequestsProvider);
+      unawaited(ref.read(viewingRequestsProvider.notifier).refresh());
       if (mounted) util.notice(context, 'تم تحديث موعد المعاينة.');
     } on ApiFailure catch (error) {
       if (mounted) util.notice(context, error.message);
@@ -165,7 +167,7 @@ class _ViewingRequestCardState extends ConsumerState<_ViewingRequestCard> {
       await ref
           .read(viewingRequestRepositoryProvider)
           .deleteViewingRequest(widget.item.id);
-      ref.invalidate(viewingRequestsProvider);
+      unawaited(ref.read(viewingRequestsProvider.notifier).refresh());
       if (mounted) util.notice(context, 'تم حذف طلب المعاينة.');
     } on ApiFailure catch (error) {
       if (mounted) util.notice(context, error.message);
@@ -203,7 +205,7 @@ class _ViewingRequestCardState extends ConsumerState<_ViewingRequestCard> {
       await ref
           .read(viewingRequestRepositoryProvider)
           .updateViewingRequest(requestId: widget.item.id, status: status);
-      ref.invalidate(viewingRequestsProvider);
+      unawaited(ref.read(viewingRequestsProvider.notifier).refresh());
       if (mounted) {
         util.notice(
           context,

@@ -29,13 +29,17 @@
             (() => {
                 const serverTheme = @json($serverTheme);
                 const cookieTheme = @json($cookieTheme);
-                let theme = cookieTheme || serverTheme || 'system';
+                // Match the client theme manager's precedence before any stylesheet is loaded.
+                // localStorage must be considered even when a server preference exists, otherwise
+                // a stale server value can flash before app.js applies the browser preference.
+                let theme = cookieTheme || 'system';
                 try {
-                    if (!serverTheme && !cookieTheme) {
-                        const local = localStorage.getItem('lux_theme');
-                        if (['light', 'dark', 'system'].includes(local)) theme = local;
-                    }
-                } catch (_) {}
+                    const local = localStorage.getItem('lux_theme');
+                    if (!cookieTheme && ['light', 'dark', 'system'].includes(local)) theme = local;
+                    else if (!cookieTheme && !['light', 'dark', 'system'].includes(local)) theme = serverTheme || 'system';
+                } catch (_) {
+                    theme = cookieTheme || serverTheme || 'system';
+                }
                 document.documentElement.classList.toggle('dark', theme === 'dark' || (theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches));
                 document.documentElement.dataset.theme = theme;
                 window.__LUX_THEME_SERVER__ = serverTheme;

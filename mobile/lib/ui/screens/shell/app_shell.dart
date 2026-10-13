@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/navigation/active_chat_context.dart';
 import '../../../core/navigation/notification_navigation.dart';
 import '../../../core/services/lux_notification_service.dart';
 import '../../../core/theme/app_theme.dart';
@@ -35,7 +36,6 @@ class _AppShellState extends ConsumerState<AppShell> {
   var _index = 0;
   final _shellKey = GlobalKey<ScaffoldState>();
   final Set<String> _observedNotificationIds = <String>{};
-  Timer? _notificationTimer;
   Timer? _sessionRefreshTimer;
   bool _notificationsPrimed = false;
 
@@ -46,21 +46,21 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void initState() {
     super.initState();
+    final realtime = ref.read(realtimeServiceProvider);
+    realtime.onEvent = _handleRealtimeEvent;
+    if (ref.read(sessionProvider).asData?.value != null)
+      unawaited(realtime.start());
     final service = ref.read(localNotificationServiceProvider);
     service.onNotificationResponse = _openFromSystemNotification;
     unawaited(service.initialize());
     unawaited(_handleLaunchNotification());
     final push = ref.read(firebasePushMessagingServiceProvider);
     push.onNotificationOpened = _openFromSystemNotification;
+    push.onMessageReceived = _handlePushMessage;
     unawaited(push.initializeAndRegister());
-    // Polling محسوب للإشعارات والمحادثات — 25 ثانية، فقط عند وجود جلسة.
-    _notificationTimer = Timer.periodic(const Duration(seconds: 25), (_) {
-      if (ref.read(sessionProvider).asData?.value != null) {
-        ref.invalidate(notificationsProvider);
-        ref.invalidate(conversationsProvider);
-      }
-    });
-    _sessionRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    // Notifications refresh from push/WebSocket events; avoid global polling
+    // that repeatedly invalidates whole screens and destroys their state.
+    _sessionRefreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (mounted && ref.read(sessionProvider).asData?.value != null) {
         unawaited(ref.read(sessionProvider.notifier).refreshCurrentUser());
       }
@@ -69,9 +69,40 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   void dispose() {
-    _notificationTimer?.cancel();
     _sessionRefreshTimer?.cancel();
+    unawaited(ref.read(realtimeServiceProvider).stop());
     super.dispose();
+  }
+
+  void _handleRealtimeEvent(String event, Map<String, dynamic> data) {
+    if (!mounted) return;
+    if (event == 'message.received' || event == 'notifications.updated') {
+      unawaited(ref.read(notificationsProvider.notifier).refresh());
+      unawaited(ref.read(unreadNotificationCountProvider.notifier).refresh());
+      unawaited(ref.read(conversationsProvider.notifier).refresh());
+      final id = int.tryParse(data['conversation_id']?.toString() ?? '');
+      if (id != null && id == ActiveChatContext.conversationId) {
+        unawaited(ref.read(messagesProvider(id).notifier).refresh());
+      }
+    } else if (event == 'conversation.read') {
+      unawaited(ref.read(conversationsProvider.notifier).refresh());
+      final id = int.tryParse(data['conversation_id']?.toString() ?? '');
+      if (id != null) ref.invalidate(messagesProvider(id));
+    }
+  }
+
+  Future<void> _handlePushMessage(Map<String, dynamic> data) async {
+    if (!mounted) return;
+    unawaited(ref.read(notificationsProvider.notifier).refresh());
+    unawaited(ref.read(unreadNotificationCountProvider.notifier).refresh());
+    unawaited(ref.read(conversationsProvider.notifier).refresh());
+    final conversationId = int.tryParse(
+      data['conversation_id']?.toString() ?? '',
+    );
+    if (conversationId != null &&
+        conversationId == ActiveChatContext.conversationId) {
+      unawaited(ref.read(messagesProvider(conversationId).notifier).refresh());
+    }
   }
 
   /// فتح المصدر من إشعار نظام (التطبيق في الخلفية).
@@ -103,7 +134,11 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
     for (final item in items.where((item) => !item.isRead)) {
       if (!_observedNotificationIds.add(item.id) ||
-          !_isNotificationEnabled(item, settings)) {
+          !_isNotificationEnabled(item, settings) ||
+          (item.isMessage &&
+              item.conversationId != null &&
+              item.conversationId == ActiveChatContext.conversationId) ||
+          !ActiveChatContext.markNotificationShown(item.id)) {
         continue;
       }
       unawaited(ref.read(localNotificationServiceProvider).show(item));
@@ -150,7 +185,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     final notifications =
         ref.watch(notificationsProvider).asData?.value ??
         const <LuxNotification>[];
-    final unreadCount = notifications.where((item) => !item.isRead).length;
+    final unreadCount =
+        ref.watch(unreadNotificationCountProvider).asData?.value ??
+        notifications.where((item) => !item.isRead).length;
     ref.listen<AsyncValue<List<LuxNotification>>>(
       notificationsProvider,
       (_, next) =>
@@ -158,9 +195,20 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
     ref.listen<AsyncValue<SessionData?>>(
       sessionProvider,
-      (_, next) {
-        if (next.asData?.value != null) {
-          unawaited(ref.read(firebasePushMessagingServiceProvider).initializeAndRegister());
+      (previous, next) {
+        final previousUserId = previous?.asData?.value?.user.id;
+        final nextUserId = next.asData?.value?.user.id;
+        if (previousUserId == nextUserId) return;
+
+        if (nextUserId != null) {
+          unawaited(
+            ref
+                .read(firebasePushMessagingServiceProvider)
+                .initializeAndRegister(),
+          );
+          unawaited(ref.read(realtimeServiceProvider).start());
+        } else {
+          unawaited(ref.read(realtimeServiceProvider).stop());
         }
       },
     );

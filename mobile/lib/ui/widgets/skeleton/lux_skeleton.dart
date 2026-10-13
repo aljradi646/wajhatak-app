@@ -215,6 +215,8 @@ class LuxAsyncView<T> extends StatefulWidget {
 }
 
 class _LuxAsyncViewState<T> extends _MinimumLoadingState<LuxAsyncView<T>> {
+  T? _lastData;
+  bool _hasLastData = false;
   @override
   AsyncValue<dynamic> get _loadingValue => widget.value;
 
@@ -226,20 +228,21 @@ class _LuxAsyncViewState<T> extends _MinimumLoadingState<LuxAsyncView<T>> {
   @override
   Widget build(BuildContext context) {
     final value = widget.value;
-
-    /// التحميل الأول أو retry بدون بيانات.
-    if (_isMinimumLoadingActive) {
-      return _skeleton;
+    if (value.hasValue) {
+      _lastData = value.requireValue;
+      _hasLastData = true;
     }
 
-    /// البيانات الحالية لها الأولوية.
-    ///
-    /// حتى لو كان Riverpod يعيد تحميلها في الخلفية،
-    /// لا نستبدل الصفحة كاملة بالـSkeleton.
-    if (value.hasValue) {
-      final content = widget.data(value.requireValue);
+    // Stale-while-revalidate: render the last successful content while a
+    // refresh is pending or fails. Skeletons are reserved for first load.
+    if (_hasLastData && (value.hasValue || value.isLoading || value.hasError)) {
+      final data = value.hasValue ? value.requireValue : _lastData as T;
+      final content = widget.data(data);
 
-      if (_isBackgroundUpdating(value)) {
+      if (value.isLoading ||
+          value.isRefreshing ||
+          value.isReloading ||
+          value.retrying) {
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -262,7 +265,11 @@ class _LuxAsyncViewState<T> extends _MinimumLoadingState<LuxAsyncView<T>> {
       return content;
     }
 
-    /// تحميل بدون بيانات.
+    /// Loading without any previously successful data (first visit only).
+    if (_isMinimumLoadingActive) {
+      return _skeleton;
+    }
+
     if (value.isLoading || value.retrying) {
       return _skeleton;
     }
@@ -436,11 +443,7 @@ class PropertyDetailsSkeleton extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
             sliver: SliverList.list(
               children: [
-                LuxSkeleton(
-                  width: contentWidth * .92,
-                  height: 30,
-                  radius: 9,
-                ),
+                LuxSkeleton(width: contentWidth * .92, height: 30, radius: 9),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -612,8 +615,7 @@ class ExploreSkeleton extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final columns = Responsive.propertyGridColumns(constraints.maxWidth);
-      final cardWidth =
-          (constraints.maxWidth - (columns - 1) * 14) / columns;
+      final cardWidth = (constraints.maxWidth - (columns - 1) * 14) / columns;
 
       return _LuxShimmer(
         child: GridView.builder(
@@ -786,8 +788,7 @@ class AgentProfileSkeleton extends StatelessWidget {
                 constraints.crossAxisExtent,
               );
               final cardWidth =
-                  (constraints.crossAxisExtent - (columns - 1) * 10) /
-                  columns;
+                  (constraints.crossAxisExtent - (columns - 1) * 10) / columns;
               return SliverGrid.builder(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: columns,
@@ -817,18 +818,22 @@ class AgentReportSkeleton extends StatelessWidget {
     child: LayoutBuilder(
       builder: (context, constraints) {
         // The real KPI grid sits inside a Card with 14px padding per side.
-        final contentWidth =
-            (constraints.maxWidth - 28).clamp(0.0, constraints.maxWidth).toDouble();
+        final contentWidth = (constraints.maxWidth - 28)
+            .clamp(0.0, constraints.maxWidth)
+            .toDouble();
         final columns = contentWidth >= 1000
             ? 4
             : contentWidth >= 640
-                ? 3
-                : contentWidth >= 240
-                    ? 2
-                    : 1;
-        final cardWidth =
-            (contentWidth - (columns - 1) * 10) / columns;
-        final cardRatio = columns == 1 ? 2.7 : cardWidth < 150 ? 1.8 : 2.0;
+            ? 3
+            : contentWidth >= 240
+            ? 2
+            : 1;
+        final cardWidth = (contentWidth - (columns - 1) * 10) / columns;
+        final cardRatio = columns == 1
+            ? 2.7
+            : cardWidth < 150
+            ? 1.8
+            : 2.0;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -868,13 +873,12 @@ class AgentReportSkeleton extends StatelessWidget {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: 4,
-                      gridDelegate:
-                          SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: columns,
-                            childAspectRatio: cardRatio,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                          ),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        childAspectRatio: cardRatio,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                      ),
                       itemBuilder: (_, _) => Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -963,10 +967,9 @@ class AgentReportSkeleton extends StatelessWidget {
                       Container(
                         height: 1,
                         width: 472,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outlineVariant
-                            .withValues(alpha: .5),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withValues(alpha: .5),
                       ),
                     ],
                   ],
@@ -1055,13 +1058,14 @@ class PropertyGridSkeleton extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final resolvedPadding = padding.resolve(Directionality.of(context));
-          final contentWidth = (constraints.maxWidth - resolvedPadding.horizontal)
-              .clamp(0.0, constraints.maxWidth)
-              .toDouble();
-          final safeColumns = (columns ??
-                  Responsive.propertyGridColumns(contentWidth))
-              .clamp(1, 6)
-              .toInt();
+          final contentWidth =
+              (constraints.maxWidth - resolvedPadding.horizontal)
+                  .clamp(0.0, constraints.maxWidth)
+                  .toDouble();
+          final safeColumns =
+              (columns ?? Responsive.propertyGridColumns(contentWidth))
+                  .clamp(1, 6)
+                  .toInt();
           final cardWidth =
               (contentWidth - (safeColumns - 1) * 14) / safeColumns;
 
@@ -1163,7 +1167,9 @@ class PropertyCardSkeleton extends StatelessWidget {
       final veryCompact =
           constraints.maxWidth < 120 || constraints.maxHeight < 170;
       final compact =
-          veryCompact || constraints.maxWidth < 180 || constraints.maxHeight < 250;
+          veryCompact ||
+          constraints.maxWidth < 180 ||
+          constraints.maxHeight < 250;
       final priceWidth = compact
           ? (constraints.maxWidth - (veryCompact ? 12 : 16))
                 .clamp(veryCompact ? 50.0 : 60.0, veryCompact ? 72.0 : 88.0)
@@ -1176,9 +1182,7 @@ class PropertyCardSkeleton extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),
-          side: BorderSide(
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1259,30 +1263,20 @@ class PropertyCardSkeleton extends StatelessWidget {
                       const Spacer(),
                       Row(
                         children: [
-                          Expanded(
-                            child: LuxSkeleton(height: 22, radius: 11),
-                          ),
+                          Expanded(child: LuxSkeleton(height: 22, radius: 11)),
                           const SizedBox(width: 7),
-                          Expanded(
-                            child: LuxSkeleton(height: 22, radius: 11),
-                          ),
+                          Expanded(child: LuxSkeleton(height: 22, radius: 11)),
                           const SizedBox(width: 7),
-                          Expanded(
-                            child: LuxSkeleton(height: 22, radius: 11),
-                          ),
+                          Expanded(child: LuxSkeleton(height: 22, radius: 11)),
                         ],
                       ),
                     ] else if (!veryCompact) ...[
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Expanded(
-                            child: LuxSkeleton(height: 17, radius: 9),
-                          ),
+                          Expanded(child: LuxSkeleton(height: 17, radius: 9)),
                           const SizedBox(width: 6),
-                          Expanded(
-                            child: LuxSkeleton(height: 17, radius: 9),
-                          ),
+                          Expanded(child: LuxSkeleton(height: 17, radius: 9)),
                         ],
                       ),
                     ],
@@ -1698,6 +1692,8 @@ class SliverAsyncView<T> extends StatefulWidget {
 
 class _SliverAsyncViewState<T>
     extends _MinimumLoadingState<SliverAsyncView<T>> {
+  T? _lastData;
+  bool _hasLastData = false;
   @override
   AsyncValue<dynamic> get _loadingValue => widget.value;
 
@@ -1709,14 +1705,20 @@ class _SliverAsyncViewState<T>
   @override
   Widget build(BuildContext context) {
     final value = widget.value;
-
-    if (_isMinimumLoadingActive) {
-      return _skeleton;
+    if (value.hasValue) {
+      _lastData = value.requireValue;
+      _hasLastData = true;
     }
 
-    if (value.hasValue) {
-      final data = value.requireValue;
-
+    // Keep the last successful page visible during invalidation/revalidation.
+    // A refresh must never replace an already usable screen with a skeleton.
+    if (_hasLastData && (value.hasValue || value.isLoading || value.hasError)) {
+      final data = value.hasValue ? value.requireValue : _lastData as T;
+      final updating =
+          value.isLoading ||
+          value.isRefreshing ||
+          value.isReloading ||
+          value.retrying;
       final empty = widget.emptyOverride != null && _isEmptyCollection(data);
 
       if (empty) {
@@ -1725,7 +1727,7 @@ class _SliverAsyncViewState<T>
           child: widget.emptyOverride!,
         );
 
-        if (_isBackgroundUpdating(value)) {
+        if (updating) {
           return SliverMainAxisGroup(slivers: [_refreshProgressSliver, sliver]);
         }
 
@@ -1734,13 +1736,17 @@ class _SliverAsyncViewState<T>
 
       final contentSlivers = widget.data(data);
 
-      if (_isBackgroundUpdating(value)) {
+      if (updating) {
         return SliverMainAxisGroup(
           slivers: [_refreshProgressSliver, ...contentSlivers],
         );
       }
 
       return SliverMainAxisGroup(slivers: contentSlivers);
+    }
+
+    if (_isMinimumLoadingActive) {
+      return _skeleton;
     }
 
     if (value.isLoading || value.retrying) {

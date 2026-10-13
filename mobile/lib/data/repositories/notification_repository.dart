@@ -17,6 +17,15 @@ class NotificationRepository {
         .toList();
   }
 
+  Future<int> unreadCount() async {
+    final json = await _api.get('/notifications/unread-count');
+    final data = json['data'];
+    if (data is Map<String, dynamic>) {
+      return (data['unread_count'] as num?)?.toInt() ?? 0;
+    }
+    return 0;
+  }
+
   Future<void> markNotificationRead(String notificationId) =>
       _api.post('/notifications/$notificationId/read');
 }

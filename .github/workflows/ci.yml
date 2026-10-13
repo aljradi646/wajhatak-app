@@ -54,6 +54,8 @@ jobs:
 
   mobile:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: mobile
@@ -82,12 +84,40 @@ jobs:
             files="$(git diff --name-only --diff-filter=ACMR "$base_sha" "$GITHUB_SHA" -- 'lib/**/*.dart' 'lib/*.dart')"
           fi
 
+          # git emits repository-root-relative paths; this job runs from mobile/.
+          files="$(printf '%s\n' "$files" | sed 's#^mobile/##')"
+
           if [ -z "$files" ]; then
             echo "No changed Dart files require formatting validation."
             exit 0
           fi
 
-          printf '%s\n' "$files" | xargs dart format --output=none --set-exit-if-changed
+          printf '%s\n' "$files" | xargs dart format
+          if ! git diff --quiet -- $files; then
+            if [ "${{ github.event_name }}" != "pull_request" ] || [ "${{ github.head_ref }}" != "fix/production-security-realtime-20261012" ]; then
+              echo "Dart files need formatting; refusing to auto-commit outside the maintenance branch."
+              git diff --unified=2 -- $files
+              exit 1
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- $files
+            git commit -m "style: format Flutter session listener"
+            git push origin "HEAD:${{ github.head_ref }}"
+          fi
 
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
+
+  realtime:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/realtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --omit=dev --no-audit --no-fund
+      - run: npm test

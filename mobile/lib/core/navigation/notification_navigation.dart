@@ -15,8 +15,7 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// دفع شاشة من جذر التطبيق (يصلح حتى قبل اكتمال الجلسة).
 void pushFromRoot(Widget page) {
-  rootNavigatorKey.currentState
-      ?.push(MaterialPageRoute(builder: (_) => page));
+  rootNavigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => page));
 }
 
 /// النقر على إشعار → فتح المصدر الفعلي (المحادثة / الطلبات / العقار).
@@ -36,7 +35,8 @@ Future<void> _openNotificationSource(
       await container
           .read(notificationRepositoryProvider)
           .markNotificationRead(item.id);
-      container.invalidate(notificationsProvider);
+      await container.read(notificationsProvider.notifier).refresh();
+      await container.read(unreadNotificationCountProvider.notifier).refresh();
     } on Object {
       // القراءة تأكيدية؛ الفشل لا يمنع التنقل.
     }
@@ -52,15 +52,13 @@ Future<void> _openNotificationSource(
             builder: (_) => ChatScreen(conversation: conversation),
           ),
         );
-        container.invalidate(conversationsProvider);
+        await container.read(conversationsProvider.notifier).refresh();
         return;
       }
     }
     // المحادثة غير متاحة — نكفي بفتح صفحة الرسائل.
     await navigator.push(
-      MaterialPageRoute(
-        builder: (_) => const MessagesScreen(standalone: true),
-      ),
+      MaterialPageRoute(builder: (_) => const MessagesScreen(standalone: true)),
     );
     return;
   }
@@ -69,12 +67,17 @@ Future<void> _openNotificationSource(
     await navigator.push(
       MaterialPageRoute(builder: (_) => const ViewingRequestsScreen()),
     );
-    container.invalidate(viewingRequestsProvider);
+    await container.read(viewingRequestsProvider.notifier).refresh();
     return;
   }
 
   if (item.supportTicketId != null) {
-    await navigator.push(MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(ticketId: item.supportTicketId!)));
+    await navigator.push(
+      MaterialPageRoute(
+        builder: (_) =>
+            SupportTicketDetailScreen(ticketId: item.supportTicketId!),
+      ),
+    );
     container.invalidate(supportTicketsProvider);
     return;
   }
@@ -104,7 +107,8 @@ Future<void> openNotificationSourceById(
       : rootNavigatorKey.currentState;
   LuxNotification? item;
   try {
-    final items = await container.refresh(notificationsProvider.future);
+    await container.read(notificationsProvider.notifier).refresh();
+    final items = await container.read(notificationsProvider.future);
     for (final notification in items) {
       if (notification.id == notificationId) {
         item = notification;
@@ -129,7 +133,8 @@ Future<ConversationItem?> _findConversation(
   try {
     // تحديث فوري — لا نعتمد على الكاش القديم حتى نجد المحادثة وفتحها
     // بمحتواها الحقيقي (المعالج أسفله يُحدّث الرسائل أيضًا عند فتحها).
-    final conversations = await container.refresh(conversationsProvider.future);
+    await container.read(conversationsProvider.notifier).refresh();
+    final conversations = await container.read(conversationsProvider.future);
     for (final conversation in conversations) {
       if (conversation.id == conversationId) return conversation;
     }
