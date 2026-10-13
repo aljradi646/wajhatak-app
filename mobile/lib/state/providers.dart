@@ -328,7 +328,7 @@ Future<T> _readForSession<T>(
   T fallback,
   Future<T> Function() request,
 ) async {
-  final sessionUserId = ref.watch(sessionUserIdProvider);
+  final sessionUserId = ref.read(sessionUserIdProvider);
   if (sessionUserId == null) return fallback;
   try {
     return await request();
@@ -354,7 +354,10 @@ abstract class BackgroundRefreshController<T> extends AsyncNotifier<T> {
   Future<T> loadValue();
 
   @override
-  Future<T> build() => loadValue();
+  Future<T> build() {
+    ref.watch(sessionUserIdProvider);
+    return loadValue();
+  }
 
   Future<void> refresh() async {
     final previous = state.value;
@@ -766,7 +769,7 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
 // البلاغات والدعم
 // ---------------------------------------------------------------------------
 final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
-  if (!AppConfig.isUiPreview && ref.watch(sessionUserIdProvider) == null) return const [];
+  if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null) return const [];
   if (AppConfig.isUiPreview) return const [];
   return ref.watch(supportTicketRepositoryProvider).list();
 });
