@@ -216,6 +216,16 @@ class _PropertyCardState extends ConsumerState<PropertyCard> {
                           ),
                         ),
                       // شارة "جديد"
+                      if (widget.property.isDemo)
+                        const Positioned(
+                          top: 44,
+                          right: 10,
+                          child: _BadgePill(
+                            icon: Icons.info_outline_rounded,
+                            label: 'تجريبي',
+                            color: WajhatakColors.amber,
+                          ),
+                        ),
                       if (widget.property.isNew)
                         Positioned(
                           bottom: 9,
