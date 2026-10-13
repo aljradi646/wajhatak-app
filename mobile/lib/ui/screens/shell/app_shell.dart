@@ -39,6 +39,59 @@ class _AppShellState extends ConsumerState<AppShell> {
   Timer? _sessionRefreshTimer;
   bool _notificationsPrimed = false;
 
+  Future<void> _refreshTab(int index, bool isAgent) async {
+    // Revalidate only the active tab's data sources. Widgets keep the existing
+    // AsyncData and scroll state; the shell never recreates its page tree.
+    try {
+      if (index == 0) {
+        ref.read(propertyCatalogRevisionProvider.notifier).bump();
+        await ref.read(propertiesProvider.future);
+        return;
+      }
+
+      if (isAgent) {
+        switch (index) {
+          case 1:
+            ref.read(propertyCatalogRevisionProvider.notifier).bump();
+            await Future.wait<void>([
+              ref.read(myListingsProvider.notifier).refresh(),
+              ref.read(viewingRequestsProvider.notifier).refresh(),
+              ref.read(conversationsProvider.notifier).refresh(),
+            ]);
+            return;
+          case 2:
+            await ref.read(viewingRequestsProvider.notifier).refresh();
+            return;
+          case 3:
+            await ref.read(conversationsProvider.notifier).refresh();
+            return;
+          case 4:
+            await ref.read(sessionProvider.notifier).refreshCurrentUser();
+            return;
+        }
+      } else {
+        switch (index) {
+          case 1:
+            ref.read(propertyCatalogRevisionProvider.notifier).bump();
+            await ref.read(propertiesProvider.future);
+            return;
+          case 2:
+            await ref.refresh(favoritesProvider.future);
+            return;
+          case 3:
+            await ref.read(conversationsProvider.notifier).refresh();
+            return;
+          case 4:
+            await ref.read(sessionProvider.notifier).refreshCurrentUser();
+            return;
+        }
+      }
+    } on Object {
+      // Refresh is best-effort. A temporary network failure must not clear the
+      // cached content or reset the user's position in the current screen.
+    }
+  }
+
   void _openDrawer() => _shellKey.currentState?.openDrawer();
 
   ProviderContainer get _container => ProviderScope.containerOf(context);
@@ -112,8 +165,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   void _refreshModeratedPropertyIfPresent(Map<String, dynamic> data) {
     final propertyId = int.tryParse(data['property_id']?.toString() ?? '');
     if (propertyId == null || propertyId < 1) return;
+    ref.read(propertyCatalogRevisionProvider.notifier).bump();
     unawaited(ref.read(myListingsProvider.notifier).refresh());
-    ref.invalidate(propertyDetailProvider(propertyId));
   }
 
   /// فتح المصدر من إشعار نظام (التطبيق في الخلفية).
@@ -269,11 +322,14 @@ class _AppShellState extends ConsumerState<AppShell> {
       body: IndexedStack(
         index: _index,
         children: [
-          for (final page in pages)
-            MediaQuery(
-              // الحشوة الرأسية للهيدر داخل كل صفحة
-              data: MediaQuery.of(context),
-              child: page,
+          for (final entry in pages.indexed)
+            RefreshIndicator(
+              onRefresh: () => _refreshTab(entry.$1, isAgent),
+              child: MediaQuery(
+                // Preserve each tab subtree (and its scroll/form state).
+                data: MediaQuery.of(context),
+                child: entry.$2,
+              ),
             ),
         ],
       ),
