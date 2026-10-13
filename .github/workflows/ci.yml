@@ -90,7 +90,12 @@ jobs:
             exit 0
           fi
 
-          printf '%s\n' "$files" | xargs dart format --output=none --set-exit-if-changed
+          printf '%s\n' "$files" | xargs dart format
+          if ! git diff --quiet -- $files; then
+            echo "Dart formatting changes are required. Diff follows:"
+            git diff --unified=2 -- $files
+            exit 1
+          fi
 
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
