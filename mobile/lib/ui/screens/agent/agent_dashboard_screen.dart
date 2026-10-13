@@ -39,9 +39,9 @@ class AgentDashboardScreen extends ConsumerWidget {
         : const AsyncValue<void>.data(null);
 
     void refreshAll() {
-      ref.invalidate(myListingsProvider);
-      ref.invalidate(viewingRequestsProvider);
-      ref.invalidate(conversationsProvider);
+      unawaited(ref.read(myListingsProvider.notifier).refresh());
+      unawaited(ref.read(viewingRequestsProvider.notifier).refresh());
+      unawaited(ref.read(conversationsProvider.notifier).refresh());
     }
 
     if (user == null || !user.isAgent) {
@@ -82,9 +82,9 @@ class AgentDashboardScreen extends ConsumerWidget {
         ),
         onData: (_) => RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(myListingsProvider);
-            ref.invalidate(viewingRequestsProvider);
-            ref.invalidate(conversationsProvider);
+            unawaited(ref.read(myListingsProvider.notifier).refresh());
+            unawaited(ref.read(viewingRequestsProvider.notifier).refresh());
+            unawaited(ref.read(conversationsProvider.notifier).refresh());
             await Future.wait([
               ref.read(myListingsProvider.future),
               ref.read(viewingRequestsProvider.future),
@@ -509,7 +509,7 @@ class _ListingActionsMenu extends ConsumerWidget {
     }
     try {
       await ref.read(propertyRepositoryProvider).delete(property.id);
-      ref.invalidate(myListingsProvider);
+      unawaited(ref.read(myListingsProvider.notifier).refresh());
       ref.invalidate(propertiesProvider);
       if (context.mounted) {
         util.notice(context, 'تم حذف العقار.');
