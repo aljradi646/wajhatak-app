@@ -47,10 +47,19 @@ class NotificationsScreen extends ConsumerWidget {
         errorRetry: () => ref.invalidate(notificationsProvider),
         data: (items) {
           if (items.isEmpty) {
-            return const EmptyState(
-              title: 'لا توجد إشعارات',
-              body: 'سيصلك هنا تنبيه عند ورود رسالة أو تحديث طلب معاينة أو رد على بلاغك.',
-              icon: Icons.notifications_none_rounded,
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              children: const [
+                SizedBox(
+                  height: 300,
+                  child: EmptyState(
+                    title: 'لا توجد إشعارات',
+                    body: 'سيصلك هنا تنبيه عند ورود رسالة أو تحديث طلب معاينة أو رد على بلاغك.',
+                    icon: Icons.notifications_none_rounded,
+                  ),
+                ),
+              ],
             );
           }
           return ListView.separated(
