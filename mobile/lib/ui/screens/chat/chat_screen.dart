@@ -39,8 +39,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     ActiveChatContext.conversationId = widget.conversation.id;
-    ref.invalidate(notificationsProvider);
-    ref.invalidate(unreadNotificationCountProvider);
+    unawaited(ref.read(notificationsProvider.notifier).refresh());
+    unawaited(ref.read(unreadNotificationCountProvider.notifier).refresh());
     // تحديث فوري عند فتح المحادثة (لا يُستخدم الكاش القديم) —
     // بنفس صرامه تحديث جرس الإشعارات.
     if (ref.exists(messagesProvider(widget.conversation.id))) {
@@ -50,7 +50,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (mounted && !ref.read(realtimeServiceProvider).isConnected) {
         ref.read(messagesProvider(widget.conversation.id).notifier).refresh();
-        ref.invalidate(conversationsProvider);
+
       }
     });
   }
@@ -80,7 +80,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           );
       _controller.clear();
       if (mounted) setState(() => _pendingProperty = null);
-      ref.invalidate(conversationsProvider);
+      unawaited(ref.read(conversationsProvider.notifier).refresh());
     } on ApiFailure catch (error) {
       if (mounted) util.notice(context, error.message);
     } finally {
