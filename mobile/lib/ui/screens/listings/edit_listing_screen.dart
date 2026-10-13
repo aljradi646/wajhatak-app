@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -156,7 +157,7 @@ class _EditListingFormState extends ConsumerState<_EditListingForm> {
           'address': _address.text.trim(),
         },
       });
-      ref.invalidate(myListingsProvider);
+      unawaited(ref.read(myListingsProvider.notifier).refresh());
       ref.invalidate(propertyDetailProvider(widget.property.id));
       ref.invalidate(propertiesProvider);
       if (mounted) {
