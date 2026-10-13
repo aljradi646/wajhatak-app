@@ -60,13 +60,14 @@ final realtimeServiceProvider = Provider<RealtimeService>((ref) {
   return service;
 });
 
-final firebasePushMessagingServiceProvider = Provider<FirebasePushMessagingService>(
-  (ref) => FirebasePushMessagingService(
-    ref.watch(apiClientProvider),
-    ref.watch(tokenStoreProvider),
-    ref.watch(localNotificationServiceProvider),
-  ),
-);
+final firebasePushMessagingServiceProvider =
+    Provider<FirebasePushMessagingService>(
+      (ref) => FirebasePushMessagingService(
+        ref.watch(apiClientProvider),
+        ref.watch(tokenStoreProvider),
+        ref.watch(localNotificationServiceProvider),
+      ),
+    );
 
 final supportTicketRepositoryProvider = Provider<SupportTicketRepository>(
   (ref) => SupportTicketRepository(ref.watch(apiClientProvider)),
@@ -94,7 +95,8 @@ class SessionController extends AsyncNotifier<SessionData?> {
 
   Future<void> refreshCurrentUser() async {
     final current = state.asData?.value;
-    if (current == null || AppConfig.isUiPreview || _refreshingCurrentUser) return;
+    if (current == null || AppConfig.isUiPreview || _refreshingCurrentUser)
+      return;
     _refreshingCurrentUser = true;
     try {
       final user = await ref.read(authRepositoryProvider).refreshCurrentUser();
@@ -217,7 +219,8 @@ class SessionController extends AsyncNotifier<SessionData?> {
     }
 
     try {
-      await ref.read(firebasePushMessagingServiceProvider)
+      await ref
+          .read(firebasePushMessagingServiceProvider)
           .unregisterCurrentDevice()
           .timeout(const Duration(seconds: 2));
     } on Object {
@@ -316,8 +319,11 @@ final sessionProvider = AsyncNotifierProvider<SessionController, SessionData?>(
 
 /// Stable auth dependency for data providers. Profile refreshes must not
 /// invalidate every screen; only a change of authenticated user ID does.
-final sessionUserIdProvider = Provider<int?>((ref) =>
-    ref.watch(sessionProvider.select((session) => session.asData?.value?.user.id)));
+final sessionUserIdProvider = Provider<int?>(
+  (ref) => ref.watch(
+    sessionProvider.select((session) => session.asData?.value?.user.id),
+  ),
+);
 
 // ---------------------------------------------------------------------------
 // مساعدات داخلية
@@ -449,7 +455,8 @@ class ExploreSearchResult {
   );
 }
 
-class ExplorePropertySearchController extends AsyncNotifier<ExploreSearchResult> {
+class ExplorePropertySearchController
+    extends AsyncNotifier<ExploreSearchResult> {
   ExplorePropertySearchController(this._query);
 
   final PropertyQuery _query;
@@ -483,7 +490,9 @@ class ExplorePropertySearchController extends AsyncNotifier<ExploreSearchResult>
     }
 
     _requestInFlight = true;
-    state = AsyncData(current.copyWith(isLoadingMore: true, loadMoreError: false));
+    state = AsyncData(
+      current.copyWith(isLoadingMore: true, loadMoreError: false),
+    );
     try {
       final more = await ref
           .read(propertyRepositoryProvider)
@@ -491,29 +500,32 @@ class ExplorePropertySearchController extends AsyncNotifier<ExploreSearchResult>
       final latest = state.asData?.value ?? current;
       final seenIds = latest.items.map((item) => item.id).toSet();
       final appended = more.items.where((item) => seenIds.add(item.id));
-      state = AsyncData(latest.copyWith(
-        items: [...latest.items, ...appended],
-        hasMore: more.hasMore,
-        nextPage: more.nextPage,
-        isLoadingMore: false,
-        loadMoreError: false,
-      ));
+      state = AsyncData(
+        latest.copyWith(
+          items: [...latest.items, ...appended],
+          hasMore: more.hasMore,
+          nextPage: more.nextPage,
+          isLoadingMore: false,
+          loadMoreError: false,
+        ),
+      );
     } on Object {
       final latest = state.asData?.value ?? current;
-      state = AsyncData(latest.copyWith(
-        isLoadingMore: false,
-        loadMoreError: true,
-      ));
+      state = AsyncData(
+        latest.copyWith(isLoadingMore: false, loadMoreError: true),
+      );
     } finally {
       _requestInFlight = false;
     }
   }
 }
 
-final explorePropertySearchProvider = AsyncNotifierProvider.family<
-    ExplorePropertySearchController, ExploreSearchResult, PropertyQuery>(
-  (query) => ExplorePropertySearchController(query),
-);
+final explorePropertySearchProvider =
+    AsyncNotifierProvider.family<
+      ExplorePropertySearchController,
+      ExploreSearchResult,
+      PropertyQuery
+    >((query) => ExplorePropertySearchController(query));
 
 final propertyDetailProvider = FutureProvider.family<LuxProperty, int>((
   ref,
@@ -534,7 +546,8 @@ final favoritesProvider = FutureProvider<List<LuxProperty>>((ref) async {
   );
 });
 
-class MyListingsController extends BackgroundRefreshController<List<LuxProperty>> {
+class MyListingsController
+    extends BackgroundRefreshController<List<LuxProperty>> {
   @override
   Future<List<LuxProperty>> loadValue() async {
     if (AppConfig.isUiPreview) return (await _preview(ref)).mine();
@@ -548,8 +561,8 @@ class MyListingsController extends BackgroundRefreshController<List<LuxProperty>
 
 final myListingsProvider =
     AsyncNotifierProvider<MyListingsController, List<LuxProperty>>(
-  MyListingsController.new,
-);
+      MyListingsController.new,
+    );
 
 // ---------------------------------------------------------------------------
 // ملف الوكيل
@@ -687,7 +700,8 @@ final areasProvider = FutureProvider.family<List<LocationItem>, int>(
 // المحادثات والرسائل وطلبات المعاينة
 // ---------------------------------------------------------------------------
 
-class ConversationsController extends BackgroundRefreshController<List<ConversationItem>> {
+class ConversationsController
+    extends BackgroundRefreshController<List<ConversationItem>> {
   @override
   Future<List<ConversationItem>> loadValue() async {
     if (AppConfig.isUiPreview) return (await _preview(ref)).conversations();
@@ -701,10 +715,11 @@ class ConversationsController extends BackgroundRefreshController<List<Conversat
 
 final conversationsProvider =
     AsyncNotifierProvider<ConversationsController, List<ConversationItem>>(
-  ConversationsController.new,
-);
+      ConversationsController.new,
+    );
 
-class ViewingRequestsController extends BackgroundRefreshController<List<ViewingRequestItem>> {
+class ViewingRequestsController
+    extends BackgroundRefreshController<List<ViewingRequestItem>> {
   @override
   Future<List<ViewingRequestItem>> loadValue() async {
     if (AppConfig.isUiPreview) return (await _preview(ref)).viewingRequests();
@@ -718,8 +733,8 @@ class ViewingRequestsController extends BackgroundRefreshController<List<Viewing
 
 final viewingRequestsProvider =
     AsyncNotifierProvider<ViewingRequestsController, List<ViewingRequestItem>>(
-  ViewingRequestsController.new,
-);
+      ViewingRequestsController.new,
+    );
 
 final messagesProvider =
     AsyncNotifierProvider.family<ChatMessagesNotifier, List<ChatMessage>, int>(
@@ -806,7 +821,8 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
 // البلاغات والدعم
 // ---------------------------------------------------------------------------
 final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
-  if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null) return const [];
+  if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null)
+    return const [];
   if (AppConfig.isUiPreview) return const [];
   return ref.watch(supportTicketRepositoryProvider).list();
 });
@@ -815,7 +831,8 @@ final supportTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
 // الإشعارات
 // ---------------------------------------------------------------------------
 
-class NotificationsController extends BackgroundRefreshController<List<LuxNotification>> {
+class NotificationsController
+    extends BackgroundRefreshController<List<LuxNotification>> {
   @override
   Future<List<LuxNotification>> loadValue() async {
     if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null) {
@@ -829,10 +846,11 @@ class NotificationsController extends BackgroundRefreshController<List<LuxNotifi
 
 final notificationsProvider =
     AsyncNotifierProvider<NotificationsController, List<LuxNotification>>(
-  NotificationsController.new,
-);
+      NotificationsController.new,
+    );
 
-class UnreadNotificationCountController extends BackgroundRefreshController<int> {
+class UnreadNotificationCountController
+    extends BackgroundRefreshController<int> {
   @override
   Future<int> loadValue() async {
     if (!AppConfig.isUiPreview && ref.read(sessionUserIdProvider) == null) {
@@ -848,8 +866,8 @@ class UnreadNotificationCountController extends BackgroundRefreshController<int>
 
 final unreadNotificationCountProvider =
     AsyncNotifierProvider<UnreadNotificationCountController, int>(
-  UnreadNotificationCountController.new,
-);
+      UnreadNotificationCountController.new,
+    );
 
 // ---------------------------------------------------------------------------
 // البحث وحالة المفضلة

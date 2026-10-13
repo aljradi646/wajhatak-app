@@ -33,10 +33,7 @@ class MessagesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     if (session.isLoading) {
-      return _wrap(
-        context,
-        ConversationListSkeleton(showTitle: !standalone),
-      );
+      return _wrap(context, ConversationListSkeleton(showTitle: !standalone));
     }
     if (session.asData?.value == null) {
       return _wrap(

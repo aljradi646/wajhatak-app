@@ -15,8 +15,7 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// دفع شاشة من جذر التطبيق (يصلح حتى قبل اكتمال الجلسة).
 void pushFromRoot(Widget page) {
-  rootNavigatorKey.currentState
-      ?.push(MaterialPageRoute(builder: (_) => page));
+  rootNavigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => page));
 }
 
 /// النقر على إشعار → فتح المصدر الفعلي (المحادثة / الطلبات / العقار).
@@ -59,9 +58,7 @@ Future<void> _openNotificationSource(
     }
     // المحادثة غير متاحة — نكفي بفتح صفحة الرسائل.
     await navigator.push(
-      MaterialPageRoute(
-        builder: (_) => const MessagesScreen(standalone: true),
-      ),
+      MaterialPageRoute(builder: (_) => const MessagesScreen(standalone: true)),
     );
     return;
   }
@@ -75,7 +72,12 @@ Future<void> _openNotificationSource(
   }
 
   if (item.supportTicketId != null) {
-    await navigator.push(MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(ticketId: item.supportTicketId!)));
+    await navigator.push(
+      MaterialPageRoute(
+        builder: (_) =>
+            SupportTicketDetailScreen(ticketId: item.supportTicketId!),
+      ),
+    );
     container.invalidate(supportTicketsProvider);
     return;
   }

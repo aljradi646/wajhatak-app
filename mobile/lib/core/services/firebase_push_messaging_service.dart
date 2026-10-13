@@ -14,7 +14,11 @@ import 'lux_notification_service.dart';
 /// remain the source of truth; this service adds delivery to the OS tray when
 /// the app is backgrounded or closed.
 class FirebasePushMessagingService {
-  FirebasePushMessagingService(this._api, this._tokenStore, this._localNotifications);
+  FirebasePushMessagingService(
+    this._api,
+    this._tokenStore,
+    this._localNotifications,
+  );
 
   final LuxApiClient _api;
   final TokenStore _tokenStore;
@@ -73,7 +77,9 @@ class FirebasePushMessagingService {
         if (callback != null) unawaited(callback(message.data));
         unawaited(_showForegroundMessage(message));
       });
-      _openedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _openedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen((
+        message,
+      ) {
         unawaited(_openFromRemoteMessage(message));
       });
       _tokenSubscription ??= messaging.onTokenRefresh.listen((token) {
@@ -84,10 +90,12 @@ class FirebasePushMessagingService {
         _launchMessageHandled = true;
         final initial = await messaging.getInitialMessage();
         if (initial != null) {
-          unawaited(Future<void>.delayed(
-            const Duration(milliseconds: 350),
-            () => _openFromRemoteMessage(initial),
-          ));
+          unawaited(
+            Future<void>.delayed(
+              const Duration(milliseconds: 350),
+              () => _openFromRemoteMessage(initial),
+            ),
+          );
         }
       }
 
@@ -119,20 +127,26 @@ class FirebasePushMessagingService {
     if (token == null || token.isEmpty) return;
 
     final deviceId = await _tokenStore.readOrCreateDeviceId();
-    final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+    final platform = defaultTargetPlatform == TargetPlatform.iOS
+        ? 'ios'
+        : 'android';
     try {
-      await _api.post('/me/devices', data: {
-        'device_id': deviceId,
-        'platform': platform,
-        'push_token': pushToken,
-      });
+      await _api.post(
+        '/me/devices',
+        data: {
+          'device_id': deviceId,
+          'platform': platform,
+          'push_token': pushToken,
+        },
+      );
     } on Object {
       // A network outage must not block the signed-in experience.
     }
   }
 
   Future<void> unregisterCurrentDevice() async {
-    if (!_isSupported || WajhatakFirebaseOptions.currentPlatform == null) return;
+    if (!_isSupported || WajhatakFirebaseOptions.currentPlatform == null)
+      return;
     final token = await _tokenStore.read();
     if (token == null || token.isEmpty) return;
 
@@ -147,8 +161,11 @@ class FirebasePushMessagingService {
   Future<void> _showForegroundMessage(RemoteMessage message) async {
     final id = message.data['notification_id']?.toString();
     if (id == null || id.isEmpty) return;
-    final conversationId = int.tryParse(message.data['conversation_id']?.toString() ?? '');
-    if (conversationId != null && conversationId == ActiveChatContext.conversationId) {
+    final conversationId = int.tryParse(
+      message.data['conversation_id']?.toString() ?? '',
+    );
+    if (conversationId != null &&
+        conversationId == ActiveChatContext.conversationId) {
       return;
     }
     if (!ActiveChatContext.markNotificationShown(id)) return;
@@ -156,11 +173,14 @@ class FirebasePushMessagingService {
     final item = LuxNotification(
       id: id,
       title: message.notification?.title ?? message.data['title']?.toString(),
-      message: message.notification?.body ??
+      message:
+          message.notification?.body ??
           message.data['message']?.toString() ??
           'لديك إشعار جديد في وجهتك.',
       kind: message.data['kind']?.toString(),
-      supportTicketId: int.tryParse(message.data['support_ticket_id']?.toString() ?? ''),
+      supportTicketId: int.tryParse(
+        message.data['support_ticket_id']?.toString() ?? '',
+      ),
       conversationId: conversationId,
       propertyId: int.tryParse(message.data['property_id']?.toString() ?? ''),
       createdAt: DateTime.now(),

@@ -201,7 +201,12 @@ class PropertyDetailScreen extends ConsumerWidget {
                       ),
                     ],
                     const SizedBox(height: 24),
-                    _AgentPanel(agent: item.agent, propertyId: item.id, isOwner: item.agent?.belongsToUser(currentUserId) ?? false),
+                    _AgentPanel(
+                      agent: item.agent,
+                      propertyId: item.id,
+                      isOwner:
+                          item.agent?.belongsToUser(currentUserId) ?? false,
+                    ),
                   ],
                 ),
               ),
@@ -257,9 +262,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
                     border: Border(
-                      top: BorderSide(
-                        color: theme.colorScheme.outlineVariant,
-                      ),
+                      top: BorderSide(color: theme.colorScheme.outlineVariant),
                     ),
                   ),
                   child: compact
@@ -302,9 +305,7 @@ class PropertyDetailScreen extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
                     border: Border(
-                      top: BorderSide(
-                        color: theme.colorScheme.outlineVariant,
-                      ),
+                      top: BorderSide(color: theme.colorScheme.outlineVariant),
                     ),
                   ),
                   child: compact
@@ -318,9 +319,13 @@ class PropertyDetailScreen extends ConsumerWidget {
                         )
                       : Row(
                           children: const [
-                            Expanded(child: LuxSkeleton(height: 52, radius: 14)),
+                            Expanded(
+                              child: LuxSkeleton(height: 52, radius: 14),
+                            ),
                             SizedBox(width: 10),
-                            Expanded(child: LuxSkeleton(height: 52, radius: 14)),
+                            Expanded(
+                              child: LuxSkeleton(height: 52, radius: 14),
+                            ),
                           ],
                         ),
                 );
@@ -674,20 +679,23 @@ class _FeatureChip extends StatelessWidget {
   }
 }
 
-
 class _OwnerPropertyActions extends ConsumerStatefulWidget {
   const _OwnerPropertyActions({required this.property});
   final LuxProperty property;
   @override
-  ConsumerState<_OwnerPropertyActions> createState() => _OwnerPropertyActionsState();
+  ConsumerState<_OwnerPropertyActions> createState() =>
+      _OwnerPropertyActionsState();
 }
 
 class _OwnerPropertyActionsState extends ConsumerState<_OwnerPropertyActions> {
   bool _working = false;
   String get _status => widget.property.status ?? 'draft';
   String get _label => switch (_status) {
-    'published' => 'منشور', 'pending' => 'قيد المراجعة',
-    'rejected' => 'مرفوض', 'archived' => 'مؤرشف', _ => 'مسودة',
+    'published' => 'منشور',
+    'pending' => 'قيد المراجعة',
+    'rejected' => 'مرفوض',
+    'archived' => 'مؤرشف',
+    _ => 'مسودة',
   };
   Color _color(ThemeData theme) => switch (_status) {
     'published' => WajhatakColors.emerald,
@@ -701,20 +709,30 @@ class _OwnerPropertyActionsState extends ConsumerState<_OwnerPropertyActions> {
     final next = _status == 'published' ? 'draft' : 'pending';
     setState(() => _working = true);
     try {
-      await ref.read(propertyRepositoryProvider).update(widget.property.id, {'status': next});
+      await ref.read(propertyRepositoryProvider).update(widget.property.id, {
+        'status': next,
+      });
       if (!mounted) return;
       ref.invalidate(propertyDetailProvider(widget.property.id));
       unawaited(ref.read(myListingsProvider.notifier).refresh());
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
-        next == 'draft'
-          ? 'تم إيقاف نشر العقار. يمكنك إرساله للمراجعة مجددًا لاحقًا.'
-          : 'تم إرسال العقار للمراجعة. النشر النهائي يحتاج اعتماد الإدارة.',
-      )));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            next == 'draft'
+                ? 'تم إيقاف نشر العقار. يمكنك إرساله للمراجعة مجددًا لاحقًا.'
+                : 'تم إرسال العقار للمراجعة. النشر النهائي يحتاج اعتماد الإدارة.',
+          ),
+        ),
+      );
     } on Object {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('تعذّر تحديث حالة العقار. تحقق من الاتصال ثم أعد المحاولة.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تعذّر تحديث حالة العقار. تحقق من الاتصال ثم أعد المحاولة.',
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -725,7 +743,8 @@ class _OwnerPropertyActionsState extends ConsumerState<_OwnerPropertyActions> {
     final theme = Theme.of(context);
     final tone = _color(theme);
     return Card(
-      elevation: 0, margin: EdgeInsets.zero,
+      elevation: 0,
+      margin: EdgeInsets.zero,
       color: theme.colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
@@ -733,42 +752,108 @@ class _OwnerPropertyActionsState extends ConsumerState<_OwnerPropertyActions> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            Icon(Icons.manage_accounts_rounded, color: theme.colorScheme.primary),
-            const SizedBox(width: 9),
-            Expanded(child: Text('إدارة عقارك', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900))),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(color: tone.withValues(alpha: .12), borderRadius: BorderRadius.circular(30)),
-              child: Text(_label, style: TextStyle(color: tone, fontWeight: FontWeight.w800, fontSize: 12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.manage_accounts_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    'إدارة عقارك',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: tone.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Text(
+                    _label,
+                    style: TextStyle(
+                      color: tone,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ]),
-          const SizedBox(height: 8),
-          Text('عدّل التفاصيل والصور، أو غيّر حالة الإعلان. إعادة النشر تمر بمراجعة الإدارة.',
-            style: theme.textTheme.bodySmall?.copyWith(height: 1.6, color: theme.colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 14),
-          LayoutBuilder(builder: (context, c) {
-            final edit = FilledButton.icon(
-              onPressed: _working ? null : () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => EditListingScreen(propertyId: widget.property.id),
-              )),
-              icon: const Icon(Icons.edit_rounded, size: 18), label: const Text('تعديل العقار'),
-            );
-            final change = OutlinedButton.icon(
-              onPressed: _working || _status == 'pending' ? null : _changeStatus,
-              icon: _working
-                  ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Icon(_status == 'published' ? Icons.visibility_off_rounded : Icons.send_rounded, size: 18),
-              label: Text(_status == 'published' ? 'إيقاف النشر' : _status == 'pending' ? 'قيد المراجعة' : 'إرسال للمراجعة'),
-            );
-            if (c.maxWidth < 380) return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [edit, const SizedBox(height: 8), change],
-            );
-            return Row(children: [Expanded(child: edit), const SizedBox(width: 9), Expanded(child: change)]);
-          }),
-        ]),
+            const SizedBox(height: 8),
+            Text(
+              'عدّل التفاصيل والصور، أو غيّر حالة الإعلان. إعادة النشر تمر بمراجعة الإدارة.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                height: 1.6,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (context, c) {
+                final edit = FilledButton.icon(
+                  onPressed: _working
+                      ? null
+                      : () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => EditListingScreen(
+                              propertyId: widget.property.id,
+                            ),
+                          ),
+                        ),
+                  icon: const Icon(Icons.edit_rounded, size: 18),
+                  label: const Text('تعديل العقار'),
+                );
+                final change = OutlinedButton.icon(
+                  onPressed: _working || _status == 'pending'
+                      ? null
+                      : _changeStatus,
+                  icon: _working
+                      ? const SizedBox(
+                          width: 17,
+                          height: 17,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          _status == 'published'
+                              ? Icons.visibility_off_rounded
+                              : Icons.send_rounded,
+                          size: 18,
+                        ),
+                  label: Text(
+                    _status == 'published'
+                        ? 'إيقاف النشر'
+                        : _status == 'pending'
+                        ? 'قيد المراجعة'
+                        : 'إرسال للمراجعة',
+                  ),
+                );
+                if (c.maxWidth < 380)
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [edit, const SizedBox(height: 8), change],
+                  );
+                return Row(
+                  children: [
+                    Expanded(child: edit),
+                    const SizedBox(width: 9),
+                    Expanded(child: change),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -103,9 +103,7 @@ class RealtimeService {
     if (_stopped || _reconnectTimer != null || !isConfigured) return;
     unawaited(_subscription?.cancel());
     _subscription = null;
-    final seconds = _reconnectAttempt < 5
-        ? (1 << _reconnectAttempt)
-        : 30;
+    final seconds = _reconnectAttempt < 5 ? (1 << _reconnectAttempt) : 30;
     _reconnectAttempt++;
     _reconnectTimer = Timer(Duration(seconds: seconds), () {
       _reconnectTimer = null;

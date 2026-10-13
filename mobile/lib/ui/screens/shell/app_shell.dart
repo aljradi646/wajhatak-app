@@ -48,7 +48,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     super.initState();
     final realtime = ref.read(realtimeServiceProvider);
     realtime.onEvent = _handleRealtimeEvent;
-    if (ref.read(sessionProvider).asData?.value != null) unawaited(realtime.start());
+    if (ref.read(sessionProvider).asData?.value != null)
+      unawaited(realtime.start());
     final service = ref.read(localNotificationServiceProvider);
     service.onNotificationResponse = _openFromSystemNotification;
     unawaited(service.initialize());
@@ -89,12 +90,15 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (id != null) ref.invalidate(messagesProvider(id));
     }
   }
+
   Future<void> _handlePushMessage(Map<String, dynamic> data) async {
     if (!mounted) return;
     unawaited(ref.read(notificationsProvider.notifier).refresh());
     unawaited(ref.read(unreadNotificationCountProvider.notifier).refresh());
     unawaited(ref.read(conversationsProvider.notifier).refresh());
-    final conversationId = int.tryParse(data['conversation_id']?.toString() ?? '');
+    final conversationId = int.tryParse(
+      data['conversation_id']?.toString() ?? '',
+    );
     if (conversationId != null &&
         conversationId == ActiveChatContext.conversationId) {
       unawaited(ref.read(messagesProvider(conversationId).notifier).refresh());
@@ -131,7 +135,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     for (final item in items.where((item) => !item.isRead)) {
       if (!_observedNotificationIds.add(item.id) ||
           !_isNotificationEnabled(item, settings) ||
-          (item.isMessage && item.conversationId != null &&
+          (item.isMessage &&
+              item.conversationId != null &&
               item.conversationId == ActiveChatContext.conversationId) ||
           !ActiveChatContext.markNotificationShown(item.id)) {
         continue;
@@ -180,24 +185,26 @@ class _AppShellState extends ConsumerState<AppShell> {
     final notifications =
         ref.watch(notificationsProvider).asData?.value ??
         const <LuxNotification>[];
-    final unreadCount = ref.watch(unreadNotificationCountProvider).asData?.value ??
+    final unreadCount =
+        ref.watch(unreadNotificationCountProvider).asData?.value ??
         notifications.where((item) => !item.isRead).length;
     ref.listen<AsyncValue<List<LuxNotification>>>(
       notificationsProvider,
       (_, next) =>
           next.whenData((items) => _handleNotifications(items, settings)),
     );
-    ref.listen<AsyncValue<SessionData?>>(
-      sessionProvider,
-      (_, next) {
-        if (next.asData?.value != null) {
-          unawaited(ref.read(firebasePushMessagingServiceProvider).initializeAndRegister());
-          unawaited(ref.read(realtimeServiceProvider).start());
-        } else {
-          unawaited(ref.read(realtimeServiceProvider).stop());
-        }
-      },
-    );
+    ref.listen<AsyncValue<SessionData?>>(sessionProvider, (_, next) {
+      if (next.asData?.value != null) {
+        unawaited(
+          ref
+              .read(firebasePushMessagingServiceProvider)
+              .initializeAndRegister(),
+        );
+        unawaited(ref.read(realtimeServiceProvider).start());
+      } else {
+        unawaited(ref.read(realtimeServiceProvider).stop());
+      }
+    });
     final isAgent = user?.isAgent ?? false;
     final pages = isAgent
         ? [
