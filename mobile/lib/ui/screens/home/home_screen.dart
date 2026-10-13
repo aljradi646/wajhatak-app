@@ -21,6 +21,7 @@ class HomeScreen extends ConsumerWidget {
     final userName = session?.user.name.split(' ').first;
 
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
