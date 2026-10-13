@@ -80,6 +80,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       unawaited(ref.read(notificationsProvider.notifier).refresh());
       unawaited(ref.read(unreadNotificationCountProvider.notifier).refresh());
       unawaited(ref.read(conversationsProvider.notifier).refresh());
+      _refreshModeratedPropertyIfPresent(data);
       final id = int.tryParse(data['conversation_id']?.toString() ?? '');
       if (id != null && id == ActiveChatContext.conversationId) {
         unawaited(ref.read(messagesProvider(id).notifier).refresh());
@@ -87,7 +88,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     } else if (event == 'conversation.read') {
       unawaited(ref.read(conversationsProvider.notifier).refresh());
       final id = int.tryParse(data['conversation_id']?.toString() ?? '');
-      if (id != null) ref.invalidate(messagesProvider(id));
+      if (id != null) {
+        unawaited(ref.read(messagesProvider(id).notifier).refresh());
+      }
     }
   }
 
@@ -96,6 +99,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     unawaited(ref.read(notificationsProvider.notifier).refresh());
     unawaited(ref.read(unreadNotificationCountProvider.notifier).refresh());
     unawaited(ref.read(conversationsProvider.notifier).refresh());
+    _refreshModeratedPropertyIfPresent(data);
     final conversationId = int.tryParse(
       data['conversation_id']?.toString() ?? '',
     );
@@ -103,6 +107,13 @@ class _AppShellState extends ConsumerState<AppShell> {
         conversationId == ActiveChatContext.conversationId) {
       unawaited(ref.read(messagesProvider(conversationId).notifier).refresh());
     }
+  }
+
+  void _refreshModeratedPropertyIfPresent(Map<String, dynamic> data) {
+    final propertyId = int.tryParse(data['property_id']?.toString() ?? '');
+    if (propertyId == null || propertyId < 1) return;
+    unawaited(ref.read(myListingsProvider.notifier).refresh());
+    ref.invalidate(propertyDetailProvider(propertyId));
   }
 
   /// فتح المصدر من إشعار نظام (التطبيق في الخلفية).
