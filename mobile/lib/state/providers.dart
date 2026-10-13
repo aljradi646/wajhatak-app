@@ -517,6 +517,7 @@ final propertyDetailProvider = FutureProvider.family<LuxProperty, int>((
 
 final favoritesProvider = FutureProvider<List<LuxProperty>>((ref) async {
   if (AppConfig.isUiPreview) return (await _preview(ref)).favorites();
+  ref.watch(sessionUserIdProvider);
   return _readForSession(
     ref,
     const <LuxProperty>[],
@@ -724,7 +725,10 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
   final int _conversationId;
 
   @override
-  Future<List<ChatMessage>> build() => _load();
+  Future<List<ChatMessage>> build() {
+    ref.watch(sessionUserIdProvider);
+    return _load();
+  }
 
   Future<List<ChatMessage>> _load() async {
     if (AppConfig.isUiPreview) {
