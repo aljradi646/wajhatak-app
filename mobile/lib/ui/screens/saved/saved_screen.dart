@@ -32,11 +32,8 @@ class SavedScreen extends ConsumerWidget {
       );
     }
     final items = ref.watch(favoritesProvider);
-    return Scaffold(
-      appBar: (ModalRoute.of(context)?.canPop ?? false)
-          ? WajhatakScreenHeader(title: 'مفضلاتك')
-          : null,
-      body: CustomScrollView(
+    final standalone = ModalRoute.of(context)?.canPop ?? false;
+    final content = CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           const SliverPadding(
@@ -95,7 +92,21 @@ class SavedScreen extends ConsumerWidget {
                   ],
           ),
         ],
-      ),
+      );
+    return Scaffold(
+      appBar: standalone ? WajhatakScreenHeader(title: 'مفضلاتك') : null,
+      body: standalone
+          ? RefreshIndicator(
+              onRefresh: () async {
+                try {
+                  await ref.refresh(favoritesProvider.future);
+                } on Object {
+                  // Preserve cached favorites on transient network failure.
+                }
+              },
+              child: content,
+            )
+          : content,
     );
   }
 }
