@@ -40,11 +40,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     ActiveChatContext.conversationId = widget.conversation.id;
     unawaited(_syncReadStateAfterOpening());
-    // تحديث فوري عند فتح المحادثة (لا يُستخدم الكاش القديم) —
-    // بنفس صرامه تحديث جرس الإشعارات.
-    if (ref.exists(messagesProvider(widget.conversation.id))) {
-      ref.read(messagesProvider(widget.conversation.id).notifier).refresh();
-    }
     // Polling خفيف للرسائل الجديدة كل 6 ثوان — تحديث خلفي بدون اهتزاز.
     _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (mounted && !ref.read(realtimeServiceProvider).isConnected) {
@@ -67,8 +62,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _syncReadStateAfterOpening() async {
     // The messages endpoint marks incoming messages and their linked
     // notifications as read. Refresh dependent badges only after that commit.
+    final provider = messagesProvider(widget.conversation.id);
     try {
-      await ref.read(messagesProvider(widget.conversation.id).future);
+      if (ref.exists(provider)) {
+        await ref.read(provider.notifier).refresh();
+      } else {
+        await ref.read(provider.future);
+      }
     } on Object {
       // The conversation UI owns the visible load/retry error.
     }
