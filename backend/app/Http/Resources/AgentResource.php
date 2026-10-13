@@ -17,7 +17,11 @@ class AgentResource extends JsonResource
             'name' => $this->user->name,
             'email' => $this->user->email,
             'phone' => $this->user->phone,
-            'avatar_url' => $avatarPath ? asset('storage/'.$avatarPath) : null,
+            'avatar_url' => $avatarPath
+                ? (\Illuminate\Support\Str::startsWith($avatarPath, ['http://', 'https://'])
+                    ? $avatarPath
+                    : asset('storage/'.$avatarPath))
+                : null,
             'bio' => $this->bio,
             'rating' => (float) $this->rating,
             'reviews_count' => $this->reviews_count,
@@ -26,6 +30,7 @@ class AgentResource extends JsonResource
             'verification_status' => $this->verification_status,
             'is_verified' => $this->verification_status === 'approved' && (bool) $this->is_active,
             'is_active' => (bool) $this->is_active,
+            'is_demo' => (bool) $this->is_demo,
         ];
     }
 }
