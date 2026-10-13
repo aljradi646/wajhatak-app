@@ -326,6 +326,13 @@ if [ "$SERVICE_TYPE" != "static" ]; then
             ;;
     esac
 
+    # Additive showcase catalog: has its own marker so databases that were
+    # initialized before this release also receive the 100 demo records once.
+    # The seeder is idempotent, preserves user-owned rows, and marks every
+    # showcase listing/profile as demo. On later boots this is a quick no-op.
+    echo "==> [Wajhatak] Ensuring the showcase catalog is provisioned..."
+    php artisan db:seed --class=ShowcaseCatalogSeeder --force || echo "    ShowcaseCatalogSeeder failed; it will retry on the next boot."
+
     # 6b. صحة المساعد الذكي: فحص حقيقي من داخل التطبيق (مخطط + إعدادات +
     #     فهرس مقابل العقارات + بحث حقيقي + محادثة حقيقية)، مع إصلاح آلي
     #     لأي جدول/عمود ناقص أو فهرس فارغ. السبب صار ظاهرًا في سجل النشر
