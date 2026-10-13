@@ -554,6 +554,7 @@ final propertyDetailProvider = FutureProvider.family<LuxProperty, int>((
   ref,
   id,
 ) async {
+  ref.watch(propertyCatalogRevisionProvider);
   if (AppConfig.isUiPreview) return (await _preview(ref)).detail(id);
   ref.watch(sessionUserIdProvider);
   return ref.read(propertyRepositoryProvider).detail(id);
