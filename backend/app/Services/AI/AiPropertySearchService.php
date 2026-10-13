@@ -457,7 +457,7 @@ class AiPropertySearchService
         if ($image) {
             $path = trim((string) $image->path);
             if (preg_match('/^https?:\/\//i', $path) === 1) {
-                $imageUrl = $path;
+                $imageUrl = $image->image_url;
             } elseif ($path !== '' && \Illuminate\Support\Facades\Storage::disk('public')->exists(ltrim($path, '/'))) {
                 $imageUrl = asset('storage/'.ltrim($path, '/'));
             }
@@ -491,6 +491,7 @@ class AiPropertySearchService
             'is_furnished' => $property->is_furnished !== null ? (bool) $property->is_furnished : null,
             'is_new' => $property->is_new !== null ? (bool) $property->is_new : null,
             'is_featured' => $property->is_featured !== null ? (bool) $property->is_featured : null,
+            'is_demo' => (bool) $property->is_demo,
             'status' => $statusValue,
             'available' => $statusValue === PropertyStatus::Published->value,
             'match_score' => $score,
