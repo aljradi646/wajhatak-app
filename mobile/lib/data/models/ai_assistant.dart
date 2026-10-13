@@ -22,6 +22,7 @@ class AiPropertyResult {
     this.bathrooms,
     this.isNew = false,
     this.isFeatured = false,
+    this.isDemo = false,
     this.imageUrl,
     this.referenceCode,
     this.address,
@@ -47,6 +48,7 @@ class AiPropertyResult {
   final bool isFurnished;
   final bool isNew;
   final bool isFeatured;
+  final bool isDemo;
   final bool available;
   final String? imageUrl;
   final String? referenceCode;
@@ -87,6 +89,7 @@ class AiPropertyResult {
       isFurnished: json['is_furnished'] as bool? ?? false,
       isNew: json['is_new'] as bool? ?? false,
       isFeatured: json['is_featured'] as bool? ?? false,
+      isDemo: json['is_demo'] as bool? ?? false,
       available: json['available'] as bool? ?? true,
       imageUrl: json['image_url'] as String?,
       referenceCode: json['reference_code'] as String?,
