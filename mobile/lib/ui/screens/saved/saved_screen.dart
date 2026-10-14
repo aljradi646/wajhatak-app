@@ -99,7 +99,8 @@ class SavedScreen extends ConsumerWidget {
           ? RefreshIndicator(
               onRefresh: () async {
                 try {
-                  await ref.refresh(favoritesProvider.future);
+                  ref.invalidate(favoritesProvider);
+                  await ref.read(favoritesProvider.future);
                 } on Object {
                   // Preserve cached favorites on transient network failure.
                 }

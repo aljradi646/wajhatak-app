@@ -522,6 +522,7 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildTypeSelector(
     List<AgentReportType> types,
     AgentReportType current,
@@ -637,6 +638,7 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     _ => WajhatakColors.amberDeep,
   };
 
+  // ignore: unused_element
   Widget _buildDateRange(ThemeData theme) {
     final now = DateTime.now();
     final presets = <({String label, int days})>[
@@ -725,6 +727,7 @@ class _AgentReportsScreenState extends ConsumerState<AgentReportsScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildFilterRow(AgentReportFilterDefinition definition) {
     final selected = _filters[definition.key];
     return Padding(

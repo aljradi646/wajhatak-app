@@ -675,15 +675,10 @@ LuxProperty _luxPropertyFromAi(AiPropertyResult property) {
 // ignore: unused_element
 class _AiPropertyMiniCard extends StatelessWidget {
   // ignore: unused_element_parameter
-  const _AiPropertyMiniCard({
-    required this.property,
-    required this.onTap,
-    this.onFavorite,
-  });
+  const _AiPropertyMiniCard({required this.property, required this.onTap});
 
   final AiPropertyResult property;
   final VoidCallback onTap;
-  final VoidCallback? onFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -917,16 +912,6 @@ class _AiPropertyMiniCard extends StatelessWidget {
                           visualDensity: VisualDensity.compact,
                         ),
                       ),
-                      if (onFavorite != null)
-                        IconButton(
-                          tooltip: 'حفظ في المفضلة',
-                          onPressed: onFavorite,
-                          icon: const Icon(
-                            Icons.favorite_border_rounded,
-                            size: 18,
-                          ),
-                          visualDensity: VisualDensity.compact,
-                        ),
                       IconButton(
                         tooltip: 'مشاركة',
                         onPressed: () => _share(context),

@@ -76,7 +76,8 @@ class _AppShellState extends ConsumerState<AppShell> {
             await ref.read(propertiesProvider.future);
             return;
           case 2:
-            await ref.refresh(favoritesProvider.future);
+            ref.invalidate(favoritesProvider);
+            await ref.read(favoritesProvider.future);
             return;
           case 3:
             await ref.read(conversationsProvider.notifier).refresh();
