@@ -151,7 +151,9 @@ ThemeData buildWajhatakTheme([Brightness brightness = Brightness.light]) {
   );
 
   final systemOverlayStyle = SystemUiOverlayStyle(
-    statusBarColor: background,
+    statusBarColor: dark
+        ? WajhatakColors.surfaceDark
+        : WajhatakColors.surfaceHighLight,
     statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
     statusBarBrightness: brightness,
     systemNavigationBarColor: surface,

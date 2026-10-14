@@ -99,6 +99,43 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           Text(
+            'تنسيق الوقت',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: SegmentedButton<String>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: 'system',
+                    icon: Icon(Icons.settings_suggest_outlined),
+                    label: Text('النظام'),
+                  ),
+                  ButtonSegment(
+                    value: '12',
+                    icon: Icon(Icons.schedule_outlined),
+                    label: Text('12 ساعة'),
+                  ),
+                  ButtonSegment(
+                    value: '24',
+                    icon: Icon(Icons.access_time_rounded),
+                    label: Text('24 ساعة'),
+                  ),
+                ],
+                selected: {settings.timeFormat},
+                onSelectionChanged: (formats) => ref
+                    .read(appSettingsProvider.notifier)
+                    .setTimeFormat(formats.first),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
             'الإشعارات',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w900,
@@ -185,13 +222,20 @@ class SettingsScreen extends ConsumerWidget {
                 if (session?.user.isAgent == true) ...[
                   const Divider(height: 1),
                   ListTile(
-                    leading: Icon(Icons.apartment_rounded, color: theme.colorScheme.primary),
+                    leading: Icon(
+                      Icons.apartment_rounded,
+                      color: theme.colorScheme.primary,
+                    ),
                     title: const Text('عقاراتي'),
-                    subtitle: const Text('إدارة العقارات وتعديلها ومتابعة حالاتها'),
+                    subtitle: const Text(
+                      'إدارة العقارات وتعديلها ومتابعة حالاتها',
+                    ),
                     trailing: const Icon(Icons.chevron_left_rounded),
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => const AgentDashboardScreen(),
-                    )),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AgentDashboardScreen(),
+                      ),
+                    ),
                   ),
                   const Divider(height: 1),
                 ],

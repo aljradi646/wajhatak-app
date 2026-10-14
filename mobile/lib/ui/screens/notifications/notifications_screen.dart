@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 
 import '../../../core/navigation/notification_navigation.dart';
 import '../../../core/theme/icon_badges.dart';
+import '../../../core/utils/format_app_time.dart';
 import '../../../data/models/models.dart';
+import '../../../state/app_settings_controller.dart';
 import '../../../state/providers.dart';
 import '../../widgets.dart';
 import '../auth/auth_screen.dart';
@@ -32,6 +34,7 @@ class NotificationsScreen extends ConsumerWidget {
       );
     }
     final notifications = ref.watch(notificationsProvider);
+    final settings = ref.watch(appSettingsProvider);
     return Scaffold(
       appBar: WajhatakScreenHeader(title: 'الإشعارات'),
       body: RefreshIndicator(
@@ -42,50 +45,58 @@ class NotificationsScreen extends ConsumerWidget {
           ]);
         },
         child: LuxAsyncView<List<LuxNotification>>(
-        value: notifications,
-        loading: const NotificationListSkeleton(),
-        errorRetry: () => ref.invalidate(notificationsProvider),
-        data: (items) {
-          if (items.isEmpty) {
-            return ListView(
+          value: notifications,
+          loading: const NotificationListSkeleton(),
+          errorRetry: () => ref.invalidate(notificationsProvider),
+          data: (items) {
+            if (items.isEmpty) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                children: const [
+                  SizedBox(
+                    height: 300,
+                    child: EmptyState(
+                      title: 'لا توجد إشعارات',
+                      body:
+                          'سيصلك هنا تنبيه عند ورود رسالة أو تحديث طلب معاينة أو رد على بلاغك.',
+                      icon: Icons.notifications_none_rounded,
+                    ),
+                  ),
+                ],
+              );
+            }
+            return ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(20),
-              children: const [
-                SizedBox(
-                  height: 300,
-                  child: EmptyState(
-                    title: 'لا توجد إشعارات',
-                    body: 'سيصلك هنا تنبيه عند ورود رسالة أو تحديث طلب معاينة أو رد على بلاغك.',
-                    icon: Icons.notifications_none_rounded,
-                  ),
+              itemCount: items.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
+              itemBuilder: (context, index) => _NotificationCard(
+                item: items[index],
+                timeFormat: settings.timeFormat,
+                onTap: () => openNotificationSource(
+                  context,
+                  ProviderScope.containerOf(context),
+                  items[index],
                 ),
-              ],
-            );
-          }
-          return ListView.separated(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
-            itemCount: items.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 10),
-            itemBuilder: (context, index) => _NotificationCard(
-              item: items[index],
-              onTap: () => openNotificationSource(
-                context,
-                ProviderScope.containerOf(context),
-                items[index],
               ),
-            ),
-          );
-        },
-      )),
+            );
+          },
+        ),
+      ),
     );
   }
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({required this.item, required this.onTap});
+  const _NotificationCard({
+    required this.item,
+    required this.timeFormat,
+    required this.onTap,
+  });
 
   final LuxNotification item;
+  final String timeFormat;
   final VoidCallback onTap;
 
   AccentTone get _tone => switch (item.kind) {
@@ -169,7 +180,7 @@ class _NotificationCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      DateFormat.yMMMd('ar').add_jm().format(item.createdAt),
+                      '${DateFormat.yMMMd('ar').format(item.createdAt.toLocal())} · ${formatAppTime(context, item.createdAt, preference: timeFormat)}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

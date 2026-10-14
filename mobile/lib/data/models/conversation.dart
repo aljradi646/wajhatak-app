@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-
 /// محادثة بين عميل ووكيل — فريدة لكل (عميل + وكيل) على الخادم.
 @immutable
 class ConversationItem {
@@ -8,6 +7,7 @@ class ConversationItem {
     required this.id,
     required this.title,
     this.agentId,
+    this.agentProfileId,
     this.clientId,
     this.propertyId,
     this.preview,
@@ -22,8 +22,10 @@ class ConversationItem {
 
   final int id;
   final String title;
+
   /// User ID of the agent participant (not the Agent profile row ID).
   final int? agentId;
+  final int? agentProfileId;
   final int? clientId;
   final int? propertyId;
   final String? preview;
@@ -49,6 +51,7 @@ class ConversationItem {
           ? agentName!
           : property?['title'] as String? ?? 'محادثة',
       agentId: agent?['id'] as int?,
+      agentProfileId: agent?['profile_id'] as int?,
       clientId: client?['id'] as int?,
       propertyId: property?['id'] as int?,
       preview: last?['body'] as String?,
@@ -63,6 +66,7 @@ class ConversationItem {
       unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
     );
   }
+
   /// Returns the other conversation participant irrespective of account role.
   /// Both sides may have agent accounts, so roles cannot identify the counterpart.
   String otherParticipantNameFor(int? currentUserId) {
@@ -83,5 +87,4 @@ class ConversationItem {
     if (currentUserId == clientId) return agentAvatarUrl;
     return null;
   }
-
 }

@@ -115,15 +115,11 @@ class AgentDashboardScreen extends ConsumerWidget {
                 sliver: SliverToBoxAdapter(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final columns = constraints.maxWidth >= 900
-                          ? 4
-                          : constraints.maxWidth >= 560
-                          ? 3
-                          : 2;
+                      const columns = 4;
                       final cellWidth =
-                          (constraints.maxWidth - (columns - 1) * 10) / columns;
-                      final cellHeight = (cellWidth * .46)
-                          .clamp(64.0, 84.0)
+                          (constraints.maxWidth - (columns - 1) * 8) / columns;
+                      final cellHeight = (cellWidth * .92)
+                          .clamp(76.0, 96.0)
                           .toDouble();
                       final actions = <Widget>[
                         _AgentQuickAction(
@@ -173,8 +169,8 @@ class AgentDashboardScreen extends ConsumerWidget {
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: columns,
                           mainAxisExtent: cellHeight,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
                         ),
                         itemBuilder: (context, index) => actions[index],
                       );

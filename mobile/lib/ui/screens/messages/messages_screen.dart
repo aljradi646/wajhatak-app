@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-
+import '../../../core/utils/format_app_time.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/models.dart';
+import '../../../state/app_settings_controller.dart';
 import '../../../state/providers.dart';
 import '../../widgets.dart';
 import '../auth/auth_screen.dart';
@@ -73,7 +73,8 @@ class MessagesScreen extends ConsumerWidget {
                         height: 280,
                         child: EmptyState(
                           title: 'لا توجد محادثات',
-                          body: 'ابدأ محادثة من صفحة تفاصيل أي عقار عبر "مراسلة الوكيل".',
+                          body:
+                              'ابدأ محادثة من صفحة تفاصيل أي عقار عبر "مراسلة الوكيل".',
                           icon: Icons.chat_bubble_outline_rounded,
                         ),
                       ),
@@ -114,6 +115,7 @@ class _ConversationTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final currentUser = ref.watch(sessionProvider).asData?.value?.user;
+    final settings = ref.watch(appSettingsProvider);
     final displayName = item.otherParticipantNameFor(currentUser?.id);
     final otherAvatarUrl = item.otherParticipantAvatarUrlFor(currentUser?.id);
     final hasRecentActivity =
@@ -171,7 +173,11 @@ class _ConversationTile extends ConsumerWidget {
                         ),
                         if (item.lastMessageAt != null)
                           Text(
-                            DateFormat.Hm('ar').format(item.lastMessageAt!),
+                            formatAppTime(
+                              context,
+                              item.lastMessageAt!,
+                              preference: settings.timeFormat,
+                            ),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: hasRecentActivity
                                   ? theme.colorScheme.primary

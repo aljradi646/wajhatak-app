@@ -483,10 +483,15 @@ class AgentReportController extends Controller
 
     private function siteInfo(): array
     {
+        $logoPath = public_path('favicon.png');
+        $logo = is_file($logoPath)
+            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath))
+            : null;
+
         return [
             'name' => Setting::get('site_name', 'وجهتك'),
             'tagline' => Setting::get('site_tagline', 'وجهتك إلى العقار المناسب.'),
-            'logo' => null,
+            'logo' => $logo,
             'currency' => $this->currency(),
         ];
     }

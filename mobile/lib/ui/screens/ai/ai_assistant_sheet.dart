@@ -14,6 +14,7 @@ import '../../../state/providers.dart';
 import '../property/property_detail_screen.dart';
 import '../shared/toggle_favorite.dart';
 import '../../widgets/skeleton/lux_skeleton.dart';
+import '../../widgets/property/property_card.dart';
 
 /// نافذة المساعد الذكي — Bottom Sheet على الجوال، ولوحة عائمة متمركزة على
 /// الشاشات الكبيرة. تصميم متوافق مع هوية وجهتك (زمردي + كهرماني + Cairo).
@@ -96,11 +97,13 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
     final bootstrap = ref.watch(aiBootstrapProvider).asData?.value;
     final lastFailed =
         state.messages.isNotEmpty && state.messages.last.status == 'error';
-    final showTyping = state.loading &&
+    final showTyping =
+        state.loading &&
         (state.messages.isEmpty ||
             state.messages.last.isUser ||
             state.messages.last.status != 'streaming');
-    final pristineConversation = state.conversationId == null &&
+    final pristineConversation =
+        state.conversationId == null &&
         state.messages.length == 1 &&
         !state.messages.first.isUser;
 
@@ -151,7 +154,8 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
           IconButton(
             tooltip: 'محادثة جديدة',
             icon: const Icon(Icons.add_comment_rounded),
-            onPressed: () => ref.read(aiConversationProvider.notifier).newConversation(),
+            onPressed: () =>
+                ref.read(aiConversationProvider.notifier).newConversation(),
           ),
           IconButton(
             tooltip: 'مسح المحادثة',
@@ -181,7 +185,8 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
                           return const _TypingIndicator();
                         }
                         final message = state.messages[index];
-                        final welcome = index == 0 &&
+                        final welcome =
+                            index == 0 &&
                             state.messages.length == 1 &&
                             !message.isUser &&
                             state.conversationId == null &&
@@ -190,7 +195,9 @@ class _AiAssistantPanelState extends ConsumerState<AiAssistantPanel> {
                           message: message,
                           isWelcome: welcome,
                           onPropertyTap: _openProperty,
-                          onFavoriteTap: _canFavorite ? (property) => _favorite(property) : null,
+                          onFavoriteTap: _canFavorite
+                              ? (property) => _favorite(property)
+                              : null,
                         );
                       },
                     ),
@@ -286,28 +293,66 @@ class _AiAssistantSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     final shade = Theme.of(context).colorScheme.surfaceContainerHighest;
     Widget bar(double width, double height) => Container(
-      width: width, height: height,
-      decoration: BoxDecoration(color: shade, borderRadius: BorderRadius.circular(10)),
-    );
-    return ListView(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 24), children: [
-      Row(children: [bar(44, 44), const SizedBox(width: 12), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [bar(170, 16), const SizedBox(height: 9), bar(220, 11)])]),
-      const SizedBox(height: 30),
-      Align(alignment: AlignmentDirectional.centerEnd, child: bar(205, 54)),
-      const SizedBox(height: 20),
-      Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(22)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          bar(160, 18), const SizedBox(height: 15), bar(double.infinity, 12), const SizedBox(height: 9), bar(245, 12), const SizedBox(height: 22),
-          Row(children: [Expanded(child: bar(double.infinity, 108)), const SizedBox(width: 10), Expanded(child: bar(double.infinity, 108))]),
-        ]),
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: shade,
+        borderRadius: BorderRadius.circular(10),
       ),
-    ]);
+    );
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 24),
+      children: [
+        Row(
+          children: [
+            bar(44, 44),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [bar(170, 16), const SizedBox(height: 9), bar(220, 11)],
+            ),
+          ],
+        ),
+        const SizedBox(height: 30),
+        Align(alignment: AlignmentDirectional.centerEnd, child: bar(205, 54)),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              bar(160, 18),
+              const SizedBox(height: 15),
+              bar(double.infinity, 12),
+              const SizedBox(height: 9),
+              bar(245, 12),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(child: bar(double.infinity, 108)),
+                  const SizedBox(width: 10),
+                  Expanded(child: bar(double.infinity, 108)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
 class _MessageBubble extends StatefulWidget {
-  const _MessageBubble({required this.message, required this.onPropertyTap, this.onFavoriteTap, this.isWelcome = false});
+  const _MessageBubble({
+    required this.message,
+    required this.onPropertyTap,
+    this.onFavoriteTap,
+    this.isWelcome = false,
+  });
   final AiChatMessage message;
   final ValueChanged<int> onPropertyTap;
   final ValueChanged<AiPropertyResult>? onFavoriteTap;
@@ -321,7 +366,10 @@ class _MessageBubbleState extends State<_MessageBubble> {
   Timer? _timer;
 
   @override
-  void dispose() { _timer?.cancel(); super.dispose(); }
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   void _revealCopy() {
     if (widget.message.isUser || widget.message.content.trim().isEmpty) return;
@@ -344,9 +392,12 @@ class _MessageBubbleState extends State<_MessageBubble> {
     if (!mounted) return;
     _timer?.cancel();
     setState(() => _showCopy = false);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('تم نسخ الرسالة'), duration: Duration(milliseconds: 850),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم نسخ الرسالة'),
+        duration: Duration(milliseconds: 850),
+      ),
+    );
   }
 
   @override
@@ -358,78 +409,122 @@ class _MessageBubbleState extends State<_MessageBubble> {
     return MouseRegion(
       onEnter: (_) => _revealCopy(),
       onExit: (_) => _scheduleCopyHide(),
-      child: SizedBox(width: double.infinity, child: Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (widget.isWelcome) GestureDetector(onTap: _revealCopy, onLongPress: _copy, child: _WelcomeMessage(content: content))
-        else Align(
-          alignment: user ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .88),
-            child: Material(
-              color: user ? theme.colorScheme.surfaceContainerHigh : theme.colorScheme.primaryContainer.withValues(alpha: .38),
-              borderRadius: BorderRadiusDirectional.only(
-                topStart: const Radius.circular(19), topEnd: const Radius.circular(19),
-                bottomStart: Radius.circular(user ? 5 : 19), bottomEnd: Radius.circular(user ? 19 : 5),
-              ),
-              child: InkWell(
-                onTap: _revealCopy, onLongPress: _copy,
-                borderRadius: BorderRadius.circular(19),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Text(widget.message.content, style: theme.textTheme.bodyLarge?.copyWith(height: 1.72, fontSize: 15.5, fontWeight: FontWeight.w500)),
+      child: SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (widget.isWelcome)
+                GestureDetector(
+                  onTap: _revealCopy,
+                  onLongPress: _copy,
+                  child: _WelcomeMessage(content: content),
+                )
+              else
+                Align(
+                  alignment: user
+                      ? AlignmentDirectional.centerStart
+                      : AlignmentDirectional.centerEnd,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width * .88,
+                    ),
+                    child: Material(
+                      color: user
+                          ? theme.colorScheme.surfaceContainerHigh
+                          : theme.colorScheme.primaryContainer.withValues(
+                              alpha: .38,
+                            ),
+                      borderRadius: BorderRadiusDirectional.only(
+                        topStart: const Radius.circular(19),
+                        topEnd: const Radius.circular(19),
+                        bottomStart: Radius.circular(user ? 5 : 19),
+                        bottomEnd: Radius.circular(user ? 19 : 5),
+                      ),
+                      child: InkWell(
+                        onTap: _revealCopy,
+                        onLongPress: _copy,
+                        borderRadius: BorderRadius.circular(19),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Text(
+                            widget.message.content,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              height: 1.72,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 160),
+                child: _showCopy && !user && content.isNotEmpty
+                    ? Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: IconButton.filledTonal(
+                          tooltip: 'نسخ الرد',
+                          visualDensity: VisualDensity.compact,
+                          iconSize: 17,
+                          onPressed: _copy,
+                          icon: const Icon(Icons.copy_rounded),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
-            ),
-          ),
-        ),
-        AnimatedSize(duration: const Duration(milliseconds: 160), child:
-          _showCopy && !user && content.isNotEmpty
-            ? Align(alignment: AlignmentDirectional.centerEnd, child: IconButton.filledTonal(
-                tooltip: 'نسخ الرد', visualDensity: VisualDensity.compact,
-                iconSize: 17, onPressed: _copy, icon: const Icon(Icons.copy_rounded),
-              ))
-            : const SizedBox.shrink(),
-        ),
-        if (items.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final cardWidth = constraints.maxWidth < 380
-                  ? constraints.maxWidth * .72
-                  : constraints.maxWidth < 640
-                      ? 244.0
-                      : (constraints.maxWidth / 4).clamp(220.0, 248.0).toDouble();
-              return SizedBox(
-                width: double.infinity,
-                height: 286,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsetsDirectional.only(end: 4),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    final property = items[index];
+              if (items.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cardWidth = constraints.maxWidth < 640
+                        ? 200.0
+                        : (constraints.maxWidth / 5)
+                              .clamp(200.0, 240.0)
+                              .toDouble();
+                    final cardHeight = cardWidth / .7;
                     return SizedBox(
-                      width: cardWidth,
-                      height: 278,
-                      child: _AiPropertyMiniCard(
-                        property: property,
-                        onTap: () => widget.onPropertyTap(property.propertyId),
-                        onFavorite: widget.onFavoriteTap == null
-                            ? null
-                            : () => widget.onFavoriteTap!(property),
+                      width: double.infinity,
+                      height: cardHeight,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsetsDirectional.only(end: 4),
+                        itemCount: items.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final property = items[index];
+                          return SizedBox(
+                            width: cardWidth,
+                            height: cardHeight,
+                            child: PropertyCard(
+                              property: _luxPropertyFromAi(property),
+                              compact: true,
+                              onTap: () =>
+                                  widget.onPropertyTap(property.propertyId),
+                              onFavorite: widget.onFavoriteTap == null
+                                  ? null
+                                  : () => widget.onFavoriteTap!(property),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },
                 ),
-              );
-            },
+              ],
+            ],
           ),
-        ],
-      ]),
-    )));
+        ),
+      ),
+    );
   }
 }
 
@@ -442,24 +537,57 @@ class _WelcomeMessage extends StatelessWidget {
     final lines = content.split('\n');
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 12, 4, 18),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Align(alignment: AlignmentDirectional.centerStart, child: Container(
-          width: 46, height: 46,
-          decoration: BoxDecoration(
-            gradient: WajhatakColors.amberGradient, borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: WajhatakColors.amber.withValues(alpha: .20), blurRadius: 16, offset: const Offset(0, 5))],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                gradient: WajhatakColors.amberGradient,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: WajhatakColors.amber.withValues(alpha: .20),
+                    blurRadius: 16,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                color: Colors.white,
+                size: 23,
+              ),
+            ),
           ),
-          child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 23),
-        )),
-        const SizedBox(height: 22),
-        Text(lines.isEmpty ? content : lines.first, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, height: 1.45)),
-        if (lines.length > 1) ...[
-          const SizedBox(height: 9),
-          Text(lines.skip(1).join('\n'), style: theme.textTheme.bodyLarge?.copyWith(height: 1.85, fontSize: 15.5, color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 22),
+          Text(
+            lines.isEmpty ? content : lines.first,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w900,
+              height: 1.45,
+            ),
+          ),
+          if (lines.length > 1) ...[
+            const SizedBox(height: 9),
+            Text(
+              lines.skip(1).join('\n'),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                height: 1.85,
+                fontSize: 15.5,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Divider(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: .8),
+          ),
         ],
-        const SizedBox(height: 20),
-        Divider(color: theme.colorScheme.outlineVariant.withValues(alpha: .8)),
-      ]),
+      ),
     );
   }
 }
@@ -509,7 +637,44 @@ class _CopyMessageButtonState extends State<_CopyMessageButton> {
   }
 }
 
+LuxProperty _luxPropertyFromAi(AiPropertyResult property) {
+  return LuxProperty(
+    id: property.propertyId,
+    title: property.title,
+    price: property.price ?? 0,
+    currency: property.currency ?? 'YER',
+    transactionType: property.transactionType,
+    referenceCode: property.referenceCode,
+    area: property.area,
+    bedrooms: property.bedrooms,
+    bathrooms: property.bathrooms,
+    isFurnished: property.isFurnished,
+    isNew: property.isNew,
+    isFeatured: property.isFeatured,
+    isDemo: property.isDemo,
+    typeName: property.type,
+    location: PropertyLocation(
+      city: property.city,
+      district: property.district,
+      neighborhood: property.neighborhood,
+      address: property.address,
+    ),
+    images: property.imageUrl?.isNotEmpty == true
+        ? [
+            PropertyImage(
+              id: property.propertyId,
+              url: property.imageUrl!,
+              isCover: true,
+            ),
+          ]
+        : const [],
+  );
+}
+
+// Legacy implementation kept temporarily for compatibility with older builds.
+// ignore: unused_element
 class _AiPropertyMiniCard extends StatelessWidget {
+  // ignore: unused_element_parameter
   const _AiPropertyMiniCard({
     required this.property,
     required this.onTap,
@@ -548,236 +713,229 @@ class _AiPropertyMiniCard extends StatelessWidget {
                             height: double.infinity,
                             radius: 0,
                           ),
-                          errorWidget: (context, url, error) => _imageFallback(theme),
+                          errorWidget: (context, url, error) =>
+                              _imageFallback(theme),
                         )
                       : _imageFallback(theme),
                 ),
               ),
               const SizedBox(height: 6),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            property.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall?.copyWith(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          property.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            height: 1.15,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ),
+                      if (property.isAlternative)
+                        Container(
+                          margin: const EdgeInsetsDirectional.only(start: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: WajhatakColors.amber.withValues(alpha: .16),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'قريب من طلبك',
+                            style: TextStyle(
+                              fontSize: 9,
                               fontWeight: FontWeight.w800,
-                              height: 1.15,
-                              fontSize: 12.5,
                             ),
                           ),
                         ),
-                        if (property.isAlternative)
-                          Container(
-                            margin: const EdgeInsetsDirectional.only(start: 6),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: WajhatakColors.amber.withValues(
-                                alpha: .16,
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'قريب من طلبك',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} • ${property.transactionLabel}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w900,
                           ),
+                        ),
+                      ),
+                      _copyButton(
+                        context,
+                        'السعر',
+                        '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} ${property.transactionLabel}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        size: 12,
+                        color: WajhatakColors.terracotta,
+                      ),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          property.address?.isNotEmpty == true
+                              ? property.address!
+                              : property.locationLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      _copyButton(
+                        context,
+                        'الموقع',
+                        property.address?.isNotEmpty == true
+                            ? property.address!
+                            : property.locationLabel,
+                      ),
+                      if (property.bedrooms != null) ...[
+                        Icon(
+                          Icons.bed_rounded,
+                          size: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        Text(
+                          ' ${property.bedrooms}',
+                          style: theme.textTheme.bodySmall,
+                        ),
                       ],
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} • ${property.transactionLabel}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
+                      if (property.bathrooms != null) ...[
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.bathtub_rounded,
+                          size: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                        _copyButton(
-                          context,
-                          'السعر',
-                          '${formatMoney(property.price ?? 0, property.currency ?? 'YER')} ${property.transactionLabel}',
+                        Text(
+                          ' ${property.bathrooms}',
+                          style: theme.textTheme.bodySmall,
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 3),
+                    ],
+                  ),
+                  if (property.agentPhone?.isNotEmpty == true) ...[
                     Row(
                       children: [
                         Icon(
-                          Icons.location_on_rounded,
-                          size: 12,
-                          color: WajhatakColors.terracotta,
+                          Icons.phone_outlined,
+                          size: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            property.address?.isNotEmpty == true
-                                ? property.address!
-                                : property.locationLabel,
+                            property.agentPhone!,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                        ),
+                        IconButton(
+                          tooltip: 'اتصال بالوكيل',
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(2),
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                          icon: const Icon(Icons.call_rounded, size: 15),
+                          onPressed: () async {
+                            final uri = Uri(
+                              scheme: 'tel',
+                              path: property.agentPhone!,
+                            );
+                            await launchUrl(uri);
+                          },
                         ),
                         _copyButton(
                           context,
-                          'الموقع',
-                          property.address?.isNotEmpty == true
-                              ? property.address!
-                              : property.locationLabel,
+                          'هاتف الوكيل',
+                          property.agentPhone!,
                         ),
-                        if (property.bedrooms != null) ...[
-                          Icon(
-                            Icons.bed_rounded,
-                            size: 13,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          Text(
-                            ' ${property.bedrooms}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                        if (property.bathrooms != null) ...[
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.bathtub_rounded,
-                            size: 13,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          Text(
-                            ' ${property.bathrooms}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
                       ],
                     ),
-                    if (property.agentPhone?.isNotEmpty == true) ...[
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.phone_outlined,
-                            size: 13,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              property.agentPhone!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'اتصال بالوكيل',
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.all(2),
-                            constraints: const BoxConstraints(
-                              minWidth: 28,
-                              minHeight: 28,
-                            ),
-                            icon: const Icon(Icons.call_rounded, size: 15),
-                            onPressed: () async {
-                              final uri = Uri(
-                                scheme: 'tel',
-                                path: property.agentPhone!,
-                              );
-                              await launchUrl(uri);
-                            },
-                          ),
-                          _copyButton(
-                            context,
-                            'هاتف الوكيل',
-                            property.agentPhone!,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                    ],
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 2,
-                      runSpacing: 2,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (property.referenceCode?.isNotEmpty == true) ...[
-                          Icon(
-                            Icons.tag_rounded,
-                            size: 13,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 3),
-                          Flexible(
-                            child: Text(
-                              property.referenceCode!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          _copyButton(
-                            context,
-                            'الرمز',
+                    const SizedBox(height: 4),
+                  ],
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 2,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (property.referenceCode?.isNotEmpty == true) ...[
+                        Icon(
+                          Icons.tag_rounded,
+                          size: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
                             property.referenceCode!,
-                          ),
-                        ],
-                        if (property.isDemo)
-                          _chip(context, 'تجريبي', WajhatakColors.amber),
-                        if (!property.available)
-                          _chip(context, 'غير متاح', WajhatakColors.terracotta)
-                        else if (property.isFurnished)
-                          _chip(context, 'مفروش', WajhatakColors.teal),
-                        TextButton.icon(
-                          onPressed: onTap,
-                          icon: const Icon(Icons.visibility_rounded, size: 15),
-                          label: const Text('التفاصيل'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            visualDensity: VisualDensity.compact,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
-                        if (onFavorite != null)
-                          IconButton(
-                            tooltip: 'حفظ في المفضلة',
-                            onPressed: onFavorite,
-                            icon: const Icon(
-                              Icons.favorite_border_rounded,
-                              size: 18,
-                            ),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        IconButton(
-                          tooltip: 'مشاركة',
-                          onPressed: () => _share(context),
-                          icon: const Icon(Icons.ios_share_rounded, size: 17),
+                        _copyButton(context, 'الرمز', property.referenceCode!),
+                      ],
+                      if (property.isDemo)
+                        _chip(context, 'تجريبي', WajhatakColors.amber),
+                      if (!property.available)
+                        _chip(context, 'غير متاح', WajhatakColors.terracotta)
+                      else if (property.isFurnished)
+                        _chip(context, 'مفروش', WajhatakColors.teal),
+                      TextButton.icon(
+                        onPressed: onTap,
+                        icon: const Icon(Icons.visibility_rounded, size: 15),
+                        label: const Text('التفاصيل'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           visualDensity: VisualDensity.compact,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                      if (onFavorite != null)
+                        IconButton(
+                          tooltip: 'حفظ في المفضلة',
+                          onPressed: onFavorite,
+                          icon: const Icon(
+                            Icons.favorite_border_rounded,
+                            size: 18,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      IconButton(
+                        tooltip: 'مشاركة',
+                        onPressed: () => _share(context),
+                        icon: const Icon(Icons.ios_share_rounded, size: 17),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),

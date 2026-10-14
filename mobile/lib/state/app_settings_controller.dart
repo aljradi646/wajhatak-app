@@ -10,6 +10,7 @@ class AppSettings {
     this.propertyUpdates = true,
     this.searchHistory = const [],
     this.lastTransactionType,
+    this.timeFormat = 'system',
   });
 
   final bool messageNotifications;
@@ -17,6 +18,7 @@ class AppSettings {
   final bool propertyUpdates;
   final List<String> searchHistory;
   final String? lastTransactionType;
+  final String timeFormat;
 
   AppSettings copyWith({
     bool? messageNotifications,
@@ -24,6 +26,7 @@ class AppSettings {
     bool? propertyUpdates,
     List<String>? searchHistory,
     String? Function()? lastTransactionType,
+    String? timeFormat,
   }) => AppSettings(
     messageNotifications: messageNotifications ?? this.messageNotifications,
     viewingNotifications: viewingNotifications ?? this.viewingNotifications,
@@ -32,6 +35,7 @@ class AppSettings {
     lastTransactionType: lastTransactionType != null
         ? lastTransactionType()
         : this.lastTransactionType,
+    timeFormat: timeFormat ?? this.timeFormat,
   );
 }
 
@@ -46,6 +50,7 @@ class AppSettingsController extends Notifier<AppSettings> {
   static const _updatesKey = 'lux_notify_property_updates';
   static const _searchHistoryKey = 'lux_search_history';
   static const _lastTransactionKey = 'lux_last_transaction_type';
+  static const _timeFormatKey = 'lux_time_format';
   static const _maxSearchHistory = 10;
   final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
@@ -61,6 +66,7 @@ class AppSettingsController extends Notifier<AppSettings> {
     final updates = await _preferences.getBool(_updatesKey);
     final historyJson = await _preferences.getString(_searchHistoryKey);
     final lastTx = await _preferences.getString(_lastTransactionKey);
+    final timeFormat = await _preferences.getString(_timeFormatKey);
     List<String> history = const [];
     if (historyJson != null && historyJson.isNotEmpty) {
       try {
@@ -73,6 +79,10 @@ class AppSettingsController extends Notifier<AppSettings> {
       propertyUpdates: updates ?? true,
       searchHistory: history,
       lastTransactionType: lastTx,
+      timeFormat: switch (timeFormat) {
+        '12' || '24' => timeFormat!,
+        _ => 'system',
+      },
     );
   }
 
@@ -119,6 +129,15 @@ class AppSettingsController extends Notifier<AppSettings> {
     } else {
       await _preferences.setString(_lastTransactionKey, type);
     }
+  }
+
+  Future<void> setTimeFormat(String format) async {
+    final normalized = switch (format) {
+      '12' || '24' => format,
+      _ => 'system',
+    };
+    state = state.copyWith(timeFormat: normalized);
+    await _preferences.setString(_timeFormatKey, normalized);
   }
 
   Future<void> _update(AppSettings next, String key, bool value) async {

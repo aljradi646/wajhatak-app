@@ -3,17 +3,19 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/navigation/active_chat_context.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/format_money.dart';
+import '../../../core/utils/format_app_time.dart';
 import '../../../core/utils/notice.dart' as util;
 import '../../../data/api_client.dart';
 import '../../../data/models/models.dart';
+import '../../../state/app_settings_controller.dart';
 import '../../../state/providers.dart';
 import '../../widgets.dart';
 import '../property/property_detail_screen.dart';
+import '../agent/agent_profile_screen.dart';
 
 /// شاشة المحادثة — تعرض بيانات الطرف الآخر الفعلية وبطاقات العقارات السياقية.
 class ChatScreen extends ConsumerStatefulWidget {
@@ -107,6 +109,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final messages = ref.watch(messagesProvider(widget.conversation.id));
     final currentUser = ref.watch(sessionProvider).asData?.value?.user;
+    final settings = ref.watch(appSettingsProvider);
     // Resolve by participant IDs, not roles: an agent can message another agent.
     final displayName = widget.conversation.otherParticipantNameFor(
       currentUser?.id,
@@ -123,10 +126,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Padding(
             padding: const EdgeInsets.only(left: 4),
             child: Center(
-              child: UserAvatar(
+              child: _ChatParticipantAvatar(
                 avatarUrl: otherAvatarUrl,
                 name: displayName,
-                radius: 19,
+                canOpenAgent:
+                    currentUser?.id == widget.conversation.clientId &&
+                    widget.conversation.agentProfileId != null,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AgentProfileScreen(
+                      agentId: widget.conversation.agentProfileId!,
+                      propertyId: widget.conversation.propertyId,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -165,6 +178,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 _TextMessage(
                                   body: item.body,
                                   createdAt: item.createdAt,
+                                  timeFormat: settings.timeFormat,
                                   isMine: mine,
                                   readAt: item.readAt,
                                 ),
@@ -178,6 +192,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         return _TextMessage(
                           body: item.body,
                           createdAt: item.createdAt,
+                          timeFormat: settings.timeFormat,
                           isMine: mine,
                           readAt: item.readAt,
                         );
@@ -355,18 +370,48 @@ class _PendingPropertyAttachment extends StatelessWidget {
   }
 }
 
+class _ChatParticipantAvatar extends StatelessWidget {
+  const _ChatParticipantAvatar({
+    required this.avatarUrl,
+    required this.name,
+    required this.canOpenAgent,
+    required this.onTap,
+  });
+
+  final String? avatarUrl;
+  final String name;
+  final bool canOpenAgent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = UserAvatar(avatarUrl: avatarUrl, name: name, radius: 19);
+    if (!canOpenAgent) return avatar;
+    return Tooltip(
+      message: 'فتح ملف الوكيل',
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Padding(padding: const EdgeInsets.all(2), child: avatar),
+      ),
+    );
+  }
+}
+
 class _TextMessage extends StatelessWidget {
   const _TextMessage({
     required this.body,
     required this.createdAt,
     required this.isMine,
     this.readAt,
+    required this.timeFormat,
   });
 
   final String body;
   final DateTime createdAt;
   final bool isMine;
   final DateTime? readAt;
+  final String timeFormat;
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +469,7 @@ class _TextMessage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  DateFormat.Hm('ar').format(createdAt),
+                  formatAppTime(context, createdAt, preference: timeFormat),
                   style: TextStyle(
                     color: isMine
                         ? theme.colorScheme.onPrimary.withValues(alpha: .75)

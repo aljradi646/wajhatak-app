@@ -64,7 +64,9 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         _resultsScrollController.position.extentAfter > 480) {
       return;
     }
-    unawaited(ref.read(explorePropertySearchProvider(_activeQuery).notifier).loadMore());
+    unawaited(
+      ref.read(explorePropertySearchProvider(_activeQuery).notifier).loadMore(),
+    );
   }
 
   void _onSearchChanged(String value) {
@@ -140,9 +142,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   }
 
   void _onSortSelected(String value) {
-    setState(() => _filters = _filters.copyWith(
-      sort: value == 'recommended' ? null : value,
-    ));
+    setState(
+      () => _filters = _filters.copyWith(
+        sort: value == 'recommended' ? null : value,
+      ),
+    );
   }
 
   Future<void> _refreshExploreResults() async {
@@ -168,262 +172,278 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     final query = _filters.copyWith(search: _term);
     _activeQuery = query;
     final propertyTypes =
-        ref.watch(propertyTypesProvider).asData?.value ?? const <TaxonomyItem>[];
+        ref.watch(propertyTypesProvider).asData?.value ??
+        const <TaxonomyItem>[];
     final results = ref.watch(explorePropertySearchProvider(query));
     final mappedProperties =
         results.asData?.value.items ?? const <LuxProperty>[];
 
     return Scaffold(
-      appBar: (ModalRoute.of(context)?.canPop ?? false)
-          ? WajhatakScreenHeader(title: 'استكشف العقارات')
-          : null,
-      body: RefreshIndicator(
-        onRefresh: _refreshExploreResults,
-        child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'استكشف العقارات',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                    _MapButton(
-                      enabled: mappedProperties.isNotEmpty,
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              PropertyMapScreen(properties: mappedProperties),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _controller,
-                  textInputAction: TextInputAction.search,
-                  onChanged: _onSearchChanged,
-                  onSubmitted: _onSearchSubmitted,
-                  decoration: InputDecoration(
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    hintText: 'ابحث باسم الحي أو المدينة',
-                    suffixIcon: IconButton(
-                      onPressed: () {
-                        _searchDebounce?.cancel();
-                        _controller.clear();
-                        setState(() => _term = '');
-                      },
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // رقائق نوع العملية — بأيقونات ملونة
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _TransactionChip(
-                        label: 'الكل',
-                        icon: Icons.apps_rounded,
-                        tone: AccentTone.violet,
-                        selected: _filters.transactionType == null,
-                        onSelected: () {
-                          setState(() => _filters = _filters.copyWith(transactionType: null));
-                          ref
-                              .read(appSettingsProvider.notifier)
-                              .setLastTransactionType(null);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _TransactionChip(
-                        label: 'للبيع',
-                        icon: Icons.sell_rounded,
-                        tone: AccentTone.emerald,
-                        selected: _filters.transactionType == 'sale',
-                        onSelected: () {
-                          setState(() => _filters = _filters.copyWith(transactionType: 'sale'));
-                          ref
-                              .read(appSettingsProvider.notifier)
-                              .setLastTransactionType('sale');
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _TransactionChip(
-                        label: 'للإيجار',
-                        icon: Icons.key_rounded,
-                        tone: AccentTone.sky,
-                        selected: _filters.transactionType == 'rent',
-                        onSelected: () {
-                          setState(() => _filters = _filters.copyWith(transactionType: 'rent'));
-                          ref
-                              .read(appSettingsProvider.notifier)
-                              .setLastTransactionType('rent');
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SortMenu(
-                        selected: _filters.sort ?? 'recommended',
-                        onSelected: _onSortSelected,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _openFilters(propertyTypes),
-                        icon: const Icon(Icons.tune_rounded),
-                        label: Text(
-                          _activeFilterCount == 0
-                              ? 'الفلاتر'
-                              : 'الفلاتر ($_activeFilterCount)',
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (_activeFilterCount > 0) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.filter_alt_rounded,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '$_activeFilterCount من الفلاتر مفعّل',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _clearFilters,
-                        icon: const Icon(Icons.clear_all_rounded, size: 17),
-                        label: const Text('مسح الفلاتر'),
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Expanded(
-            child: LuxAsyncView<ExploreSearchResult>(
-              value: results,
-              loading: const ExploreSkeleton(),
-              errorRetry: () => ref.invalidate(explorePropertySearchProvider(query)),
-              data: (page) => page.items.isEmpty
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      children: [
-                        SizedBox(
-                          height: 320,
-                          child: EmptyState(
-                            title: 'لا توجد نتائج مطابقة',
-                            body: 'لم نجد عقارات تطابق البحث والفلاتر الحالية. امسحها للعودة إلى جميع العقارات.',
-                            icon: Icons.search_off_rounded,
-                            actionLabel: 'عرض جميع العقارات',
-                            onAction: _resetExplore,
-                          ),
-                        ),
-                      ],
-                    )
-                  : LayoutBuilder(
-                      builder: (_, constraints) => GridView.builder(
-                        controller: _resultsScrollController,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: Responsive.propertyGridColumns(
-                            constraints.maxWidth,
-                          ),
-                          mainAxisSpacing: 14,
-                          crossAxisSpacing: 14,
-                          childAspectRatio: Responsive.propertyCardAspectRatio(
-                            constraints.maxWidth /
-                                Responsive.propertyGridColumns(
-                                  constraints.maxWidth,
-                                ),
-                          ),
-                        ),
-                        itemCount: page.items.length + (page.hasMore ? 1 : 0),
-                        itemBuilder: (_, index) {
-                          if (index == page.items.length) {
-                            return Center(
-                              child: page.isLoadingMore
-                                  ? const CircularProgressIndicator()
-                                  : TextButton.icon(
-                                      onPressed: () => unawaited(
-                                        ref
-                                            .read(explorePropertySearchProvider(query).notifier)
-                                            .loadMore(retry: page.loadMoreError),
-                                      ),
-                                      icon: Icon(
-                                        page.loadMoreError
-                                            ? Icons.refresh_rounded
-                                            : Icons.expand_more_rounded,
-                                      ),
-                                      label: Text(
-                                        page.loadMoreError
-                                            ? 'إعادة المحاولة'
-                                            : 'تحميل المزيد',
-                                      ),
-                                    ),
-                            );
-                          }
-
-                          final property = page.items[index];
-                          return PropertyCard(
-                            property: property,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => PropertyDetailScreen(
-                                  propertyId: property.id,
-                                ),
-                              ),
-                            ),
-                            onFavorite: () =>
-                                toggleFavorite(context, ref, property),
-                          );
-                        },
-                      ),
-                    ),
+      appBar: WajhatakScreenHeader(
+        title: 'استكشف العقارات',
+        actions: [
+          _MapButton(
+            enabled: mappedProperties.isNotEmpty,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PropertyMapScreen(properties: mappedProperties),
+              ),
             ),
           ),
         ],
-      )),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refreshExploreResults,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _controller,
+                    textInputAction: TextInputAction.search,
+                    onChanged: _onSearchChanged,
+                    onSubmitted: _onSearchSubmitted,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      hintText: 'ابحث باسم الحي أو المدينة',
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          _searchDebounce?.cancel();
+                          _controller.clear();
+                          setState(() => _term = '');
+                        },
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // رقائق نوع العملية — بأيقونات ملونة
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _TransactionChip(
+                          label: 'الكل',
+                          icon: Icons.apps_rounded,
+                          tone: AccentTone.violet,
+                          selected: _filters.transactionType == null,
+                          onSelected: () {
+                            setState(
+                              () => _filters = _filters.copyWith(
+                                transactionType: null,
+                              ),
+                            );
+                            ref
+                                .read(appSettingsProvider.notifier)
+                                .setLastTransactionType(null);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _TransactionChip(
+                          label: 'للبيع',
+                          icon: Icons.sell_rounded,
+                          tone: AccentTone.emerald,
+                          selected: _filters.transactionType == 'sale',
+                          onSelected: () {
+                            setState(
+                              () => _filters = _filters.copyWith(
+                                transactionType: 'sale',
+                              ),
+                            );
+                            ref
+                                .read(appSettingsProvider.notifier)
+                                .setLastTransactionType('sale');
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _TransactionChip(
+                          label: 'للإيجار',
+                          icon: Icons.key_rounded,
+                          tone: AccentTone.sky,
+                          selected: _filters.transactionType == 'rent',
+                          onSelected: () {
+                            setState(
+                              () => _filters = _filters.copyWith(
+                                transactionType: 'rent',
+                              ),
+                            );
+                            ref
+                                .read(appSettingsProvider.notifier)
+                                .setLastTransactionType('rent');
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SortMenu(
+                          selected: _filters.sort ?? 'recommended',
+                          onSelected: _onSortSelected,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openFilters(propertyTypes),
+                          icon: const Icon(Icons.tune_rounded),
+                          label: Text(
+                            _activeFilterCount == 0
+                                ? 'الفلاتر'
+                                : 'الفلاتر ($_activeFilterCount)',
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_activeFilterCount > 0) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.filter_alt_rounded,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '$_activeFilterCount من الفلاتر مفعّل',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _clearFilters,
+                          icon: const Icon(Icons.clear_all_rounded, size: 17),
+                          label: const Text('مسح الفلاتر'),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Expanded(
+              child: LuxAsyncView<ExploreSearchResult>(
+                value: results,
+                loading: const ExploreSkeleton(),
+                errorRetry: () =>
+                    ref.invalidate(explorePropertySearchProvider(query)),
+                data: (page) => page.items.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        children: [
+                          SizedBox(
+                            height: 320,
+                            child: EmptyState(
+                              title: 'لا توجد نتائج مطابقة',
+                              body:
+                                  'لم نجد عقارات تطابق البحث والفلاتر الحالية. امسحها للعودة إلى جميع العقارات.',
+                              icon: Icons.search_off_rounded,
+                              actionLabel: 'عرض جميع العقارات',
+                              onAction: _resetExplore,
+                            ),
+                          ),
+                        ],
+                      )
+                    : LayoutBuilder(
+                        builder: (_, constraints) => GridView.builder(
+                          controller: _resultsScrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: Responsive.propertyGridColumns(
+                                  constraints.maxWidth,
+                                ),
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 14,
+                                childAspectRatio:
+                                    Responsive.propertyCardAspectRatio(
+                                      constraints.maxWidth /
+                                          Responsive.propertyGridColumns(
+                                            constraints.maxWidth,
+                                          ),
+                                    ),
+                              ),
+                          itemCount: page.items.length + (page.hasMore ? 1 : 0),
+                          itemBuilder: (_, index) {
+                            if (index == page.items.length) {
+                              return Center(
+                                child: page.isLoadingMore
+                                    ? const CircularProgressIndicator()
+                                    : TextButton.icon(
+                                        onPressed: () => unawaited(
+                                          ref
+                                              .read(
+                                                explorePropertySearchProvider(
+                                                  query,
+                                                ).notifier,
+                                              )
+                                              .loadMore(
+                                                retry: page.loadMoreError,
+                                              ),
+                                        ),
+                                        icon: Icon(
+                                          page.loadMoreError
+                                              ? Icons.refresh_rounded
+                                              : Icons.expand_more_rounded,
+                                        ),
+                                        label: Text(
+                                          page.loadMoreError
+                                              ? 'إعادة المحاولة'
+                                              : 'تحميل المزيد',
+                                        ),
+                                      ),
+                              );
+                            }
+
+                            final property = page.items[index];
+                            return PropertyCard(
+                              property: property,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => PropertyDetailScreen(
+                                    propertyId: property.id,
+                                  ),
+                                ),
+                              ),
+                              onFavorite: () =>
+                                  toggleFavorite(context, ref, property),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -445,30 +465,18 @@ class _MapButton extends StatelessWidget {
       child: InkWell(
         onTap: enabled ? onPressed : null,
         borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.map_rounded,
-                size: 18,
-                color: enabled
-                    ? WajhatakColors.sky
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 7),
-              Text(
-                'الخريطة',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: enabled
-                      ? WajhatakColors.sky
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+        child: Tooltip(
+          message: 'الخريطة',
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(
+              Icons.location_on_rounded,
+              size: 21,
+              color: enabled
+                  ? WajhatakColors.sky
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),
@@ -536,7 +544,6 @@ class _TransactionChip extends StatelessWidget {
   }
 }
 
-
 class _SortMenu extends StatelessWidget {
   const _SortMenu({required this.selected, required this.onSelected});
 
@@ -579,7 +586,11 @@ class _SortMenu extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(child: Text(option.label)),
                   if (option.value == selected)
-                    Icon(Icons.check_rounded, size: 18, color: theme.colorScheme.primary),
+                    Icon(
+                      Icons.check_rounded,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
                 ],
               ),
             ),
@@ -595,14 +606,20 @@ class _SortMenu extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.sort_rounded, color: theme.colorScheme.primary, size: 20),
+            Icon(
+              Icons.sort_rounded,
+              color: theme.colorScheme.primary,
+              size: 20,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 current.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(width: 4),
@@ -679,16 +696,23 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
     _bedroomsMin = TextEditingController(
       text: (query.bedroomsMin ?? query.bedrooms)?.toString() ?? '',
     );
-    _bedroomsMax = TextEditingController(text: query.bedroomsMax?.toString() ?? '');
+    _bedroomsMax = TextEditingController(
+      text: query.bedroomsMax?.toString() ?? '',
+    );
     _bathroomsMin = TextEditingController(
       text: (query.bathroomsMin ?? query.bathrooms)?.toString() ?? '',
     );
-    _bathroomsMax = TextEditingController(text: query.bathroomsMax?.toString() ?? '');
+    _bathroomsMax = TextEditingController(
+      text: query.bathroomsMax?.toString() ?? '',
+    );
     _parkingMin = TextEditingController(
       text: (query.parkingSpacesMin ?? query.parkingSpaces)?.toString() ?? '',
     );
-    _parkingMax = TextEditingController(text: query.parkingSpacesMax?.toString() ?? '');
-    _propertyType = _availableTypes.any((item) => item.slug == query.propertyType)
+    _parkingMax = TextEditingController(
+      text: query.parkingSpacesMax?.toString() ?? '',
+    );
+    _propertyType =
+        _availableTypes.any((item) => item.slug == query.propertyType)
         ? query.propertyType
         : null;
     _furnished = query.isFurnished;
@@ -734,12 +758,16 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
   }
 
   bool? _booleanValue(String? value) => switch (value) {
-        'yes' => true,
-        'no' => false,
-        _ => null,
-      };
+    'yes' => true,
+    'no' => false,
+    _ => null,
+  };
 
-  String _booleanChoice(bool? value) => value == null ? 'all' : value ? 'yes' : 'no';
+  String _booleanChoice(bool? value) => value == null
+      ? 'all'
+      : value
+      ? 'yes'
+      : 'no';
 
   bool _validateRanges() {
     final minPrice = _doubleValue(_minPrice);
@@ -777,20 +805,35 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
       _validationMessage = 'المساحة القصوى يجب أن تكون أكبر من المساحة الدنيا.';
       return false;
     }
-    if (bedroomsMin != null && bedroomsMax != null && bedroomsMin > bedroomsMax ||
-        bathroomsMin != null && bathroomsMax != null && bathroomsMin > bathroomsMax ||
+    if (bedroomsMin != null &&
+            bedroomsMax != null &&
+            bedroomsMin > bedroomsMax ||
+        bathroomsMin != null &&
+            bathroomsMax != null &&
+            bathroomsMin > bathroomsMax ||
         parkingMin != null && parkingMax != null && parkingMin > parkingMax) {
       _validationMessage = 'تحقق من الحدود الدنيا والعليا للأعداد.';
       return false;
     }
-    if ([bedroomsMin, bedroomsMax, bathroomsMin, bathroomsMax]
-        .whereType<int>()
-        .any((value) => value < 0 || value > 20) ||
-        [parkingMin, parkingMax].whereType<int>().any((value) => value < 0 || value > 50)) {
+    if ([
+          bedroomsMin,
+          bedroomsMax,
+          bathroomsMin,
+          bathroomsMax,
+        ].whereType<int>().any((value) => value < 0 || value > 20) ||
+        [
+          parkingMin,
+          parkingMax,
+        ].whereType<int>().any((value) => value < 0 || value > 50)) {
       _validationMessage = 'عدد الغرف والحمامات بين 0 و20 والمواقف بين 0 و50.';
       return false;
     }
-    if ([minPrice, maxPrice, minArea, maxArea].whereType<double>().any((value) => value < 0)) {
+    if ([
+      minPrice,
+      maxPrice,
+      minArea,
+      maxArea,
+    ].whereType<double>().any((value) => value < 0)) {
       _validationMessage = 'لا يمكن إدخال قيم سالبة.';
       return false;
     }
@@ -798,30 +841,31 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
     return true;
   }
 
-  bool _hasText(TextEditingController controller) => controller.text.trim().isNotEmpty;
+  bool _hasText(TextEditingController controller) =>
+      controller.text.trim().isNotEmpty;
 
   PropertyQuery _buildQuery() => widget.initial.copyWith(
-        city: _textValue(_city),
-        district: _textValue(_district),
-        neighborhood: _textValue(_neighborhood),
-        propertyType: _propertyType,
-        minPrice: _doubleValue(_minPrice),
-        maxPrice: _doubleValue(_maxPrice),
-        minArea: _doubleValue(_minArea),
-        maxArea: _doubleValue(_maxArea),
-        bedrooms: null,
-        bathrooms: null,
-        parkingSpaces: null,
-        bedroomsMin: _intValue(_bedroomsMin),
-        bedroomsMax: _intValue(_bedroomsMax),
-        bathroomsMin: _intValue(_bathroomsMin),
-        bathroomsMax: _intValue(_bathroomsMax),
-        parkingSpacesMin: _intValue(_parkingMin),
-        parkingSpacesMax: _intValue(_parkingMax),
-        isFurnished: _furnished,
-        isNew: _isNew,
-        isFeatured: _isFeatured,
-      );
+    city: _textValue(_city),
+    district: _textValue(_district),
+    neighborhood: _textValue(_neighborhood),
+    propertyType: _propertyType,
+    minPrice: _doubleValue(_minPrice),
+    maxPrice: _doubleValue(_maxPrice),
+    minArea: _doubleValue(_minArea),
+    maxArea: _doubleValue(_maxArea),
+    bedrooms: null,
+    bathrooms: null,
+    parkingSpaces: null,
+    bedroomsMin: _intValue(_bedroomsMin),
+    bedroomsMax: _intValue(_bedroomsMax),
+    bathroomsMin: _intValue(_bathroomsMin),
+    bathroomsMax: _intValue(_bathroomsMax),
+    parkingSpacesMin: _intValue(_parkingMin),
+    parkingSpacesMax: _intValue(_parkingMax),
+    isFurnished: _furnished,
+    isNew: _isNew,
+    isFeatured: _isFeatured,
+  );
 
   void _apply() {
     if (!_validateRanges()) {
@@ -859,52 +903,53 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
   }
 
   InputDecoration _decoration(String label, IconData icon) => InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 19),
-        isDense: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-      );
+    labelText: label,
+    prefixIcon: Icon(icon, size: 19),
+    isDense: true,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+  );
 
-  Widget _textField(TextEditingController controller, String label, IconData icon) =>
-      TextField(
-        controller: controller,
-        textDirection: TextDirection.rtl,
-        decoration: _decoration(label, icon),
-        textInputAction: TextInputAction.next,
-      );
+  Widget _textField(
+    TextEditingController controller,
+    String label,
+    IconData icon,
+  ) => TextField(
+    controller: controller,
+    textDirection: TextDirection.rtl,
+    decoration: _decoration(label, icon),
+    textInputAction: TextInputAction.next,
+  );
 
   Widget _numberField(
     TextEditingController controller,
     String label, {
     required bool decimal,
-  }) =>
-      TextField(
-        controller: controller,
-        keyboardType: TextInputType.numberWithOptions(decimal: decimal),
-        textDirection: TextDirection.ltr,
-        decoration: InputDecoration(
-          labelText: label,
-          isDense: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-      );
+  }) => TextField(
+    controller: controller,
+    keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+    textDirection: TextDirection.ltr,
+    decoration: InputDecoration(
+      labelText: label,
+      isDense: true,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+    ),
+  );
 
   Widget _booleanDropdown({
     required String label,
     required bool? value,
     required ValueChanged<bool?> onChanged,
-  }) =>
-      DropdownButtonFormField<String>(
-        initialValue: _booleanChoice(value),
-        isExpanded: true,
-        decoration: _decoration(label, Icons.tune_rounded),
-        items: const [
-          DropdownMenuItem(value: 'all', child: Text('الكل')),
-          DropdownMenuItem(value: 'yes', child: Text('نعم')),
-          DropdownMenuItem(value: 'no', child: Text('لا')),
-        ],
-        onChanged: (choice) => onChanged(_booleanValue(choice)),
-      );
+  }) => DropdownButtonFormField<String>(
+    initialValue: _booleanChoice(value),
+    isExpanded: true,
+    decoration: _decoration(label, Icons.tune_rounded),
+    items: const [
+      DropdownMenuItem(value: 'all', child: Text('الكل')),
+      DropdownMenuItem(value: 'yes', child: Text('نعم')),
+      DropdownMenuItem(value: 'no', child: Text('لا')),
+    ],
+    onChanged: (choice) => onChanged(_booleanValue(choice)),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -925,7 +970,9 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
                     Expanded(
                       child: Text(
                         'تصفية العقارات',
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -945,85 +992,186 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
                       DropdownButtonFormField<String>(
                         initialValue: _propertyType ?? '',
                         isExpanded: true,
-                        decoration: _decoration('نوع العقار', Icons.home_work_rounded),
+                        decoration: _decoration(
+                          'نوع العقار',
+                          Icons.home_work_rounded,
+                        ),
                         items: [
-                          const DropdownMenuItem(value: '', child: Text('جميع الأنواع')),
+                          const DropdownMenuItem(
+                            value: '',
+                            child: Text('جميع الأنواع'),
+                          ),
                           ...availableTypes.map(
                             (item) => DropdownMenuItem(
                               value: item.slug!,
-                              child: Text(item.name, overflow: TextOverflow.ellipsis),
+                              child: Text(
+                                item.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
                         ],
                         onChanged: (value) => setState(
-                          () => _propertyType = value == null || value.isEmpty ? null : value,
+                          () => _propertyType = value == null || value.isEmpty
+                              ? null
+                              : value,
                         ),
                       ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          Expanded(child: _textField(_city, 'المدينة', Icons.location_city_rounded)),
+                          Expanded(
+                            child: _textField(
+                              _city,
+                              'المدينة',
+                              Icons.location_city_rounded,
+                            ),
+                          ),
                           const SizedBox(width: 10),
-                          Expanded(child: _textField(_district, 'الحي / المديرية', Icons.map_outlined)),
+                          Expanded(
+                            child: _textField(
+                              _district,
+                              'الحي / المديرية',
+                              Icons.map_outlined,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _textField(_neighborhood, 'المنطقة الفرعية', Icons.place_outlined),
+                      _textField(
+                        _neighborhood,
+                        'المنطقة الفرعية',
+                        Icons.place_outlined,
+                      ),
                       const SizedBox(height: 16),
-                      Text('نطاق السعر', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+                      Text(
+                        'نطاق السعر',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: _numberField(_minPrice, 'من', decimal: true)),
+                          Expanded(
+                            child: _numberField(_minPrice, 'من', decimal: true),
+                          ),
                           const SizedBox(width: 10),
-                          Expanded(child: _numberField(_maxPrice, 'إلى', decimal: true)),
+                          Expanded(
+                            child: _numberField(
+                              _maxPrice,
+                              'إلى',
+                              decimal: true,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 14),
-                      Text('المساحة (م²)', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+                      Text(
+                        'المساحة (م²)',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: _numberField(_minArea, 'من', decimal: true)),
+                          Expanded(
+                            child: _numberField(_minArea, 'من', decimal: true),
+                          ),
                           const SizedBox(width: 10),
-                          Expanded(child: _numberField(_maxArea, 'إلى', decimal: true)),
+                          Expanded(
+                            child: _numberField(_maxArea, 'إلى', decimal: true),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 14),
-                      Text('غرف النوم', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+                      Text(
+                        'غرف النوم',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: _numberField(_bedroomsMin, 'الحد الأدنى', decimal: false)),
+                          Expanded(
+                            child: _numberField(
+                              _bedroomsMin,
+                              'الحد الأدنى',
+                              decimal: false,
+                            ),
+                          ),
                           const SizedBox(width: 10),
-                          Expanded(child: _numberField(_bedroomsMax, 'الحد الأعلى', decimal: false)),
+                          Expanded(
+                            child: _numberField(
+                              _bedroomsMax,
+                              'الحد الأعلى',
+                              decimal: false,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 14),
-                      Text('الحمامات', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+                      Text(
+                        'الحمامات',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: _numberField(_bathroomsMin, 'الحد الأدنى', decimal: false)),
+                          Expanded(
+                            child: _numberField(
+                              _bathroomsMin,
+                              'الحد الأدنى',
+                              decimal: false,
+                            ),
+                          ),
                           const SizedBox(width: 10),
-                          Expanded(child: _numberField(_bathroomsMax, 'الحد الأعلى', decimal: false)),
+                          Expanded(
+                            child: _numberField(
+                              _bathroomsMax,
+                              'الحد الأعلى',
+                              decimal: false,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 14),
-                      Text('مواقف السيارات', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+                      Text(
+                        'مواقف السيارات',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Expanded(child: _numberField(_parkingMin, 'الحد الأدنى', decimal: false)),
+                          Expanded(
+                            child: _numberField(
+                              _parkingMin,
+                              'الحد الأدنى',
+                              decimal: false,
+                            ),
+                          ),
                           const SizedBox(width: 10),
-                          Expanded(child: _numberField(_parkingMax, 'الحد الأعلى', decimal: false)),
+                          Expanded(
+                            child: _numberField(
+                              _parkingMax,
+                              'الحد الأعلى',
+                              decimal: false,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 14),
                       _booleanDropdown(
                         label: 'التأثيث',
                         value: _furnished,
-                        onChanged: (value) => setState(() => _furnished = value),
+                        onChanged: (value) =>
+                            setState(() => _furnished = value),
                       ),
                       const SizedBox(height: 10),
                       Row(
@@ -1032,7 +1180,8 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
                             child: _booleanDropdown(
                               label: 'عقار جديد',
                               value: _isNew,
-                              onChanged: (value) => setState(() => _isNew = value),
+                              onChanged: (value) =>
+                                  setState(() => _isNew = value),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -1040,7 +1189,8 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
                             child: _booleanDropdown(
                               label: 'مميز',
                               value: _isFeatured,
-                              onChanged: (value) => setState(() => _isFeatured = value),
+                              onChanged: (value) =>
+                                  setState(() => _isFeatured = value),
                             ),
                           ),
                         ],
@@ -1049,7 +1199,9 @@ class _PropertyFiltersSheetState extends State<_PropertyFiltersSheet> {
                         const SizedBox(height: 12),
                         Text(
                           _validationMessage!,
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
                         ),
                       ],
                     ],

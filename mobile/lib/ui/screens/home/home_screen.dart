@@ -56,7 +56,8 @@ class HomeScreen extends ConsumerWidget {
                   SliverFillRemaining(
                     child: EmptyState(
                       title: 'لا توجد عقارات منشورة بعد',
-                      body: 'ستظهر العقارات المنشورة والمعتمدة هنا تلقائيًا فور نشرها.',
+                      body:
+                          'ستظهر العقارات المنشورة والمعتمدة هنا تلقائيًا فور نشرها.',
                       icon: Icons.villa_outlined,
                     ),
                   ),
@@ -70,14 +71,16 @@ class HomeScreen extends ConsumerWidget {
                           constraints.crossAxisExtent,
                         );
                         return SliverGrid.builder(
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: columns,
-                            mainAxisSpacing: 14,
-                            crossAxisSpacing: 14,
-                            childAspectRatio: Responsive.propertyCardAspectRatio(
-                              constraints.crossAxisExtent / columns,
-                            ),
-                          ),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columns,
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 14,
+                                childAspectRatio:
+                                    Responsive.propertyCardAspectRatio(
+                                      constraints.crossAxisExtent / columns,
+                                    ),
+                              ),
                           itemCount: items.length,
                           itemBuilder: (_, index) => PropertyCard(
                             property: items[index],
@@ -232,9 +235,11 @@ class _HeroSearchCardState extends State<_HeroSearchCard> {
                         textInputAction: TextInputAction.search,
                         onSubmitted: (_) => _submit(),
                         style: const TextStyle(
+                          color: Colors.black,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         ),
+                        cursorColor: Colors.black,
                         decoration: InputDecoration(
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,

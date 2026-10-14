@@ -66,7 +66,22 @@
         .b-red { background: #FEE2E2; color: #991B1B; border-color: #FCA5A5; }
         .b-gray { background: #F3F4F6; color: #374151; border-color: #D1D5DB; }
         .b-blue { background: #E0F2FE; color: #075985; border-color: #7DD3FC; }
-        .footer { position: fixed; bottom: -11mm; left: 0; right: 0; text-align: center; font-size: 8pt; color: #9CA3AF; }
+        .footer {
+            position: fixed;
+            bottom: -10mm;
+            left: 0;
+            right: 0;
+            border-top: 1px solid #D1D5DB;
+            padding-top: 4px;
+            font-size: 8pt;
+            color: #6B7280;
+            direction: rtl;
+        }
+        .footer table { width: 100%; border-collapse: collapse; }
+        .footer td { vertical-align: middle; }
+        .footer-logo { width: 18px; height: 18px; object-fit: contain; vertical-align: middle; }
+        .footer-brand { font-weight: bold; color: #075E4A; }
+        .footer-page { text-align: left; direction: ltr; }
     </style>
 </head>
 <body>
@@ -144,7 +159,20 @@
     </table>
 
     <div class="footer">
-        تم إنشاء هذا التقرير بواسطة منصة {{ $report['site']['name'] }} — صفحة {PAGE_NUM} من {PAGE_COUNT}
+        <table>
+            <tr>
+                <td style="width: 24px;">
+                    @if (! empty($report['site']['logo']))
+                        <img class="footer-logo" src="{!! $report['site']['logo'] !!}" alt="">
+                    @endif
+                </td>
+                <td>
+                    <span class="footer-brand">{{ $report['site']['name'] }}</span>
+                    <span> — {{ $report['heading'] }} — تقرير رسمي صادر من المنصة</span>
+                </td>
+                <td class="footer-page">صفحة {PAGE_NUM} من {PAGE_COUNT}</td>
+            </tr>
+        </table>
     </div>
 
 </body>

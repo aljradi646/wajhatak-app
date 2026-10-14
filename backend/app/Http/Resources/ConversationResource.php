@@ -28,6 +28,7 @@ class ConversationResource extends JsonResource
 
                 return [
                     'id' => $agent->id,
+                    'profile_id' => $agent->agentProfile?->id,
                     'name' => $agent->name,
                     'avatar_url' => $avatarPath ? asset('storage/'.$avatarPath) : null,
                 ];

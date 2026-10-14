@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../brand.dart';
 
 /// الهيدر الموحد لكل التطبيق (RTL):
@@ -31,14 +32,15 @@ class WajhatakHeader extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
     final bool canPop = ModalRoute.of(context)?.canPop ?? false;
     final showBack = automaticallyImplyLeading && canPop;
 
     final overlayStyle = SystemUiOverlayStyle(
-      statusBarColor: theme.scaffoldBackgroundColor,
-      statusBarIconBrightness: theme.brightness == Brightness.dark
-          ? Brightness.light
-          : Brightness.dark,
+      statusBarColor: dark
+          ? WajhatakColors.surfaceDark
+          : WajhatakColors.surfaceHighLight,
+      statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
       statusBarBrightness: theme.brightness,
     );
 
@@ -56,14 +58,15 @@ class WajhatakHeader extends StatelessWidget implements PreferredSizeWidget {
                 // أقصى اليمين: القائمة أو رجوع
                 _HeaderIconButton(
                   icon: showBack
-                      ? Icons.arrow_forward_ios_rounded
+                      ? Icons.arrow_back_rounded
                       : Icons.menu_rounded,
                   onPressed: showBack
                       ? (onBackPressed ??
                             () => Navigator.of(context).maybePop())
                       : onMenuTap,
                   tooltip: showBack ? 'رجوع' : 'القائمة',
-                  tinted: !showBack,
+                  tinted: true,
+                  prominent: showBack,
                 ),
                 const SizedBox(width: 8),
                 // اسم التطبيق / عنوان الشاشة
@@ -146,12 +149,14 @@ class _HeaderIconButton extends StatelessWidget {
     required this.onPressed,
     required this.tooltip,
     this.tinted = true,
+    this.prominent = false,
   });
 
   final IconData icon;
   final VoidCallback? onPressed;
   final String tooltip;
   final bool tinted;
+  final bool prominent;
 
   @override
   Widget build(BuildContext context) {
@@ -171,9 +176,11 @@ class _HeaderIconButton extends StatelessWidget {
             height: 44,
             child: Icon(
               icon,
-              size: tinted ? 22 : 18,
+              size: prominent ? 26 : (tinted ? 22 : 18),
               color: tinted
-                  ? theme.colorScheme.primary
+                  ? (prominent && theme.brightness == Brightness.dark
+                        ? Colors.white
+                        : theme.colorScheme.primary)
                   : theme.colorScheme.onSurface,
             ),
           ),
@@ -279,11 +286,12 @@ class WajhatakScreenHeader extends StatelessWidget
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
     final overlayStyle = SystemUiOverlayStyle(
-      statusBarColor: theme.scaffoldBackgroundColor,
-      statusBarIconBrightness: theme.brightness == Brightness.dark
-          ? Brightness.light
-          : Brightness.dark,
+      statusBarColor: dark
+          ? WajhatakColors.surfaceDark
+          : WajhatakColors.surfaceHighLight,
+      statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
       statusBarBrightness: theme.brightness,
     );
 
@@ -299,16 +307,40 @@ class WajhatakScreenHeader extends StatelessWidget
               textDirection: TextDirection.rtl,
               children: [
                 Material(
-                  color: theme.colorScheme.surfaceContainerHigh,
+                  color: theme.colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    onTap:
-                        onBackPressed ?? () => Navigator.of(context).maybePop(),
-                    borderRadius: BorderRadius.circular(14),
-                    child: const SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Icon(Icons.arrow_forward_ios_rounded, size: 18),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withValues(alpha: .28),
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: .12,
+                          ),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: InkWell(
+                      onTap:
+                          onBackPressed ??
+                          () => Navigator.of(context).maybePop(),
+                      borderRadius: BorderRadius.circular(14),
+                      child: SizedBox(
+                        width: 46,
+                        height: 46,
+                        child: Icon(
+                          Icons.arrow_back_rounded,
+                          size: 26,
+                          color: dark
+                              ? Colors.white
+                              : theme.colorScheme.primary,
+                        ),
+                      ),
                     ),
                   ),
                 ),
