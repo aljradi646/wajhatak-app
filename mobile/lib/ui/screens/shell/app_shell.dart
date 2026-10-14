@@ -109,7 +109,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     unawaited(_handleLaunchNotification());
     final push = ref.read(firebasePushMessagingServiceProvider);
     push.onRoleChanged = () async {
-      if (mounted) await ref.read(sessionProvider.notifier).refreshCurrentUser();
+      if (mounted)
+        await ref.read(sessionProvider.notifier).refreshCurrentUser();
     };
     push.onNotificationOpened = _openFromSystemNotification;
     push.onMessageReceived = _handlePushMessage;
@@ -327,10 +328,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         children: [
           for (final entry in pages.indexed)
             if (entry.$1 == 1)
-              MediaQuery(
-                data: MediaQuery.of(context),
-                child: entry.$2,
-              )
+              MediaQuery(data: MediaQuery.of(context), child: entry.$2)
             else
               RefreshIndicator(
                 onRefresh: () => _refreshTab(entry.$1, isAgent),

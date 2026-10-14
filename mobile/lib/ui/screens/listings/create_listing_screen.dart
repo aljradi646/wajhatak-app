@@ -158,7 +158,6 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     }
   }
 
-
   Future<void> _submit() async {
     if (!(_form.currentState?.validate() ?? false) || _typeId == null) {
       if (_typeId == null) util.notice(context, 'اختر نوع العقار.');
@@ -218,7 +217,8 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     final features = ref.watch(featuresProvider);
     final currencies = ref.watch(currenciesProvider);
     final countries = ref.watch(countriesProvider);
-    final initialCatalogsReady = types.hasValue &&
+    final initialCatalogsReady =
+        types.hasValue &&
         features.hasValue &&
         currencies.hasValue &&
         countries.hasValue;
@@ -235,341 +235,316 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
       ),
       body: !initialCatalogsReady
           ? initialCatalogError
-              ? _CreateListingCatalogError(onRetry: _retryInitialLookups)
-              : const _CreateListingScreenSkeleton()
+                ? _CreateListingCatalogError(onRetry: _retryInitialLookups)
+                : const _CreateListingScreenSkeleton()
           : Form(
-        key: _form,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
-          children: [
-            _FormSection(
-              icon: Icons.info_rounded,
-              tone: AccentTone.emerald,
-              title: 'المعلومات الأساسية',
-              children: [
-                TextFormField(
-                  controller: _title,
-                  decoration: const InputDecoration(
-                    labelText: 'عنوان العقار',
-                    prefixIcon: Icon(Icons.title_rounded),
-                  ),
-                  validator: (value) => (value ?? '').trim().length >= 5
-                      ? null
-                      : 'أدخل عنوانًا واضحًا للعقار.',
-                ),
-                const SizedBox(height: 12),
-                types.when(
-                  data: (data) => DropdownButtonFormField<int>(
-                    initialValue: _typeId,
-                    isExpanded: true,
-                    menuMaxHeight: 340,
-                    decoration: const InputDecoration(
-                      labelText: 'نوع العقار',
-                      prefixIcon: Icon(Icons.category_rounded),
-                    ),
-                    items: [
-                      for (final item in data)
-                        DropdownMenuItem(
-                          value: item.id,
-                          child: Text(item.name),
-                        ),
-                    ],
-                    onChanged: (value) => setState(() => _typeId = value),
-                    validator: (value) =>
-                        value == null ? 'اختر نوع العقار.' : null,
-                  ),
-                  loading: () => const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10),
-                    child: LuxSkeleton(height: 54),
-                  ),
-                  error: (error, _) => ErrorState(
-                    message: 'تعذر تحميل أنواع العقارات.',
-                    onRetry: () => ref.invalidate(propertyTypesProvider),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _TransactionOption(
-                        label: 'للبيع',
-                        icon: Icons.sell_rounded,
-                        color: WajhatakColors.emerald,
-                        selected: _transaction == 'sale',
-                        onTap: () => setState(() => _transaction = 'sale'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _TransactionOption(
-                        label: 'للإيجار',
-                        icon: Icons.key_rounded,
-                        color: WajhatakColors.sky,
-                        selected: _transaction == 'rent',
-                        onTap: () => setState(() => _transaction = 'rent'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _description,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'وصف العقار',
-                    alignLabelWithHint: true,
-                    prefixIcon: Icon(Icons.description_rounded),
-                  ),
-                  validator: (value) => (value ?? '').trim().length >= 15
-                      ? null
-                      : 'اكتب وصفًا لا يقل عن 15 حرفًا.',
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SwitchTile(
-                        label: 'مفروش',
-                        icon: Icons.chair_rounded,
-                        value: _furnished,
-                        onChanged: (v) => setState(() => _furnished = v),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _SwitchTile(
-                        label: 'عقار جديد',
-                        icon: Icons.auto_awesome_rounded,
-                        value: _isNew,
-                        onChanged: (v) => setState(() => _isNew = v),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _FormSection(
-              icon: Icons.payments_rounded,
-              tone: AccentTone.amber,
-              title: 'السعر والمساحة',
-              children: [
-                // [ حقل السعر ] [ قائمة العملة ▼ ]
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    Widget priceField() => TextFormField(
-                      controller: _price,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'السعر',
-                        prefixIcon: Icon(Icons.attach_money_rounded),
-                      ),
-                      validator: (value) =>
-                          double.tryParse((value ?? '').trim()) != null
-                          ? null
-                          : 'أدخل سعرًا صحيحًا.',
-                    );
-
-                    Widget currencyField() => currencies.when(
-                      data: (list) => DropdownButtonFormField<String>(
-                        initialValue: _currency,
-                        isExpanded: true,
-                        menuMaxHeight: 300,
+              key: _form,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+                children: [
+                  _FormSection(
+                    icon: Icons.info_rounded,
+                    tone: AccentTone.emerald,
+                    title: 'المعلومات الأساسية',
+                    children: [
+                      TextFormField(
+                        controller: _title,
                         decoration: const InputDecoration(
-                          labelText: 'العملة',
-                          prefixIcon: Icon(Icons.currency_exchange_rounded),
+                          labelText: 'عنوان العقار',
+                          prefixIcon: Icon(Icons.title_rounded),
                         ),
-                        items: [
-                          for (final currency in list)
-                            DropdownMenuItem(
-                              value: currency.code,
-                              child: Text(
-                                '${currency.flag} ${currency.symbolAr}',
-                                overflow: TextOverflow.ellipsis,
+                        validator: (value) => (value ?? '').trim().length >= 5
+                            ? null
+                            : 'أدخل عنوانًا واضحًا للعقار.',
+                      ),
+                      const SizedBox(height: 12),
+                      types.when(
+                        data: (data) => DropdownButtonFormField<int>(
+                          initialValue: _typeId,
+                          isExpanded: true,
+                          menuMaxHeight: 340,
+                          decoration: const InputDecoration(
+                            labelText: 'نوع العقار',
+                            prefixIcon: Icon(Icons.category_rounded),
+                          ),
+                          items: [
+                            for (final item in data)
+                              DropdownMenuItem(
+                                value: item.id,
+                                child: Text(item.name),
                               ),
-                            ),
-                        ],
-                        onChanged: (value) =>
-                            setState(() => _currency = value ?? 'YER'),
+                          ],
+                          onChanged: (value) => setState(() => _typeId = value),
+                          validator: (value) =>
+                              value == null ? 'اختر نوع العقار.' : null,
+                        ),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: LuxSkeleton(height: 54),
+                        ),
+                        error: (error, _) => ErrorState(
+                          message: 'تعذر تحميل أنواع العقارات.',
+                          onRetry: () => ref.invalidate(propertyTypesProvider),
+                        ),
                       ),
-                      loading: () => const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 10),
-                        child: LuxSkeleton(height: 54),
-                      ),
-                      error: (_error, _stackTrace) => Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          Text(
-                            'تعذر تحميل العملات',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontSize: 12,
+                          Expanded(
+                            child: _TransactionOption(
+                              label: 'للبيع',
+                              icon: Icons.sell_rounded,
+                              color: WajhatakColors.emerald,
+                              selected: _transaction == 'sale',
+                              onTap: () =>
+                                  setState(() => _transaction = 'sale'),
                             ),
                           ),
-                          TextButton(
-                            onPressed: () => ref.invalidate(currenciesProvider),
-                            child: const Text('إعادة المحاولة'),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _TransactionOption(
+                              label: 'للإيجار',
+                              icon: Icons.key_rounded,
+                              color: WajhatakColors.sky,
+                              selected: _transaction == 'rent',
+                              onTap: () =>
+                                  setState(() => _transaction = 'rent'),
+                            ),
                           ),
                         ],
                       ),
-                    );
-
-                    if (constraints.maxWidth < 320) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _description,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          labelText: 'وصف العقار',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.description_rounded),
+                        ),
+                        validator: (value) => (value ?? '').trim().length >= 15
+                            ? null
+                            : 'اكتب وصفًا لا يقل عن 15 حرفًا.',
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          priceField(),
-                          const SizedBox(height: 10),
-                          currencyField(),
+                          Expanded(
+                            child: _SwitchTile(
+                              label: 'مفروش',
+                              icon: Icons.chair_rounded,
+                              value: _furnished,
+                              onChanged: (v) => setState(() => _furnished = v),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _SwitchTile(
+                              label: 'عقار جديد',
+                              icon: Icons.auto_awesome_rounded,
+                              value: _isNew,
+                              onChanged: (v) => setState(() => _isNew = v),
+                            ),
+                          ),
                         ],
-                      );
-                    }
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _FormSection(
+                    icon: Icons.payments_rounded,
+                    tone: AccentTone.amber,
+                    title: 'السعر والمساحة',
+                    children: [
+                      // [ حقل السعر ] [ قائمة العملة ▼ ]
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          Widget priceField() => TextFormField(
+                            controller: _price,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'السعر',
+                              prefixIcon: Icon(Icons.attach_money_rounded),
+                            ),
+                            validator: (value) =>
+                                double.tryParse((value ?? '').trim()) != null
+                                ? null
+                                : 'أدخل سعرًا صحيحًا.',
+                          );
 
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 3, child: priceField()),
-                        const SizedBox(width: 10),
-                        Expanded(flex: 2, child: currencyField()),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final columns = constraints.maxWidth < 320 ? 1 : 2;
-                    final fieldWidth =
-                        (constraints.maxWidth - (columns - 1) * 10) / columns;
-                    return Wrap(
-                      spacing: 10,
-                      runSpacing: 12,
-                      children: [
-                        SizedBox(
-                          width: fieldWidth,
-                          child: TextFormField(
-                            controller: _area,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'المساحة م²',
-                              prefixIcon: Icon(Icons.square_foot_rounded),
+                          Widget currencyField() => currencies.when(
+                            data: (list) => DropdownButtonFormField<String>(
+                              initialValue: _currency,
+                              isExpanded: true,
+                              menuMaxHeight: 300,
+                              decoration: const InputDecoration(
+                                labelText: 'العملة',
+                                prefixIcon: Icon(
+                                  Icons.currency_exchange_rounded,
+                                ),
+                              ),
+                              items: [
+                                for (final currency in list)
+                                  DropdownMenuItem(
+                                    value: currency.code,
+                                    child: Text(
+                                      '${currency.flag} ${currency.symbolAr}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _currency = value ?? 'YER'),
                             ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: fieldWidth,
-                          child: TextFormField(
-                            controller: _bedrooms,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'غرف النوم',
-                              prefixIcon: Icon(Icons.bed_rounded),
+                            loading: () => const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 10),
+                              child: LuxSkeleton(height: 54),
                             ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final columns = constraints.maxWidth < 320 ? 1 : 2;
-                    final fieldWidth =
-                        (constraints.maxWidth - (columns - 1) * 10) / columns;
-                    return Wrap(
-                      spacing: 10,
-                      runSpacing: 12,
-                      children: [
-                        SizedBox(
-                          width: fieldWidth,
-                          child: TextFormField(
-                            controller: _bathrooms,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'الحمامات',
-                              prefixIcon: Icon(Icons.bathtub_rounded),
+                            error: (_error, _stackTrace) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'تعذر تحميل العملات',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      ref.invalidate(currenciesProvider),
+                                  child: const Text('إعادة المحاولة'),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: fieldWidth,
-                          child: TextFormField(
-                            controller: _parkingSpaces,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'المواقف',
-                              prefixIcon: Icon(Icons.directions_car_rounded),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _FormSection(
-              icon: Icons.location_on_rounded,
-              tone: AccentTone.rose,
-              title: 'الموقع',
-              children: [
-                // دولة ← محافظة ← مدينة ← منطقة (قوائم متتالية من الخادم)
-                countries.when(
-                  data: (list) => _CascadeDropdown<LocationItem>(
-                    label: 'الدولة',
-                    icon: Icons.public_rounded,
-                    items: list,
-                    value: _country,
-                    onChanged: (value) {
-                      setState(() {
-                        _country = value;
-                        _region = null;
-                        _city = null;
-                        _areaLocation = null;
-                      });
-                      if (value != null) {
-                        unawaited(
-                          _warmLocationData(
-                            ref.read(regionsProvider(value.id).future),
-                          ),
-                        );
-                      }
-                    },
+                          );
+
+                          if (constraints.maxWidth < 320) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                priceField(),
+                                const SizedBox(height: 10),
+                                currencyField(),
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(flex: 3, child: priceField()),
+                              const SizedBox(width: 10),
+                              Expanded(flex: 2, child: currencyField()),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final columns = constraints.maxWidth < 320 ? 1 : 2;
+                          final fieldWidth =
+                              (constraints.maxWidth - (columns - 1) * 10) /
+                              columns;
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 12,
+                            children: [
+                              SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  controller: _area,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'المساحة م²',
+                                    prefixIcon: Icon(Icons.square_foot_rounded),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  controller: _bedrooms,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'غرف النوم',
+                                    prefixIcon: Icon(Icons.bed_rounded),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final columns = constraints.maxWidth < 320 ? 1 : 2;
+                          final fieldWidth =
+                              (constraints.maxWidth - (columns - 1) * 10) /
+                              columns;
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 12,
+                            children: [
+                              SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  controller: _bathrooms,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'الحمامات',
+                                    prefixIcon: Icon(Icons.bathtub_rounded),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: fieldWidth,
+                                child: TextFormField(
+                                  controller: _parkingSpaces,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'المواقف',
+                                    prefixIcon: Icon(
+                                      Icons.directions_car_rounded,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                  loading: () => const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10),
-                    child: LuxSkeleton(height: 54),
-                  ),
-                  error: (_error, _stackTrace) => ErrorState(
-                    message: 'تعذر تحميل الدول.',
-                    onRetry: () => ref.invalidate(countriesProvider),
-                  ),
-                ),
-                if (_country != null) ...[
-                  const SizedBox(height: 12),
-                  ref
-                      .watch(regionsProvider(_country!.id))
-                      .when(
+                  const SizedBox(height: 16),
+                  _FormSection(
+                    icon: Icons.location_on_rounded,
+                    tone: AccentTone.rose,
+                    title: 'الموقع',
+                    children: [
+                      // دولة ← محافظة ← مدينة ← منطقة (قوائم متتالية من الخادم)
+                      countries.when(
                         data: (list) => _CascadeDropdown<LocationItem>(
-                          label: 'المحافظة / المنطقة',
-                          icon: Icons.map_rounded,
+                          label: 'الدولة',
+                          icon: Icons.public_rounded,
                           items: list,
-                          value: _region,
+                          value: _country,
                           onChanged: (value) {
                             setState(() {
-                              _region = value;
+                              _country = value;
+                              _region = null;
                               _city = null;
                               _areaLocation = null;
                             });
                             if (value != null) {
                               unawaited(
                                 _warmLocationData(
-                                  ref.read(citiesProvider(value.id).future),
+                                  ref.read(regionsProvider(value.id).future),
                                 ),
                               );
                             }
@@ -580,290 +555,334 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                           child: LuxSkeleton(height: 54),
                         ),
                         error: (_error, _stackTrace) => ErrorState(
-                          message: 'تعذر تحميل المحافظات والمناطق.',
-                          onRetry: () =>
-                              ref.invalidate(regionsProvider(_country!.id)),
+                          message: 'تعذر تحميل الدول.',
+                          onRetry: () => ref.invalidate(countriesProvider),
                         ),
                       ),
-                ],
-                if (_region != null) ...[
-                  const SizedBox(height: 12),
-                  ref
-                      .watch(citiesProvider(_region!.id))
-                      .when(
-                        data: (list) => _CascadeDropdown<LocationItem>(
-                          label: 'المدينة',
-                          icon: Icons.location_city_rounded,
-                          items: list,
-                          value: _city,
-                          onChanged: (value) {
-                            setState(() {
-                              _city = value;
-                              _areaLocation = null;
-                            });
-                            if (value != null) {
-                              unawaited(
-                                _warmLocationData(
-                                  ref.read(areasProvider(value.id).future),
+                      if (_country != null) ...[
+                        const SizedBox(height: 12),
+                        ref
+                            .watch(regionsProvider(_country!.id))
+                            .when(
+                              data: (list) => _CascadeDropdown<LocationItem>(
+                                label: 'المحافظة / المنطقة',
+                                icon: Icons.map_rounded,
+                                items: list,
+                                value: _region,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _region = value;
+                                    _city = null;
+                                    _areaLocation = null;
+                                  });
+                                  if (value != null) {
+                                    unawaited(
+                                      _warmLocationData(
+                                        ref.read(
+                                          citiesProvider(value.id).future,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                              loading: () => const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                                child: LuxSkeleton(height: 54),
+                              ),
+                              error: (_error, _stackTrace) => ErrorState(
+                                message: 'تعذر تحميل المحافظات والمناطق.',
+                                onRetry: () => ref.invalidate(
+                                  regionsProvider(_country!.id),
                                 ),
-                              );
-                            }
-                          },
-                        ),
-                        loading: () => const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 10),
-                          child: LuxSkeleton(height: 54),
-                        ),
-                        error: (_error, _stackTrace) => ErrorState(
-                          message: 'تعذر تحميل المدن.',
-                          onRetry: () =>
-                              ref.invalidate(citiesProvider(_region!.id)),
+                              ),
+                            ),
+                      ],
+                      if (_region != null) ...[
+                        const SizedBox(height: 12),
+                        ref
+                            .watch(citiesProvider(_region!.id))
+                            .when(
+                              data: (list) => _CascadeDropdown<LocationItem>(
+                                label: 'المدينة',
+                                icon: Icons.location_city_rounded,
+                                items: list,
+                                value: _city,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _city = value;
+                                    _areaLocation = null;
+                                  });
+                                  if (value != null) {
+                                    unawaited(
+                                      _warmLocationData(
+                                        ref.read(
+                                          areasProvider(value.id).future,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                              loading: () => const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                                child: LuxSkeleton(height: 54),
+                              ),
+                              error: (_error, _stackTrace) => ErrorState(
+                                message: 'تعذر تحميل المدن.',
+                                onRetry: () =>
+                                    ref.invalidate(citiesProvider(_region!.id)),
+                              ),
+                            ),
+                      ],
+                      if (_city != null) ...[
+                        const SizedBox(height: 12),
+                        ref
+                            .watch(areasProvider(_city!.id))
+                            .when(
+                              data: (list) => _CascadeDropdown<LocationItem>(
+                                label: 'الحي / المنطقة الفرعية',
+                                icon: Icons.signpost_rounded,
+                                items: list,
+                                value: _areaLocation,
+                                onChanged: (value) =>
+                                    setState(() => _areaLocation = value),
+                              ),
+                              loading: () => const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                                child: LuxSkeleton(height: 54),
+                              ),
+                              error: (_error, _stackTrace) => ErrorState(
+                                message: 'تعذر تحميل الأحياء.',
+                                onRetry: () =>
+                                    ref.invalidate(areasProvider(_city!.id)),
+                              ),
+                            ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _neighborhood,
+                        decoration: const InputDecoration(
+                          labelText: 'الحي / الشارع (يدوي - اختياري)',
+                          prefixIcon: Icon(Icons.streetview_rounded),
                         ),
                       ),
-                ],
-                if (_city != null) ...[
-                  const SizedBox(height: 12),
-                  ref
-                      .watch(areasProvider(_city!.id))
-                      .when(
-                        data: (list) => _CascadeDropdown<LocationItem>(
-                          label: 'الحي / المنطقة الفرعية',
-                          icon: Icons.signpost_rounded,
-                          items: list,
-                          value: _areaLocation,
-                          onChanged: (value) =>
-                              setState(() => _areaLocation = value),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _address,
+                        decoration: const InputDecoration(
+                          labelText: 'العنوان التفصيلي',
+                          prefixIcon: Icon(Icons.home_rounded),
                         ),
-                        loading: () => const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 10),
-                          child: LuxSkeleton(height: 54),
-                        ),
-                        error: (_error, _stackTrace) => ErrorState(
-                          message: 'تعذر تحميل الأحياء.',
-                          onRetry: () =>
-                              ref.invalidate(areasProvider(_city!.id)),
-                        ),
+                        validator: (value) => (value ?? '').trim().isNotEmpty
+                            ? null
+                            : 'أدخل العنوان.',
                       ),
-                ],
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _neighborhood,
-                  decoration: const InputDecoration(
-                    labelText: 'الحي / الشارع (يدوي - اختياري)',
-                    prefixIcon: Icon(Icons.streetview_rounded),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _address,
-                  decoration: const InputDecoration(
-                    labelText: 'العنوان التفصيلي',
-                    prefixIcon: Icon(Icons.home_rounded),
-                  ),
-                  validator: (value) =>
-                      (value ?? '').trim().isNotEmpty ? null : 'أدخل العنوان.',
-                ),
-                const SizedBox(height: 12),
-                // بطاقة تحديد الموقع الحقيقي على الخريطة.
-                Container(
-                  decoration: BoxDecoration(
-                    color: _pinLatitude != null
-                        ? WajhatakColors.emerald.withValues(alpha: .08)
-                        : Theme.of(context).colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _pinLatitude != null
-                          ? WajhatakColors.emerald
-                          : Theme.of(context).colorScheme.outline,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: Icon(
-                      _pinLatitude != null
-                          ? Icons.location_on_rounded
-                          : Icons.add_location_alt_rounded,
-                      color: _pinLatitude != null
-                          ? WajhatakColors.emerald
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      _pinLatitude != null
-                          ? 'تم تحديد الموقع على الخريطة ✓'
-                          : 'حدد موقع العقار على الخريطة',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: _pinLatitude != null
-                        ? Text(
-                            '(${_pinLatitude!.toStringAsFixed(5)}, ${_pinLongitude!.toStringAsFixed(5)})',
-                            textDirection: TextDirection.ltr,
-                            style: const TextStyle(fontSize: 11),
-                          )
-                        : const Text(
-                            'موقع دقيق يظهر للباحثين على خريطة العقارات',
-                            style: TextStyle(fontSize: 11),
-                          ),
-                    trailing: const Icon(Icons.chevron_left_rounded),
-                    onTap: _pickOnMap,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _FormSection(
-              icon: Icons.star_rounded,
-              tone: AccentTone.violet,
-              title: 'المزايا',
-              children: [
-                features.when(
-                  data: (data) => Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final item in data)
-                        FilterChip(
-                          label: Text(item.name),
-                          selected: _featureIds.contains(item.id),
-                          showCheckmark: true,
-                          onSelected: (selected) => setState(
-                            () => selected
-                                ? _featureIds.add(item.id)
-                                : _featureIds.remove(item.id),
+                      const SizedBox(height: 12),
+                      // بطاقة تحديد الموقع الحقيقي على الخريطة.
+                      Container(
+                        decoration: BoxDecoration(
+                          color: _pinLatitude != null
+                              ? WajhatakColors.emerald.withValues(alpha: .08)
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _pinLatitude != null
+                                ? WajhatakColors.emerald
+                                : Theme.of(context).colorScheme.outline,
                           ),
                         ),
+                        child: ListTile(
+                          leading: Icon(
+                            _pinLatitude != null
+                                ? Icons.location_on_rounded
+                                : Icons.add_location_alt_rounded,
+                            color: _pinLatitude != null
+                                ? WajhatakColors.emerald
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                          ),
+                          title: Text(
+                            _pinLatitude != null
+                                ? 'تم تحديد الموقع على الخريطة ✓'
+                                : 'حدد موقع العقار على الخريطة',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: _pinLatitude != null
+                              ? Text(
+                                  '(${_pinLatitude!.toStringAsFixed(5)}, ${_pinLongitude!.toStringAsFixed(5)})',
+                                  textDirection: TextDirection.ltr,
+                                  style: const TextStyle(fontSize: 11),
+                                )
+                              : const Text(
+                                  'موقع دقيق يظهر للباحثين على خريطة العقارات',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                          trailing: const Icon(Icons.chevron_left_rounded),
+                          onTap: _pickOnMap,
+                        ),
+                      ),
                     ],
                   ),
-                  loading: () => const Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  const SizedBox(height: 16),
+                  _FormSection(
+                    icon: Icons.star_rounded,
+                    tone: AccentTone.violet,
+                    title: 'المزايا',
                     children: [
-                      LuxSkeleton(width: 84, height: 34, radius: 18),
-                      LuxSkeleton(width: 66, height: 34, radius: 18),
-                      LuxSkeleton(width: 92, height: 34, radius: 18),
+                      features.when(
+                        data: (data) => Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final item in data)
+                              FilterChip(
+                                label: Text(item.name),
+                                selected: _featureIds.contains(item.id),
+                                showCheckmark: true,
+                                onSelected: (selected) => setState(
+                                  () => selected
+                                      ? _featureIds.add(item.id)
+                                      : _featureIds.remove(item.id),
+                                ),
+                              ),
+                          ],
+                        ),
+                        loading: () => const Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            LuxSkeleton(width: 84, height: 34, radius: 18),
+                            LuxSkeleton(width: 66, height: 34, radius: 18),
+                            LuxSkeleton(width: 92, height: 34, radius: 18),
+                          ],
+                        ),
+                        error: (error, stackTrace) => ErrorState(
+                          message: 'تعذر تحميل مزايا العقارات.',
+                          onRetry: () => ref.invalidate(featuresProvider),
+                        ),
+                      ),
                     ],
                   ),
-                  error: (error, stackTrace) => ErrorState(
-                    message: 'تعذر تحميل مزايا العقارات.',
-                    onRetry: () => ref.invalidate(featuresProvider),
+                  const SizedBox(height: 16),
+                  _FormSection(
+                    icon: Icons.photo_library_rounded,
+                    tone: AccentTone.sky,
+                    title: 'صور العقار (حد أقصى 12)',
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _images.length >= 12 ? null : _pickImages,
+                        icon: const Icon(Icons.add_photo_alternate_rounded),
+                        label: Text(
+                          _images.isEmpty
+                              ? 'اختيار صور من الجهاز'
+                              : 'إضافة المزيد (${_images.length}/12)',
+                        ),
+                      ),
+                      if (_images.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 110,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _images.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(width: 8),
+                            itemBuilder: (context, index) => Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Image.file(
+                                    _images[index],
+                                    width: 120,
+                                    height: 110,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                if (index == 0)
+                                  Positioned(
+                                    top: 6,
+                                    right: 6,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: WajhatakColors.emerald,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'غلاف',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                Positioned(
+                                  top: 4,
+                                  left: 4,
+                                  child: Material(
+                                    color: Colors.black.withValues(alpha: .55),
+                                    borderRadius: BorderRadius.circular(99),
+                                    child: InkWell(
+                                      onTap: () => _removeImage(index),
+                                      borderRadius: BorderRadius.circular(99),
+                                      child: const SizedBox(
+                                        width: 26,
+                                        height: 26,
+                                        child: Icon(
+                                          Icons.close_rounded,
+                                          size: 15,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _FormSection(
-              icon: Icons.photo_library_rounded,
-              tone: AccentTone.sky,
-              title: 'صور العقار (حد أقصى 12)',
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _images.length >= 12 ? null : _pickImages,
-                  icon: const Icon(Icons.add_photo_alternate_rounded),
-                  label: Text(
-                    _images.isEmpty
-                        ? 'اختيار صور من الجهاز'
-                        : 'إضافة المزيد (${_images.length}/12)',
-                  ),
-                ),
-                if (_images.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 26),
                   SizedBox(
-                    height: 110,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _images.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(width: 8),
-                      itemBuilder: (context, index) => Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Image.file(
-                              _images[index],
-                              width: 120,
-                              height: 110,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          if (index == 0)
-                            Positioned(
-                              top: 6,
-                              right: 6,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: WajhatakColors.emerald,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'غلاف',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _submitting ? null : _submit,
+                      icon: _submitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
                               ),
-                            ),
-                          Positioned(
-                            top: 4,
-                            left: 4,
-                            child: Material(
-                              color: Colors.black.withValues(alpha: .55),
-                              borderRadius: BorderRadius.circular(99),
-                              child: InkWell(
-                                onTap: () => _removeImage(index),
-                                borderRadius: BorderRadius.circular(99),
-                                child: const SizedBox(
-                                  width: 26,
-                                  height: 26,
-                                  child: Icon(
-                                    Icons.close_rounded,
-                                    size: 15,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                            )
+                          : const Icon(Icons.send_rounded, size: 20),
+                      label: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        child: Text(
+                          _submitting ? 'جارٍ الإرسال…' : 'إرسال للمراجعة',
+                          style: const TextStyle(fontSize: 15.5),
+                        ),
                       ),
                     ),
                   ),
                 ],
-              ],
-            ),
-            const SizedBox(height: 26),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _submitting ? null : _submit,
-                icon: _submitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.send_rounded, size: 20),
-                label: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  child: Text(
-                    _submitting ? 'جارٍ الإرسال…' : 'إرسال للمراجعة',
-                    style: const TextStyle(fontSize: 15.5),
-                  ),
-                ),
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -921,10 +940,7 @@ class _CreateListingScreenSkeleton extends StatelessWidget {
   Widget _field({double? width, double height = 52}) =>
       LuxSkeleton(width: width, height: height, radius: 12);
 
-  Widget _section({
-    required double titleWidth,
-    required List<Widget> fields,
-  }) {
+  Widget _section({required double titleWidth, required List<Widget> fields}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1000,14 +1016,7 @@ class _CreateListingScreenSkeleton extends StatelessWidget {
         const SizedBox(height: 16),
         _section(
           titleWidth: 82,
-          fields: [
-            _field(),
-            _field(),
-            _field(),
-            _field(),
-            _field(),
-            _field(),
-          ],
+          fields: [_field(), _field(), _field(), _field(), _field(), _field()],
         ),
         const SizedBox(height: 16),
         _section(
@@ -1030,10 +1039,7 @@ class _CreateListingScreenSkeleton extends StatelessWidget {
         const SizedBox(height: 16),
         _section(
           titleWidth: 92,
-          fields: [
-            _field(height: 92),
-            _field(height: 56),
-          ],
+          fields: [_field(height: 92), _field(height: 56)],
         ),
         const SizedBox(height: 18),
         _field(height: 54),

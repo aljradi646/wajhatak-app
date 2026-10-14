@@ -34,65 +34,65 @@ class SavedScreen extends ConsumerWidget {
     final items = ref.watch(favoritesProvider);
     final standalone = ModalRoute.of(context)?.canPop ?? false;
     final content = CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          const SliverPadding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
-            sliver: SliverToBoxAdapter(child: _SavedHeader()),
-          ),
-          SliverAsyncView<List<LuxProperty>>(
-            value: items,
-            errorRetry: () => ref.invalidate(favoritesProvider),
-            data: (data) => data.isEmpty
-                ? const [
-                    SliverFillRemaining(
-                      child: EmptyState(
-                        title: 'لا توجد مفضلات بعد',
-                        body: 'اضغط على القلب في أي عقار يعجبك وسيظهر هنا.',
-                        icon: Icons.favorite_border_rounded,
-                      ),
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        const SliverPadding(
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
+          sliver: SliverToBoxAdapter(child: _SavedHeader()),
+        ),
+        SliverAsyncView<List<LuxProperty>>(
+          value: items,
+          errorRetry: () => ref.invalidate(favoritesProvider),
+          data: (data) => data.isEmpty
+              ? const [
+                  SliverFillRemaining(
+                    child: EmptyState(
+                      title: 'لا توجد مفضلات بعد',
+                      body: 'اضغط على القلب في أي عقار يعجبك وسيظهر هنا.',
+                      icon: Icons.favorite_border_rounded,
                     ),
-                  ]
-                : [
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                      sliver: SliverLayoutBuilder(
-                        builder: (context, constraints) {
-                          final columns = Responsive.propertyGridColumns(
-                            constraints.crossAxisExtent,
-                          );
-                          return SliverGrid.builder(
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: columns,
-                                  mainAxisSpacing: 14,
-                                  crossAxisSpacing: 14,
-                                  childAspectRatio:
-                                      Responsive.propertyCardAspectRatio(
-                                        constraints.crossAxisExtent / columns,
-                                      ),
-                                ),
-                            itemCount: data.length,
-                            itemBuilder: (_, index) => PropertyCard(
-                              property: data[index],
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => PropertyDetailScreen(
-                                    propertyId: data[index].id,
-                                  ),
+                  ),
+                ]
+              : [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                    sliver: SliverLayoutBuilder(
+                      builder: (context, constraints) {
+                        final columns = Responsive.propertyGridColumns(
+                          constraints.crossAxisExtent,
+                        );
+                        return SliverGrid.builder(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columns,
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 14,
+                                childAspectRatio:
+                                    Responsive.propertyCardAspectRatio(
+                                      constraints.crossAxisExtent / columns,
+                                    ),
+                              ),
+                          itemCount: data.length,
+                          itemBuilder: (_, index) => PropertyCard(
+                            property: data[index],
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PropertyDetailScreen(
+                                  propertyId: data[index].id,
                                 ),
                               ),
-                              onFavorite: () =>
-                                  toggleFavorite(context, ref, data[index]),
                             ),
-                          );
-                        },
-                      ),
+                            onFavorite: () =>
+                                toggleFavorite(context, ref, data[index]),
+                          ),
+                        );
+                      },
                     ),
-                  ],
-          ),
-        ],
-      );
+                  ),
+                ],
+        ),
+      ],
+    );
     return Scaffold(
       appBar: standalone ? WajhatakScreenHeader(title: 'مفضلاتك') : null,
       body: standalone

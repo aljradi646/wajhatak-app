@@ -424,8 +424,8 @@ class PropertyCatalogRevisionController extends Notifier<int> {
 
 final propertyCatalogRevisionProvider =
     NotifierProvider<PropertyCatalogRevisionController, int>(
-  PropertyCatalogRevisionController.new,
-);
+      PropertyCatalogRevisionController.new,
+    );
 
 // ---------------------------------------------------------------------------
 // العقارات

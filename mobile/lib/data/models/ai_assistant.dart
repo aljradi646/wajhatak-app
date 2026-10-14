@@ -236,12 +236,14 @@ class AiConversationItem {
       id: json['id'] as int,
       title: json['title'] as String? ?? 'محادثة جديدة',
       isPinned: json['is_pinned'] as bool? ?? false,
-      lastMessageAt: DateTime.parse(json['last_message_at'] as String? ?? DateTime.now().toIso8601String()),
-      messageCount: json['messages_count'] as int? ?? json['message_count'] as int? ?? 0,
+      lastMessageAt: DateTime.parse(
+        json['last_message_at'] as String? ?? DateTime.now().toIso8601String(),
+      ),
+      messageCount:
+          json['messages_count'] as int? ?? json['message_count'] as int? ?? 0,
     );
   }
 }
-
 
 @immutable
 class AiStreamEvent {
@@ -268,8 +270,8 @@ class AiStreamEvent {
     data: json['data'] is Map<String, dynamic>
         ? json['data'] as Map<String, dynamic>
         : json['result'] is Map<String, dynamic>
-            ? json['result'] as Map<String, dynamic>
-            : null,
+        ? json['result'] as Map<String, dynamic>
+        : null,
     message: json['message']?.toString(),
     statusCode: (json['status_code'] as num?)?.toInt(),
   );
