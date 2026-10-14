@@ -34,8 +34,8 @@ final class AdminAgentRoleSyncTest extends TestCase
         $hiddenClient->assignRole('user');
         Agent::query()->create([
             'user_id' => $hiddenClient->id,
-            'is_active' => false,
-            'verification_status' => 'pending',
+            'is_active' => true,
+            'verification_status' => 'approved',
         ]);
 
         $this->actingAs($admin)->patch('/admin/users/'.$client->id, [
@@ -56,9 +56,19 @@ final class AdminAgentRoleSyncTest extends TestCase
             'verification_status' => 'pending',
         ]);
 
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $client->id,
+            'type' => 'user_role_changed',
+        ]);
+
         $this->actingAs($admin)->get('/admin/agents')
             ->assertOk()
             ->assertSee('Role Change Test User')
             ->assertDontSee('User Only Must Stay Hidden');
+
+        $this->getJson('/api/v1/agents')
+            ->assertOk()
+            ->assertJsonMissing(['name' => 'User Only Must Stay Hidden']);
     }
 }

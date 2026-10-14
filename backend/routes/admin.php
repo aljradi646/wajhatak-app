@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\MailSettingsController;
 use App\Http\Controllers\Admin\PropertyController;
+use App\Http\Controllers\Admin\PublicContactSubmissionController;
 use App\Http\Controllers\Admin\PropertyFeatureController;
 use App\Http\Controllers\Admin\PropertyTypeController;
 use App\Http\Controllers\Admin\ReportController;
@@ -27,7 +28,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::resource('users', UserController::class);
 
     Route::get('support-tickets', [SupportTicketController::class, 'index'])->name('support-tickets.index');
+    Route::get('contact-submissions', [PublicContactSubmissionController::class, 'index'])->name('contact-submissions.index');
+    Route::get('contact-submissions/{submission}', [PublicContactSubmissionController::class, 'show'])->whereNumber('submission')->name('contact-submissions.show');
+    Route::post('contact-submissions/{submission}/reply', [PublicContactSubmissionController::class, 'reply'])->whereNumber('submission')->name('contact-submissions.reply');
+    Route::patch('contact-submissions/{submission}/status', [PublicContactSubmissionController::class, 'updateStatus'])->whereNumber('submission')->name('contact-submissions.status');
     Route::get('support-tickets/{ticket}', [SupportTicketController::class, 'show'])->whereNumber('ticket')->name('support-tickets.show');
+    Route::get('support-tickets/{ticket}/attachments/{attachment}', [SupportTicketController::class, 'downloadAttachment'])->whereNumber('ticket')->whereNumber('attachment')->name('support-tickets.attachments.download');
     Route::post('support-tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->whereNumber('ticket')->name('support-tickets.reply');
     Route::patch('support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus'])->whereNumber('ticket')->name('support-tickets.status');
 

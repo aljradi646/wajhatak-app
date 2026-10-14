@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicSitePageController;
+use App\Http\Controllers\PublicContactSubmissionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -29,6 +30,7 @@ Route::get('/storage/{path}', function (string $path) {
 
 Route::get('/pages', [PublicSitePageController::class, 'index'])->name('public.pages.index');
 Route::get('/pages/{slug}', [PublicSitePageController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('public.pages.show');
+Route::post('/contact', [PublicContactSubmissionController::class, 'store'])->middleware('throttle:5,10')->name('public.contact.store');
 Route::get('/privacy', fn () => redirect()->route('public.pages.show', 'privacy'))->name('public.privacy');
 Route::get('/terms', fn () => redirect()->route('public.pages.show', 'terms'))->name('public.terms');
 Route::get('/about', fn () => redirect()->route('public.pages.show', 'about'))->name('public.about');

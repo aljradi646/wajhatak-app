@@ -8,4 +8,5 @@ class SupportTicket extends Model {
     protected function casts(): array { return ['last_reply_at'=>'datetime','closed_at'=>'datetime']; }
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function messages(): HasMany { return $this->hasMany(SupportTicketMessage::class)->orderBy('created_at')->orderBy('id'); }
+    public function attachments(): HasMany { return $this->hasMany(SupportTicketAttachment::class)->latest('created_at'); }
 }

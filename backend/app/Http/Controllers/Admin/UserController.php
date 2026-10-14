@@ -6,8 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Agent;
 use App\Models\User;
+use App\Services\Notifications\FirebasePushNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Throwable;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 
@@ -58,6 +62,7 @@ class UserController extends Controller
             'avatar_path' => ['nullable', 'string', 'max:500'],
             'is_active' => ['sometimes', 'boolean'],
             'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', Rule::exists('roles', 'name')],
         ]);
 
         $user = User::create([
@@ -111,6 +116,7 @@ class UserController extends Controller
             'avatar_path' => ['nullable', 'string', 'max:500'],
             'is_active' => ['sometimes', 'boolean'],
             'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', Rule::exists('roles', 'name')],
         ]);
 
         $wantsInactive = ! $request->boolean('is_active');
@@ -136,34 +142,62 @@ class UserController extends Controller
             }
         }
 
-        $user->fill([
-            'name' => $data['name'],
-            'email' => strtolower($data['email']),
-            'phone' => $data['phone'] ?? null,
-            'locale' => $data['locale'] ?? 'ar',
-            'avatar_path' => $data['avatar_path'] ?? null,
-            'is_active' => $request->boolean('is_active'),
-        ]);
-        if (! empty($data['password'])) {
-            $user->password = Hash::make($data['password']);
-        }
-        $user->save();
+        $previousRoles = $user->getRoleNames()->sort()->values()->all();
+        $rolesWereSubmitted = array_key_exists('roles', $data);
 
-        if (array_key_exists('roles', $data)) {
-            $user->syncRoles($data['roles'] ?? []);
+        DB::transaction(function () use ($request, $data, $user): void {
+            $user->fill([
+                'name' => $data['name'],
+                'email' => strtolower($data['email']),
+                'phone' => $data['phone'] ?? null,
+                'locale' => $data['locale'] ?? 'ar',
+                'avatar_path' => $data['avatar_path'] ?? null,
+                'is_active' => $request->boolean('is_active'),
+            ]);
+            if (! empty($data['password'])) {
+                $user->password = Hash::make($data['password']);
+            }
+            $user->save();
 
-            // Create the domain profile whenever the agent role is granted.
-            // Keep it when the role is removed so re-granting the role restores
-            // the same identity; agent listing is filtered by the current role.
-            if ($user->hasRole('agent')) {
-                Agent::query()->firstOrCreate(
-                    ['user_id' => $user->id],
-                    ['is_active' => false, 'verification_status' => 'pending']
-                );
+            if (array_key_exists('roles', $data)) {
+                $user->syncRoles($data['roles'] ?? []);
+
+                // Keep the agent profile when a role is removed; re-granting the
+                // role restores the same identity without touching user-owned data.
+                if ($user->hasRole('agent')) {
+                    Agent::query()->firstOrCreate(
+                        ['user_id' => $user->id],
+                        ['is_active' => false, 'verification_status' => 'pending']
+                    );
+                }
+            }
+
+            ActivityLog::record('user', "تم تحديث المستخدم «{$user->name}»", $user);
+        });
+
+        if ($rolesWereSubmitted) {
+            $user->refresh()->load('roles');
+            $currentRoles = $user->getRoleNames()->sort()->values()->all();
+
+            if ($previousRoles !== $currentRoles) {
+                $notification = $user->notifications()->create([
+                    'id' => (string) Str::uuid(),
+                    'type' => 'user_role_changed',
+                    'data' => [
+                        'kind' => 'user_role_changed',
+                        'title' => 'تم تحديث صلاحيات حسابك',
+                        'message' => 'تم تحديث صلاحيات حسابك، وستتحدث واجهة التطبيق تلقائيًا.',
+                    ],
+                ]);
+
+                try {
+                    app(FirebasePushNotificationService::class)->sendDatabaseNotification($user, $notification);
+                } catch (Throwable $exception) {
+                    // Role changes are already persisted; push is best-effort.
+                    report($exception);
+                }
             }
         }
-
-        ActivityLog::record('user', "تم تحديث المستخدم «{$user->name}»", $user);
 
         return redirect()->route('admin.users.index')->with('status', 'تم تحديث المستخدم بنجاح.');
     }

@@ -27,6 +27,7 @@ class FirebasePushMessagingService {
   bool _launchMessageHandled = false;
 
   Future<void> Function(String? notificationId)? onNotificationOpened;
+  Future<void> Function()? onRoleChanged;
 
   bool get _isSupported =>
       !kIsWeb &&
@@ -141,6 +142,10 @@ class FirebasePushMessagingService {
   }
 
   Future<void> _showForegroundMessage(RemoteMessage message) async {
+    if (message.data['kind']?.toString() == 'user_role_changed') {
+      await onRoleChanged?.call();
+      return;
+    }
     final id = message.data['notification_id']?.toString();
     if (id == null || id.isEmpty) return;
 
@@ -158,6 +163,9 @@ class FirebasePushMessagingService {
   }
 
   Future<void> _openFromRemoteMessage(RemoteMessage message) async {
+    if (message.data['kind']?.toString() == 'user_role_changed') {
+      await onRoleChanged?.call();
+    }
     final id = message.data['notification_id']?.toString();
     if (id == null || id.isEmpty) return;
     await onNotificationOpened?.call(id);

@@ -7,6 +7,9 @@
     $pendingPropertiesCount = \App\Models\Property::query()->where('status', 'pending')->count();
     $pendingAgentsCount = \App\Models\Agent::query()->where('verification_status', 'pending')->count();
     $openSupportTicketsCount = \App\Models\SupportTicket::query()->whereIn('status', ['open', 'in_progress', 'waiting_user'])->count();
+    $newContactSubmissionsCount = \Illuminate\Support\Facades\Schema::hasTable('public_contact_submissions')
+        ? \App\Models\PublicContactSubmission::query()->where('status', 'new')->count()
+        : 0;
     $uiPreferences = auth()->check() && is_array(auth()->user()->ui_preferences) ? auth()->user()->ui_preferences : [];
     $serverTheme = in_array($uiPreferences['theme'] ?? null, ['light', 'dark', 'system'], true) ? $uiPreferences['theme'] : null;
     $cookieTheme = request()->cookie('lux_theme');
@@ -123,6 +126,11 @@
                         <x-admin.nav-link href="{{ route('admin.support-tickets.index') }}" :active="request()->routeIs('admin.support-tickets.*')" :badge="$openSupportTicketsCount">
                             <x-slot name="icon"><x-admin.icon name="messages" /></x-slot>
                             البلاغات والدعم
+                        </x-admin.nav-link>
+
+                        <x-admin.nav-link href="{{ route('admin.contact-submissions.index') }}" :active="request()->routeIs('admin.contact-submissions.*')" :badge="$newContactSubmissionsCount">
+                            <x-slot name="icon"><x-admin.icon name="messages" /></x-slot>
+                            رسائل الموقع العام
                         </x-admin.nav-link>
 
                         <x-admin.nav-link href="{{ route('admin.activity-logs.index') }}" :active="request()->routeIs('admin.activity-logs.*')">
