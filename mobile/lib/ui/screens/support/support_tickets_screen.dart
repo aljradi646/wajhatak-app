@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cross_file/cross_file.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/icon_badges.dart';
 import '../../../data/api_client.dart';
 import '../../../data/models/models.dart';
@@ -48,13 +51,37 @@ class CreateSupportTicketScreen extends ConsumerStatefulWidget {
 }
 class _CreateSupportTicketScreenState extends ConsumerState<CreateSupportTicketScreen> {
   final _form=GlobalKey<FormState>();final _subject=TextEditingController();final _message=TextEditingController();
-  String _category='technical';bool _sending=false;
+  String _category='technical';bool _sending=false;final List<XFile> _attachments=[];
   @override void dispose(){_subject.dispose();_message.dispose();super.dispose();}
+  Future<void> _pickImages() async {
+    if (_sending) return;
+    try {
+      final picked = await ImagePicker().pickMultiImage(
+        imageQuality: 85,
+        maxWidth: 1800,
+      );
+      if (!mounted || picked.isEmpty) return;
+      final remaining = 5 - _attachments.length;
+      setState(() => _attachments.addAll(picked.take(remaining)));
+      if (picked.length > remaining && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('يمكن إرفاق خمس صور كحد أقصى.')),
+        );
+      }
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر اختيار الصور. حاول مرة أخرى.')),
+        );
+      }
+    }
+  }
+
   Future<void> _submit()async{
     if(!(_form.currentState?.validate()??false)||_sending)return;
     setState(()=>_sending=true);
     try{
-      final ticket=await ref.read(supportTicketRepositoryProvider).create(subject:_subject.text,category:_category,message:_message.text);
+      final ticket=await ref.read(supportTicketRepositoryProvider).create(subject:_subject.text,category:_category,message:_message.text,attachments:_attachments);
       ref.invalidate(supportTicketsProvider);if(!mounted)return;
       Navigator.of(context).pop(true);
       Navigator.of(context).push(MaterialPageRoute(builder:(_)=>SupportTicketDetailScreen(ticketId:ticket.id)));
@@ -78,6 +105,27 @@ class _CreateSupportTicketScreenState extends ConsumerState<CreateSupportTicketS
       ],onChanged:(v){if(v!=null)setState(()=>_category=v);}),
       const SizedBox(height:14),
       TextFormField(controller:_message,decoration:const InputDecoration(labelText:'تفاصيل المشكلة',hintText:'اشرح ما حدث وما الذي كنت تحاول فعله...',alignLabelWithHint:true),minLines:6,maxLines:12,maxLength:10000,validator:(v)=>(v??'').trim().length<10?'أضف تفاصيل أكثر (10 أحرف على الأقل).':null),
+      const SizedBox(height:14),
+      OutlinedButton.icon(
+        onPressed: _sending || _attachments.length >= 5 ? null : _pickImages,
+        icon: const Icon(Icons.attach_file_rounded),
+        label: Text('إرفاق صور (' + _attachments.length.toString() + '/5)'),
+      ),
+      if (_attachments.isNotEmpty) ...[
+        const SizedBox(height:8),
+        Wrap(
+          spacing:8,
+          runSpacing:8,
+          children: _attachments.asMap().entries.map((entry) => InputChip(
+            avatar: const Icon(Icons.image_outlined, size:18),
+            label: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth:180),
+              child: Text(entry.value.name, overflow: TextOverflow.ellipsis),
+            ),
+            onDeleted: _sending ? null : () => setState(() => _attachments.removeAt(entry.key)),
+          )).toList(),
+        ),
+      ],
       const SizedBox(height:10),
       Container(padding:const EdgeInsets.all(13),decoration:BoxDecoration(color:Theme.of(context).colorScheme.secondaryContainer.withValues(alpha:.45),borderRadius:BorderRadius.circular(14)),child:const Text('لا تكتب كلمة المرور أو رمز التحقق أو معلومات دفع حساسة في البلاغ.',style:TextStyle(height:1.5))),
       const SizedBox(height:22),FilledButton.icon(onPressed:_sending?null:_submit,icon:_sending?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.send_rounded),label:Padding(padding:const EdgeInsets.symmetric(vertical:13),child:Text(_sending?'جارٍ إرسال البلاغ…':'إرسال البلاغ'))),
@@ -94,6 +142,19 @@ class _SupportTicketDetailScreenState extends ConsumerState<SupportTicketDetailS
   final _reply=TextEditingController();late Future<SupportTicket> _ticketFuture;bool _sending=false;
   @override void initState(){super.initState();_ticketFuture=ref.read(supportTicketRepositoryProvider).show(widget.ticketId);}
   @override void dispose(){_reply.dispose();super.dispose();}
+  Future<void> _openAttachment(SupportTicket ticket, SupportTicketAttachment attachment) async {
+    try {
+      final bytes = await ref.read(supportTicketRepositoryProvider).attachmentBytes(ticket.id, attachment.id);
+      await Share.shareXFiles([
+        XFile.fromData(bytes, name: attachment.originalName, mimeType: attachment.mimeType),
+      ], text: 'مرفق البلاغ ${ticket.reference}');
+    } on ApiFailure catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } on Object {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر فتح المرفق. حاول مرة أخرى.')));
+    }
+  }
+
   Future<void> _sendReply()async{
     final text=_reply.text.trim();if(text.length<2||_sending)return;setState(()=>_sending=true);
     try{final ticket=await ref.read(supportTicketRepositoryProvider).reply(widget.ticketId,text);_reply.clear();ref.invalidate(supportTicketsProvider);if(mounted)setState(()=>_ticketFuture=Future.value(ticket));}
@@ -110,6 +171,26 @@ class _SupportTicketDetailScreenState extends ConsumerState<SupportTicketDetailS
         Container(width:double.infinity,padding:const EdgeInsets.all(16),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surface,border:Border(bottom:BorderSide(color:Theme.of(context).colorScheme.outlineVariant))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text(ticket.subject,style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w900)),const SizedBox(height:4),Text(ticket.reference+' · '+ticket.statusLabel,style:TextStyle(color:Theme.of(context).colorScheme.primary,fontWeight:FontWeight.w800)),
         ])),
+        if (ticket.attachments.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal:12, vertical:8),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: ticket.attachments.map((attachment) => ActionChip(
+                avatar: Icon(attachment.mimeType.startsWith('image/') ? Icons.image_rounded : Icons.attach_file_rounded, size:18),
+                label: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth:180),
+                  child: Text(attachment.originalName, overflow: TextOverflow.ellipsis),
+                ),
+                onPressed: () => _openAttachment(ticket, attachment),
+              )).toList(),
+            ),
+          ),
         Expanded(child:ListView.builder(padding:const EdgeInsets.all(16),itemCount:ticket.messages.length,itemBuilder:(context,index){
           final m=ticket.messages[index];final admin=m.senderRole=='admin';
           return Align(alignment:admin?AlignmentDirectional.centerStart:AlignmentDirectional.centerEnd,child:Container(

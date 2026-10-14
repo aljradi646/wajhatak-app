@@ -14,7 +14,7 @@ final class PublicSitePageTest extends TestCase
     {
         $this->get('/pages')
             ->assertOk()
-            ->assertSee('السياسات، الإرشادات والدعم')
+            ->assertSee('كيف يمكننا')
             ->assertSee('/pages/privacy')
             ->assertSee('/pages/terms')
             ->assertDontSee('/admin/pages');

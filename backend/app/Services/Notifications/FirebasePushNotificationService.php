@@ -71,7 +71,7 @@ class FirebasePushNotificationService
                                 'token' => $device->push_token,
                                 'notification' => [
                                     'title' => trim((string) ($data['title'] ?? 'تحديث من وجهتك')),
-                                    'body' => trim((string) ($data['message'] ?? 'لديك إشعار جديد في وجهتك.')),
+                                    'body' => mb_substr(trim((string) ($data['message'] ?? 'لديك إشعار جديد في وجهتك.')), 0, 240),
                                 ],
                                 'data' => $payload,
                                 'android' => [

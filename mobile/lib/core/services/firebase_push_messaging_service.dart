@@ -33,6 +33,7 @@ class FirebasePushMessagingService {
 
   Future<void> Function(String? notificationId)? onNotificationOpened;
   Future<void> Function(Map<String, dynamic> data)? onMessageReceived;
+  Future<void> Function()? onRoleChanged;
 
   bool get _isSupported =>
       !kIsWeb &&
@@ -159,40 +160,56 @@ class FirebasePushMessagingService {
   }
 
   Future<void> _showForegroundMessage(RemoteMessage message) async {
-    final id = message.data['notification_id']?.toString();
-    if (id == null || id.isEmpty) return;
-    final conversationId = int.tryParse(
-      message.data['conversation_id']?.toString() ?? '',
-    );
-    if (conversationId != null &&
-        conversationId == ActiveChatContext.conversationId) {
-      return;
-    }
-    if (!ActiveChatContext.markNotificationShown(id)) return;
-
-    final item = LuxNotification(
-      id: id,
-      title: message.notification?.title ?? message.data['title']?.toString(),
-      message:
-          message.notification?.body ??
-          message.data['message']?.toString() ??
-          'لديك إشعار جديد في وجهتك.',
-      kind: message.data['kind']?.toString(),
-      supportTicketId: int.tryParse(
-        message.data['support_ticket_id']?.toString() ?? '',
-      ),
-      conversationId: conversationId,
-      propertyId: int.tryParse(message.data['property_id']?.toString() ?? ''),
-      createdAt: DateTime.now(),
-    );
-    await _localNotifications.show(item);
+  if (message.data['kind']?.toString() == 'user_role_changed') {
+    await onRoleChanged?.call();
+    return;
   }
+
+  final id = message.data['notification_id']?.toString();
+  if (id == null || id.isEmpty) return;
+
+  final conversationId = int.tryParse(
+    message.data['conversation_id']?.toString() ?? '',
+  );
+
+  if (conversationId != null &&
+      conversationId == ActiveChatContext.conversationId) {
+    return;
+  }
+
+  if (!ActiveChatContext.markNotificationShown(id)) return;
+
+  final item = LuxNotification(
+    id: id,
+    title: message.notification?.title ?? message.data['title']?.toString(),
+    message:
+        message.notification?.body ??
+        message.data['message']?.toString() ??
+        'لديك إشعار جديد في وجهتك.',
+    kind: message.data['kind']?.toString(),
+    supportTicketId: int.tryParse(
+      message.data['support_ticket_id']?.toString() ?? '',
+    ),
+    conversationId: conversationId,
+    propertyId: int.tryParse(
+      message.data['property_id']?.toString() ?? '',
+    ),
+    createdAt: DateTime.now(),
+  );
+
+  await _localNotifications.show(item);
+}
 
   Future<void> _openFromRemoteMessage(RemoteMessage message) async {
-    final id = message.data['notification_id']?.toString();
-    if (id == null || id.isEmpty) return;
-    await onNotificationOpened?.call(id);
+  if (message.data['kind']?.toString() == 'user_role_changed') {
+    await onRoleChanged?.call();
   }
+
+  final id = message.data['notification_id']?.toString();
+  if (id == null || id.isEmpty) return;
+
+  await onNotificationOpened?.call(id);
+}
 
   Future<void> dispose() async {
     await _foregroundSubscription?.cancel();

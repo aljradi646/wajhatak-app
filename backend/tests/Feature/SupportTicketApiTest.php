@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Models\SupportTicket;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -18,7 +20,11 @@ final class SupportTicketApiTest extends TestCase
         $this->getJson('/api/v1/pages')
             ->assertOk()
             ->assertJsonFragment(['slug' => 'privacy'])
-            ->assertJsonFragment(['slug' => 'terms']);
+            ->assertJsonFragment(['slug' => 'terms'])
+            ->assertJsonFragment(['slug' => 'usage-policy'])
+            ->assertJsonFragment(['slug' => 'refund-cancellation'])
+            ->assertJsonFragment(['slug' => 'cookies'])
+            ->assertJsonFragment(['slug' => 'faq']);
 
         $this->getJson('/api/v1/pages/privacy')
             ->assertOk()
@@ -92,4 +98,39 @@ final class SupportTicketApiTest extends TestCase
         $this->actingAs($user, 'sanctum')->getJson('/api/v1/support-tickets/'.$id)->assertOk();
         $this->actingAs($other, 'sanctum')->getJson('/api/v1/support-tickets/'.$id)->assertNotFound();
     }
+
+    public function test_ticket_attachments_are_private_and_only_the_owner_can_download_them(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+
+        $response = $this->actingAs($user, 'sanctum')->post('/api/v1/support-tickets', [
+            'subject' => 'بلاغ مع صورة توضيحية',
+            'category' => 'technical',
+            'message' => 'أرفقت صورة توضح الخطأ الذي يظهر عند استخدام التطبيق.',
+            'attachments' => [UploadedFile::fake()->image('evidence.png')->size(128)],
+        ]);
+
+        $response->assertCreated();
+        $ticketId = (int) $response->json('data.id');
+        $attachmentId = (int) $response->json('data.attachments.0.id');
+        $this->assertGreaterThan(0, $attachmentId);
+        $this->assertDatabaseHas('support_ticket_attachments', [
+            'id' => $attachmentId,
+            'support_ticket_id' => $ticketId,
+            'uploaded_by' => $user->id,
+            'original_name' => 'evidence.png',
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->get('/api/v1/support-tickets/'.$ticketId.'/attachments/'.$attachmentId)
+            ->assertOk()
+            ->assertHeader('x-content-type-options', 'nosniff');
+
+        $this->actingAs($other, 'sanctum')
+            ->getJson('/api/v1/support-tickets/'.$ticketId.'/attachments/'.$attachmentId)
+            ->assertNotFound();
+    }
+
 }

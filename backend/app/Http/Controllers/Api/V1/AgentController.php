@@ -12,12 +12,12 @@ class AgentController extends Controller
 {
     public function index()
     {
-        return AgentResource::collection(Agent::query()->with('user')->where('is_active', true)->withCount('properties')->paginate(15));
+        return AgentResource::collection(Agent::query()->with('user')->where('is_active', true)->whereHas('user', fn ($userQuery) => $userQuery->role('agent'))->withCount('properties')->paginate(15));
     }
 
     public function show(Agent $agent)
     {
-        abort_unless($agent->is_active, 404);
+        abort_unless($agent->is_active && $agent->user()->role('agent')->exists(), 404);
         $agent->load('user')->loadCount('properties');
 
         $properties = $this->publishedProperties($agent)->paginate($this->perPage());
@@ -27,7 +27,7 @@ class AgentController extends Controller
 
     public function properties(Agent $agent)
     {
-        abort_unless($agent->is_active, 404);
+        abort_unless($agent->is_active && $agent->user()->role('agent')->exists(), 404);
 
         return PropertyResource::collection($this->publishedProperties($agent)->paginate($this->perPage()));
     }
