@@ -288,6 +288,7 @@ class AiAssistantController extends Controller
                     'response_type' => $type,
                     'properties' => $properties,
                     'actions' => data_get($m->metadata, 'actions', []),
+                    'market_insights' => data_get($m->metadata, 'market_insights'),
                     'property_ids' => $m->property_ids,
                     'created_at' => optional($m->created_at)->toISOString(),
                 ];
