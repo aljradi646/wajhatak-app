@@ -87,6 +87,7 @@ class AiAssistantService
                     'citations' => $contract['citations'] ?? [],
                     'state_updates' => $contract['state_updates'] ?? [],
                     'source' => $contract['source'] ?? [],
+                    'market_insights' => $contract['market_insights'] ?? null,
                 ],
             );
 
