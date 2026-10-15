@@ -19,6 +19,7 @@ class AiToolRegistry
         private readonly AiPermissionGuard $permissionGuard,
         private readonly AiMemoryService $memoryService,
         private readonly AiKnowledgeService $knowledgeService,
+        private readonly AiMarketInsightsService $marketInsights,
     ) {}
 
     /**
