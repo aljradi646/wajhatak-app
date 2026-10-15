@@ -179,6 +179,7 @@ class AiToolRegistry
             'property_recommendation' => ['find_similar_properties'],
             'viewing_request' => ['create_viewing_request'],
             'platform_information', 'platform_how_to' => ['get_app_knowledge'],
+            'market_insights' => ['get_market_insights'],
             default => [],
         };
     }
@@ -217,6 +218,7 @@ class AiToolRegistry
                 'get_user_profile' => $this->executeGetUserProfile($user),
                 'cancel_viewing_request' => $this->executeCancelViewingRequest($user, $arguments),
                 'get_app_knowledge' => $this->executeGetAppKnowledge($user, $arguments),
+                'get_market_insights' => $this->executeMarketInsights($arguments),
                 default => [
                     'success' => false,
                     'error' => 'UNKNOWN_TOOL',
