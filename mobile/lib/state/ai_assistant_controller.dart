@@ -407,11 +407,12 @@ class AiConversationController extends Notifier<AiConversationState> {
 
 final aiConversationProvider =
     NotifierProvider<AiConversationController, AiConversationState>(
-  AiConversationController.new,
-);
+      AiConversationController.new,
+    );
 
-final aiConversationsListProvider =
-    FutureProvider<List<AiConversationItem>>((ref) async {
+final aiConversationsListProvider = FutureProvider<List<AiConversationItem>>((
+  ref,
+) async {
   final session = ref.watch(sessionProvider).asData?.value;
   if (session == null) return const [];
   try {
