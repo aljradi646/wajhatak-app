@@ -68,7 +68,9 @@ class AiAssistantRepository {
           .whereType<Map<String, dynamic>>()
           .toList(growable: false),
       marketInsights: data['market_insights'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(data['market_insights'] as Map<String, dynamic>)
+          ? Map<String, dynamic>.from(
+              data['market_insights'] as Map<String, dynamic>,
+            )
           : null,
       createdAt: DateTime.now(),
     );
