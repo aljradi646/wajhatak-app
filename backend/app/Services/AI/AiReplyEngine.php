@@ -39,6 +39,11 @@ class AiReplyEngine
         return implode("\n", $lines);
     }
 
+    public function marketInsightsReply(array $result): string
+    {
+        return 'ملخص السوق مبني على العروض المنشورة الحالية.';
+    }
+
     /** رد "عقار مشابه لهذا العقار" — التفاصيل تعرضها البطاقات التفاعلية. */
     public function similarReply(array $items): string
     {
