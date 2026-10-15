@@ -568,12 +568,12 @@ class _MarketInsightsCard extends StatelessWidget {
             ...groups.map((group) {
               final title =
                   [
-                    group['city'],
-                    group['property_type_name'] ?? group['property_type'],
-                    group['transaction_type'] == 'rent'
-                        ? 'للإيجار'
-                        : 'للبيع',
-                  ]
+                        group['city'],
+                        group['property_type_name'] ?? group['property_type'],
+                        group['transaction_type'] == 'rent'
+                            ? 'للإيجار'
+                            : 'للبيع',
+                      ]
                       .whereType<String>()
                       .where((value) => value.isNotEmpty)
                       .join(' · ');
