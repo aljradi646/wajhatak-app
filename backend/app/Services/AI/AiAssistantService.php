@@ -87,6 +87,7 @@ class AiAssistantService
                     'citations' => $contract['citations'] ?? [],
                     'state_updates' => $contract['state_updates'] ?? [],
                     'source' => $contract['source'] ?? [],
+                    'market_insights' => $contract['market_insights'] ?? null,
                 ],
             );
 
@@ -98,6 +99,7 @@ class AiAssistantService
                 'conversation_id' => $conversation->exists ? $conversation->id : null,
                 'session_token' => $conversation->exists ? $conversation->session_token : null,
                 'properties' => $properties,
+                'market_insights' => $contract['market_insights'] ?? null,
                 'result_mode' => $contract['result_mode'] ?? 'exact',
                 'relaxations' => $orchestratorResult['relaxations'] ?? [],
                 'filters' => $filters,

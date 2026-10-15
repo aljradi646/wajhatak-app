@@ -100,25 +100,41 @@ class AiConversationController extends Notifier<AiConversationState> {
     if (state.messages.isEmpty) {
       final user = ref.read(sessionProvider).asData?.value?.user;
       state = state.copyWith(
-        messages: [AiChatMessage.local(isUser: false, content: buildAiWelcomeMessage(user?.name))],
+        messages: [
+          AiChatMessage.local(
+            isUser: false,
+            content: buildAiWelcomeMessage(user?.name),
+          ),
+        ],
         loading: false,
         clearError: true,
       );
     }
     try {
       final bootstrap = await ref.read(aiBootstrapProvider.future);
-      if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
+      if (generation != _generation || state.phase != AiSendPhase.bootstrapping)
+        return;
       state = state.copyWith(
         loading: false,
         phase: bootstrap.enabled ? AiSendPhase.ready : AiSendPhase.disabled,
         clearError: true,
       );
     } on ApiFailure catch (error) {
-      if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
-      state = state.copyWith(loading: false, phase: AiSendPhase.failed, error: error.message);
+      if (generation != _generation || state.phase != AiSendPhase.bootstrapping)
+        return;
+      state = state.copyWith(
+        loading: false,
+        phase: AiSendPhase.failed,
+        error: error.message,
+      );
     } on Object {
-      if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
-      state = state.copyWith(loading: false, phase: AiSendPhase.failed, error: 'bootstrap_failed');
+      if (generation != _generation || state.phase != AiSendPhase.bootstrapping)
+        return;
+      state = state.copyWith(
+        loading: false,
+        phase: AiSendPhase.failed,
+        error: 'bootstrap_failed',
+      );
     }
   }
 
@@ -156,15 +172,16 @@ class AiConversationController extends Notifier<AiConversationState> {
       final cancel = CancelToken();
       _cancelToken = cancel;
 
-      await for (final event in ref
-          .read(aiAssistantRepositoryProvider)
-          .streamMessage(
-            trimmed,
-            conversationId: state.conversationId,
-            latitude: latitude,
-            longitude: longitude,
-            cancelToken: cancel,
-          )) {
+      await for (final event
+          in ref
+              .read(aiAssistantRepositoryProvider)
+              .streamMessage(
+                trimmed,
+                conversationId: state.conversationId,
+                latitude: latitude,
+                longitude: longitude,
+                cancelToken: cancel,
+              )) {
         if (generation != _generation || cancel.isCancelled) return;
 
         if (event.event == 'delta') {
@@ -194,7 +211,8 @@ class AiConversationController extends Notifier<AiConversationState> {
         } else if (event.event == 'done') {
           final result = event.data ?? const <String, dynamic>{};
           final finalMessage = AiChatMessage(
-            id: (result['message_id'] as num?)?.toInt() ??
+            id:
+                (result['message_id'] as num?)?.toInt() ??
                 DateTime.now().microsecondsSinceEpoch,
             role: 'assistant',
             content: result['reply']?.toString() ?? '',
@@ -207,6 +225,11 @@ class AiConversationController extends Notifier<AiConversationState> {
             actions: (result['actions'] as List<dynamic>? ?? const [])
                 .whereType<Map<String, dynamic>>()
                 .toList(growable: false),
+            marketInsights: result['market_insights'] is Map<String, dynamic>
+                ? Map<String, dynamic>.from(
+                    result['market_insights'] as Map<String, dynamic>,
+                  )
+                : null,
             createdAt: DateTime.now(),
           );
 
@@ -223,7 +246,8 @@ class AiConversationController extends Notifier<AiConversationState> {
             messages: messages,
             loading: false,
             phase: AiSendPhase.completed,
-            conversationId: state.conversationId ??
+            conversationId:
+                state.conversationId ??
                 (result['conversation_id'] as num?)?.toInt(),
           );
         } else if (event.event == 'error') {
@@ -309,7 +333,12 @@ class AiConversationController extends Notifier<AiConversationState> {
     cancel();
     final user = ref.read(sessionProvider).asData?.value?.user;
     state = AiConversationState(
-      messages: [AiChatMessage.local(isUser: false, content: buildAiWelcomeMessage(user?.name))],
+      messages: [
+        AiChatMessage.local(
+          isUser: false,
+          content: buildAiWelcomeMessage(user?.name),
+        ),
+      ],
       phase: AiSendPhase.bootstrapping,
     );
     // Do not wait for a network round-trip; the first streamed message creates
@@ -324,7 +353,12 @@ class AiConversationController extends Notifier<AiConversationState> {
     ref.invalidate(aiBootstrapProvider);
     final user = ref.read(sessionProvider).asData?.value?.user;
     state = AiConversationState(
-      messages: [AiChatMessage.local(isUser: false, content: buildAiWelcomeMessage(user?.name))],
+      messages: [
+        AiChatMessage.local(
+          isUser: false,
+          content: buildAiWelcomeMessage(user?.name),
+        ),
+      ],
       phase: AiSendPhase.bootstrapping,
     );
     if (id != null && signedIn) unawaited(_clearConversationSilently(id));
@@ -342,7 +376,11 @@ class AiConversationController extends Notifier<AiConversationState> {
   Future<void> loadConversation(int conversationId) async {
     final session = ref.read(sessionProvider).asData?.value;
     if (session == null) return;
-    state = state.copyWith(loading: true, phase: AiSendPhase.sending, clearError: true);
+    state = state.copyWith(
+      loading: true,
+      phase: AiSendPhase.sending,
+      clearError: true,
+    );
     try {
       final messages = await ref
           .read(aiAssistantRepositoryProvider)
@@ -371,11 +409,12 @@ class AiConversationController extends Notifier<AiConversationState> {
 
 final aiConversationProvider =
     NotifierProvider<AiConversationController, AiConversationState>(
-  AiConversationController.new,
-);
+      AiConversationController.new,
+    );
 
-final aiConversationsListProvider =
-    FutureProvider<List<AiConversationItem>>((ref) async {
+final aiConversationsListProvider = FutureProvider<List<AiConversationItem>>((
+  ref,
+) async {
   final session = ref.watch(sessionProvider).asData?.value;
   if (session == null) return const [];
   try {

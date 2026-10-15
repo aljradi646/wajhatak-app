@@ -86,6 +86,19 @@ class AiIntentRouter
             return $this->result('platform_information');
         }
 
+        if ($this->isMarketInsightsRequest($normalized)) {
+            $parsed = $this->intentService->parse($message, [], []);
+            $filters = (array) ($parsed['filters'] ?? []);
+
+            return $this->result('market_insights', [
+                'filters' => array_intersect_key(
+                    $filters,
+                    array_flip(['city', 'district', 'property_type', 'transaction_type']),
+                ),
+                'use_search_context' => false,
+            ]);
+        }
+
         if (AiChatIntentDetector::wantsNearby($message)) {
             $nearbyParsed = $this->intentService->parse($message, [], []);
             $nearbyFilters = (array) ($nearbyParsed['filters'] ?? []);
@@ -284,6 +297,15 @@ class AiIntentRouter
     private function isPlatformInformation(string $text): bool
     {
         return preg_match('/(ما هي وجهتك|وش هي وجهتك|ايش هي وجهتك|ما هي منصة وجهتك|وش هي منصة وجهتك|ايش هي منصة وجهتك|معلومات عن منصة وجهتك|معلومات عن منصه وجهتك|معلومات عن وجهتك|معلومات عن المنصة|معلومات عن المنصه|ما هي المنصة|وش هي المنصة|خدمات وجهتك|خدماتكم|عن التطبيق|عن المنصة|عن المنصه)/u', $text) === 1;
+    }
+
+    /** Market analysis is a separate intent and never reuses old property cards. */
+    private function isMarketInsightsRequest(string $text): bool
+    {
+        return preg_match(
+            '/(متوسط\\s*(?:اسعار|سعر)|متوسط\\s*الاسعار|تحليل\\s*(?:السوق|السوق العقاري)|السوق\\s*العقاري|حاله\\s*السوق|مؤشرات\\s*السوق|اسعار\\s*العقارات|كم\\s*متوسط\\s*(?:سعر|اسعار)|market\\s*(?:insights?|analysis|prices?)|average\\s+(?:property|house|apartment)\\s+prices?)/u',
+            $text,
+        ) === 1;
     }
 
     private function isPlatformHowTo(string $text): bool

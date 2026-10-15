@@ -19,6 +19,7 @@ class AiToolRegistry
         private readonly AiPermissionGuard $permissionGuard,
         private readonly AiMemoryService $memoryService,
         private readonly AiKnowledgeService $knowledgeService,
+        private readonly AiMarketInsightsService $marketInsights,
     ) {}
 
     /**
@@ -127,6 +128,20 @@ class AiToolRegistry
                     ],
                 ],
             ],
+            'get_market_insights' => [
+                'name' => 'get_market_insights',
+                'description' => 'إحصاءات وصفية حية من العروض المنشورة، مفصولة حسب العملة ونوع العملية ونوع العقار.',
+                'parameters' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'properties' => [
+                        'city' => ['type' => 'string', 'maxLength' => 100],
+                        'district' => ['type' => 'string', 'maxLength' => 100],
+                        'property_type' => ['type' => 'string', 'enum' => ['apartment', 'villa', 'floor', 'townhouse', 'land', 'shop', 'office', 'building', 'farm', 'house']],
+                        'transaction_type' => ['type' => 'string', 'enum' => ['sale', 'rent']],
+                    ],
+                ],
+            ],
             'get_app_knowledge' => [
                 'name' => 'get_app_knowledge',
                 'description' => 'استرجاع معرفة منصة وجهتك الحالية فقط؛ ليست مصدرًا لبيانات العقارات التشغيلية.',
@@ -164,6 +179,7 @@ class AiToolRegistry
             'property_recommendation' => ['find_similar_properties'],
             'viewing_request' => ['create_viewing_request'],
             'platform_information', 'platform_how_to' => ['get_app_knowledge'],
+            'market_insights' => ['get_market_insights'],
             default => [],
         };
     }
@@ -202,6 +218,7 @@ class AiToolRegistry
                 'get_user_profile' => $this->executeGetUserProfile($user),
                 'cancel_viewing_request' => $this->executeCancelViewingRequest($user, $arguments),
                 'get_app_knowledge' => $this->executeGetAppKnowledge($user, $arguments),
+                'get_market_insights' => $this->executeMarketInsights($arguments),
                 default => [
                     'success' => false,
                     'error' => 'UNKNOWN_TOOL',
@@ -227,6 +244,7 @@ class AiToolRegistry
             'find_similar_properties' => ['property_id','limit'],
             'search_nearby_properties' => ['latitude','longitude','radius_km'],
             'get_app_knowledge' => ['query'],
+            'get_market_insights' => ['city', 'district', 'property_type', 'transaction_type'],
             'create_viewing_request' => ['property_id','scheduled_date','scheduled_time','notes','confirmed'],
             'cancel_viewing_request' => ['viewing_id','confirmed'],
             default => null,
@@ -246,6 +264,10 @@ class AiToolRegistry
             }
         }
         if (isset($args['transaction_type']) && ! in_array($args['transaction_type'], ['sale','rent'], true)) return 'نوع العملية غير صالح.';
+        if (isset($args['property_type']) && ! in_array($args['property_type'], ['apartment','villa','floor','townhouse','land','shop','office','building','farm','house'], true)) return 'نوع العقار غير صالح.';
+        foreach (['city', 'district'] as $locationField) {
+            if (isset($args[$locationField]) && (! is_string($args[$locationField]) || mb_strlen(trim($args[$locationField])) > 100)) return 'اسم الموقع غير صالح.';
+        }
         foreach (['min_price', 'max_price', 'min_area', 'max_area'] as $key) {
             if (isset($args[$key]) && (! is_numeric($args[$key]) || (float) $args[$key] < 0)) {
                 return 'حد السعر أو المساحة غير صالح.';
@@ -532,6 +554,12 @@ class AiToolRegistry
         $viewing->status=ViewingRequestStatus::Cancelled;
         $viewing->save();
         return ['success'=>true,'viewing_id'=>$viewing->id,'message'=>'تم إلغاء طلب المعاينة بنجاح.'];
+    }
+
+    private function executeMarketInsights(array $args): array
+    {
+        $filters = array_intersect_key($args, array_flip(['city', 'district', 'property_type', 'transaction_type']));
+        return $this->marketInsights->summarize($filters);
     }
 
     private function executeGetAppKnowledge(?User $user, array $args): array
