@@ -170,15 +170,16 @@ class AiConversationController extends Notifier<AiConversationState> {
       final cancel = CancelToken();
       _cancelToken = cancel;
 
-      await for (final event in ref
-          .read(aiAssistantRepositoryProvider)
-          .streamMessage(
-            trimmed,
-            conversationId: state.conversationId,
-            latitude: latitude,
-            longitude: longitude,
-            cancelToken: cancel,
-          )) {
+      await for (final event
+          in ref
+              .read(aiAssistantRepositoryProvider)
+              .streamMessage(
+                trimmed,
+                conversationId: state.conversationId,
+                latitude: latitude,
+                longitude: longitude,
+                cancelToken: cancel,
+              )) {
         if (generation != _generation || cancel.isCancelled) return;
 
         if (event.event == 'delta') {
@@ -208,7 +209,8 @@ class AiConversationController extends Notifier<AiConversationState> {
         } else if (event.event == 'done') {
           final result = event.data ?? const <String, dynamic>{};
           final finalMessage = AiChatMessage(
-            id: (result['message_id'] as num?)?.toInt() ??
+            id:
+                (result['message_id'] as num?)?.toInt() ??
                 DateTime.now().microsecondsSinceEpoch,
             role: 'assistant',
             content: result['reply']?.toString() ?? '',
@@ -242,7 +244,8 @@ class AiConversationController extends Notifier<AiConversationState> {
             messages: messages,
             loading: false,
             phase: AiSendPhase.completed,
-            conversationId: state.conversationId ??
+            conversationId:
+                state.conversationId ??
                 (result['conversation_id'] as num?)?.toInt(),
           );
         } else if (event.event == 'error') {
