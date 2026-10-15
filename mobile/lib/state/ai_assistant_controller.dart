@@ -331,7 +331,12 @@ class AiConversationController extends Notifier<AiConversationState> {
     cancel();
     final user = ref.read(sessionProvider).asData?.value?.user;
     state = AiConversationState(
-      messages: [AiChatMessage.local(isUser: false, content: buildAiWelcomeMessage(user?.name))],
+      messages: [
+        AiChatMessage.local(
+          isUser: false,
+          content: buildAiWelcomeMessage(user?.name),
+        ),
+      ],
       phase: AiSendPhase.bootstrapping,
     );
     // Do not wait for a network round-trip; the first streamed message creates
@@ -346,7 +351,12 @@ class AiConversationController extends Notifier<AiConversationState> {
     ref.invalidate(aiBootstrapProvider);
     final user = ref.read(sessionProvider).asData?.value?.user;
     state = AiConversationState(
-      messages: [AiChatMessage.local(isUser: false, content: buildAiWelcomeMessage(user?.name))],
+      messages: [
+        AiChatMessage.local(
+          isUser: false,
+          content: buildAiWelcomeMessage(user?.name),
+        ),
+      ],
       phase: AiSendPhase.bootstrapping,
     );
     if (id != null && signedIn) unawaited(_clearConversationSilently(id));
@@ -364,7 +374,11 @@ class AiConversationController extends Notifier<AiConversationState> {
   Future<void> loadConversation(int conversationId) async {
     final session = ref.read(sessionProvider).asData?.value;
     if (session == null) return;
-    state = state.copyWith(loading: true, phase: AiSendPhase.sending, clearError: true);
+    state = state.copyWith(
+      loading: true,
+      phase: AiSendPhase.sending,
+      clearError: true,
+    );
     try {
       final messages = await ref
           .read(aiAssistantRepositoryProvider)
