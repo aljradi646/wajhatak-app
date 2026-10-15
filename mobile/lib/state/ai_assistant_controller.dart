@@ -100,14 +100,20 @@ class AiConversationController extends Notifier<AiConversationState> {
     if (state.messages.isEmpty) {
       final user = ref.read(sessionProvider).asData?.value?.user;
       state = state.copyWith(
-        messages: [AiChatMessage.local(isUser: false, content: buildAiWelcomeMessage(user?.name))],
+        messages: [
+          AiChatMessage.local(
+            isUser: false,
+            content: buildAiWelcomeMessage(user?.name),
+          ),
+        ],
         loading: false,
         clearError: true,
       );
     }
     try {
       final bootstrap = await ref.read(aiBootstrapProvider.future);
-      if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
+      if (generation != _generation || state.phase != AiSendPhase.bootstrapping)
+        return;
       state = state.copyWith(
         loading: false,
         phase: bootstrap.enabled ? AiSendPhase.ready : AiSendPhase.disabled,
@@ -115,10 +121,18 @@ class AiConversationController extends Notifier<AiConversationState> {
       );
     } on ApiFailure catch (error) {
       if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
-      state = state.copyWith(loading: false, phase: AiSendPhase.failed, error: error.message);
+      state = state.copyWith(
+        loading: false,
+        phase: AiSendPhase.failed,
+        error: error.message,
+      );
     } on Object {
       if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
-      state = state.copyWith(loading: false, phase: AiSendPhase.failed, error: 'bootstrap_failed');
+      state = state.copyWith(
+        loading: false,
+        phase: AiSendPhase.failed,
+        error: 'bootstrap_failed',
+      );
     }
   }
 
