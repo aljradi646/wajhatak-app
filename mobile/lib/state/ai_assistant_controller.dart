@@ -208,7 +208,9 @@ class AiConversationController extends Notifier<AiConversationState> {
                 .whereType<Map<String, dynamic>>()
                 .toList(growable: false),
             marketInsights: result['market_insights'] is Map<String, dynamic>
-                ? Map<String, dynamic>.from(result['market_insights'] as Map<String, dynamic>)
+                ? Map<String, dynamic>.from(
+                    result['market_insights'] as Map<String, dynamic>,
+                  )
                 : null,
             createdAt: DateTime.now(),
           );
