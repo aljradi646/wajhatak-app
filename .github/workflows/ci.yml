@@ -67,12 +67,6 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Temporary formatter diagnostics
-        if: github.event_name == 'pull_request'
-        run: |
-          dart format --output=show lib/state/ai_assistant_controller.dart | grep -A8 -B2 'marketInsights' || true
-          dart format --output=show lib/ui/screens/ai/ai_assistant_sheet.dart | awk '/class _MarketInsightsCard/{p=1} /class _WelcomeMessage/{p=0} p' || true
-
       - name: Check formatting for changed Dart files
         shell: bash
         run: |
