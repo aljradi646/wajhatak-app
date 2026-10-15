@@ -67,12 +67,6 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Temporary formatting diff
-        if: github.event_name == 'pull_request'
-        run: |
-          dart format --output=show lib/state/ai_assistant_controller.dart | diff -u lib/state/ai_assistant_controller.dart - || true
-          dart format --output=show lib/ui/screens/ai/ai_assistant_sheet.dart | diff -u lib/ui/screens/ai/ai_assistant_sheet.dart - || true
-
       - name: Check formatting for changed Dart files
         shell: bash
         run: |
