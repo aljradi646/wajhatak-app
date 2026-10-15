@@ -22,17 +22,17 @@ class AiMarketInsightsService
      */
     public function summarize(array $filters = []): array
     {
-        if (! Schema::hasTable('ai_search_index')) {
-            return [
-                'success' => false,
-                'error' => 'MARKET_INDEX_UNAVAILABLE',
-                'total_listings' => 0,
-                'groups' => [],
-                'as_of' => now()->toISOString(),
-            ];
-        }
-
         try {
+            if (! Schema::hasTable('ai_search_index')) {
+                return [
+                    'success' => false,
+                    'error' => 'MARKET_INDEX_UNAVAILABLE',
+                    'total_listings' => 0,
+                    'groups' => [],
+                    'as_of' => now()->toISOString(),
+                ];
+            }
+
             $query = AiSearchIndex::query()
                 ->where('status', 'published')
                 ->whereNotNull('price')
