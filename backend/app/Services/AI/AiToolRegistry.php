@@ -127,6 +127,20 @@ class AiToolRegistry
                     ],
                 ],
             ],
+            'get_market_insights' => [
+                'name' => 'get_market_insights',
+                'description' => 'إحصاءات وصفية حية من العروض المنشورة، مفصولة حسب العملة ونوع العملية ونوع العقار.',
+                'parameters' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'properties' => [
+                        'city' => ['type' => 'string', 'maxLength' => 100],
+                        'district' => ['type' => 'string', 'maxLength' => 100],
+                        'property_type' => ['type' => 'string', 'enum' => ['apartment', 'villa', 'floor', 'townhouse', 'land', 'shop', 'office', 'building', 'farm', 'house']],
+                        'transaction_type' => ['type' => 'string', 'enum' => ['sale', 'rent']],
+                    ],
+                ],
+            ],
             'get_app_knowledge' => [
                 'name' => 'get_app_knowledge',
                 'description' => 'استرجاع معرفة منصة وجهتك الحالية فقط؛ ليست مصدرًا لبيانات العقارات التشغيلية.',
