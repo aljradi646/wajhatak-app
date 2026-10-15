@@ -243,6 +243,30 @@ class AiAgentOrchestrator
             ]);
         }
 
+        if ($intent === 'market_insights') {
+            $this->stateService->clearRetrievalState($conversation, (int) $userMessage->id);
+            $filters = (array) ($route['filters'] ?? []);
+            $result = $this->toolRegistry->execute('get_market_insights', $filters, $user);
+            $success = (bool) ($result['success'] ?? false);
+
+            return $this->finish($userMessage, [
+                'reply' => $this->replyEngine->marketInsightsReply($result),
+                'status' => $success ? 'ok' : 'error',
+                'response_type' => $success ? 'market_insights' : 'error',
+                'properties' => [],
+                'filters' => $filters,
+                'market_insights' => $result,
+                'tool_calls' => [['tool' => 'get_market_insights', 'ok' => $success]],
+                'actions' => [],
+                'intent' => $intent,
+                'source' => [
+                    'type' => 'live_market_aggregate',
+                    'retrieved_at' => $result['as_of'] ?? now()->toISOString(),
+                    'result_count' => (int) ($result['total_listings'] ?? 0),
+                ],
+            ]);
+        }
+
         if ($intent === 'technical_help') {
             $this->stateService->clearRetrievalState($conversation, (int) $userMessage->id);
             return $this->finish($userMessage, [
