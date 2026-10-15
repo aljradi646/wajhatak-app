@@ -14,6 +14,7 @@ final class AiResponseContract
         'property_detail',
         'clarification',
         'unsupported',
+        'market_insights',
         'security',
         'error',
     ];
@@ -104,6 +105,7 @@ final class AiResponseContract
             'citations' => is_array($response['citations'] ?? null) ? array_values($response['citations']) : [],
             'state_updates' => is_array($response['state_updates'] ?? null) ? $response['state_updates'] : [],
             'source' => is_array($response['source'] ?? null) ? $response['source'] : [],
+            'market_insights' => is_array($response['market_insights'] ?? null) ? $response['market_insights'] : null,
             'failed_stage' => $response['failed_stage'] ?? null,
         ];
     }
