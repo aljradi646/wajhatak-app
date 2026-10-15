@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -480,6 +481,8 @@ class _MessageBubbleState extends State<_MessageBubble> {
                       )
                     : const SizedBox.shrink(),
               ),
+              if (widget.message.marketInsights != null)
+                _MarketInsightsCard(data: widget.message.marketInsights!),
               if (items.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 LayoutBuilder(
@@ -522,6 +525,69 @@ class _MessageBubbleState extends State<_MessageBubble> {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketInsightsCard extends StatelessWidget {
+  const _MarketInsightsCard({required this.data});
+
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final groups = (data['groups'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .take(5)
+        .toList(growable: false);
+    if (data['success'] != true || groups.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(top: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('ملخص السوق الحالي',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
+            Text('عدد العروض: ${data['total_listings'] ?? 0}',
+                style: theme.textTheme.bodySmall),
+            const Divider(height: 18),
+            ...groups.map((group) {
+              final title = [
+                group['city'],
+                group['property_type_name'] ?? group['property_type'],
+                group['transaction_type'] == 'rent' ? 'للإيجار' : 'للبيع',
+              ].whereType<String>().where((v) => v.isNotEmpty).join(' · ');
+              final currency = (group['currency'] ?? '').toString();
+              final average = group['average_price'];
+              final avgText = average is num
+                  ? NumberFormat.decimalPattern('en_US').format(average.round())
+                  : 'غير متاح';
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Text('المتوسط: $avgText $currency',
+                        style: theme.textTheme.bodyMedium),
+                    Text('عدد العروض: ${group['listings_count'] ?? 0}',
+                        style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 6),
+            Text('هذه أسعار عروض وليست تقييمًا رسميًا.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ],
         ),
       ),
     );
