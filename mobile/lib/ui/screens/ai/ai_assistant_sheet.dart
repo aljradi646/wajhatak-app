@@ -561,7 +561,7 @@ class _MarketInsightsCard extends StatelessWidget {
               ),
             ),
             Text(
-              'عدد العروض: \${data['total_listings'] ?? 0}',
+              'عدد العروض: ${data['total_listings'] ?? 0}',
               style: theme.textTheme.bodySmall,
             ),
             const Divider(height: 18),
@@ -593,7 +593,7 @@ class _MarketInsightsCard extends StatelessWidget {
                       style: theme.textTheme.bodyMedium,
                     ),
                     Text(
-                      'عدد العروض: \${group['listings_count'] ?? 0}',
+                      'عدد العروض: ${group['listings_count'] ?? 0}',
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
