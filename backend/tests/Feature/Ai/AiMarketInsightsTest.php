@@ -35,4 +35,20 @@ class AiMarketInsightsTest extends TestCase
             $this->assertArrayHasKey('transaction_type', $group);
         }
     }
+    public function test_market_analysis_does_not_reuse_previous_property_cards(): void
+    {
+        $first = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'أريد شقة للبيع في صنعاء',
+        ])->assertOk();
+
+        $response = $this->postJson('/api/v1/ai/chat', [
+            'message' => 'تحليل السوق العقاري',
+            'conversation_id' => $first->json('data.conversation_id'),
+            'session_token' => $first->json('data.session_token'),
+        ])->assertOk();
+
+        $this->assertSame('market_insights', $response->json('data.intent'));
+        $this->assertSame([], $response->json('data.properties'));
+    }
+
 }
