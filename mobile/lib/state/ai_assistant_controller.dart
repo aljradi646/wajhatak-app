@@ -120,14 +120,16 @@ class AiConversationController extends Notifier<AiConversationState> {
         clearError: true,
       );
     } on ApiFailure catch (error) {
-      if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
+      if (generation != _generation || state.phase != AiSendPhase.bootstrapping)
+        return;
       state = state.copyWith(
         loading: false,
         phase: AiSendPhase.failed,
         error: error.message,
       );
     } on Object {
-      if (generation != _generation || state.phase != AiSendPhase.bootstrapping) return;
+      if (generation != _generation || state.phase != AiSendPhase.bootstrapping)
+        return;
       state = state.copyWith(
         loading: false,
         phase: AiSendPhase.failed,
