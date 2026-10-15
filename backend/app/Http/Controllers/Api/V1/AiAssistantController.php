@@ -378,6 +378,7 @@ class AiAssistantController extends Controller
                 'أرخص العقارات',
                 'شقق مفروشة',
                 'عقارات قريبة مني',
+                'حلل السوق العقاري ومتوسط الأسعار',
             ],
         ]]);
     }
