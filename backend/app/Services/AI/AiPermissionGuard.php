@@ -24,6 +24,7 @@ class AiPermissionGuard
             'get_agent_info',
             'get_app_knowledge',
             'get_property_availability',
+            'get_market_insights',
         ];
 
         if (in_array($toolName, $publicTools, true)) {
