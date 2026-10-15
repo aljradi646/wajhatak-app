@@ -554,39 +554,59 @@ class _MarketInsightsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ملخص السوق الحالي',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
-            Text('عدد العروض: ${data['total_listings'] ?? 0}',
-                style: theme.textTheme.bodySmall),
+            Text(
+              'ملخص السوق الحالي',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Text(
+              'عدد العروض: \${data['total_listings'] ?? 0}',
+              style: theme.textTheme.bodySmall,
+            ),
             const Divider(height: 18),
             ...groups.map((group) {
               final title = [
                 group['city'],
                 group['property_type_name'] ?? group['property_type'],
                 group['transaction_type'] == 'rent' ? 'للإيجار' : 'للبيع',
-              ].whereType<String>().where((v) => v.isNotEmpty).join(' · ');
+              ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
               final currency = (group['currency'] ?? '').toString();
               final average = group['average_price'];
-              final avgText = average is num
+              final averageText = average is num
                   ? NumberFormat.decimalPattern('en_US').format(average.round())
                   : 'غير متاح';
+
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 5),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
-                    Text('المتوسط: $avgText $currency',
-                        style: theme.textTheme.bodyMedium),
-                    Text('عدد العروض: ${group['listings_count'] ?? 0}',
-                        style: theme.textTheme.bodySmall),
+                    Text(
+                      title,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'المتوسط: $averageText $currency',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    Text(
+                      'عدد العروض: \${group['listings_count'] ?? 0}',
+                      style: theme.textTheme.bodySmall,
+                    ),
                   ],
                 ),
               );
             }),
             const SizedBox(height: 6),
-            Text('هذه أسعار عروض وليست تقييمًا رسميًا.',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              'هذه أسعار عروض وليست تقييمًا رسميًا.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),
