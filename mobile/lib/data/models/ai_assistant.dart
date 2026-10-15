@@ -138,6 +138,7 @@ class AiChatMessage {
     this.status = 'ok',
     this.responseType = 'text',
     this.actions = const [],
+    this.marketInsights,
     this.createdAt,
   });
 
@@ -148,6 +149,7 @@ class AiChatMessage {
   final String status; // ok | blocked | error | streaming
   final String responseType;
   final List<Map<String, dynamic>> actions;
+  final Map<String, dynamic>? marketInsights;
   final DateTime? createdAt;
 
   bool get isUser => role == 'user';
@@ -159,6 +161,7 @@ class AiChatMessage {
     String status = 'ok',
     String responseType = 'text',
     List<Map<String, dynamic>> actions = const [],
+    Map<String, dynamic>? marketInsights,
   }) {
     final stamp = DateTime.now().microsecondsSinceEpoch;
     return AiChatMessage(
@@ -169,6 +172,7 @@ class AiChatMessage {
       status: status,
       responseType: responseType,
       actions: actions,
+      marketInsights: marketInsights,
       createdAt: DateTime.now(),
     );
   }
@@ -181,6 +185,7 @@ class AiChatMessage {
     String? status,
     String? responseType,
     List<Map<String, dynamic>>? actions,
+    Map<String, dynamic>? marketInsights,
     DateTime? createdAt,
   }) => AiChatMessage(
     id: id ?? this.id,
@@ -190,6 +195,7 @@ class AiChatMessage {
     status: status ?? this.status,
     responseType: responseType ?? this.responseType,
     actions: actions ?? this.actions,
+    marketInsights: marketInsights ?? this.marketInsights,
     createdAt: createdAt ?? this.createdAt,
   );
 
@@ -207,6 +213,9 @@ class AiChatMessage {
       actions: (json['actions'] as List<dynamic>? ?? const [])
           .whereType<Map<String, dynamic>>()
           .toList(growable: false),
+      marketInsights: json['market_insights'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(json['market_insights'] as Map<String, dynamic>)
+          : null,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
