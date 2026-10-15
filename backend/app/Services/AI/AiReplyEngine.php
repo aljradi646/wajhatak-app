@@ -41,7 +41,42 @@ class AiReplyEngine
 
     public function marketInsightsReply(array $result): string
     {
-        return 'ملخص السوق مبني على العروض المنشورة الحالية.';
+        if (!($result['success'] ?? false)) {
+            return 'تعذر تحميل إحصاءات السوق الحالية الآن.';
+        }
+
+        $total = (int) ($result['total_listings'] ?? 0);
+        $groups = array_values(array_filter((array) ($result['groups'] ?? []), 'is_array'));
+        if ($total === 0 || $groups === []) {
+            return 'لا توجد عروض منشورة ذات أسعار مسجلة تكفي لإعداد ملخص سوقي وفق المعايير الحالية.';
+        }
+
+        $lines = [
+            'ملخص وصفي للعروض المنشورة ذات الأسعار المسجلة حتى '.now()->format('Y-m-d').'.',
+            'عدد العروض المطابقة: '.number_format($total).'.',
+        ];
+
+        foreach (array_slice($groups, 0, 5) as $group) {
+            $label = collect([
+                $group['city'] ?? null,
+                $group['district'] ?? null,
+                $group['property_type_name'] ?? $group['property_type'] ?? null,
+                ($group['transaction_type'] ?? null) === 'sale' ? 'للبيع' : (($group['transaction_type'] ?? null) === 'rent' ? 'للإيجار' : null),
+            ])->filter()->implode(' · ');
+            $currency = trim((string) ($group['currency'] ?? ''));
+            $currency = $currency === '' ? '' : ' '.$currency;
+            $line = '• '.($label !== '' ? $label : 'مجموعة عقارية').' — '.(int) ($group['listings_count'] ?? 0).' عرضًا';
+            if (isset($group['average_price'])) {
+                $line .= '، المتوسط '.number_format((float) $group['average_price'], 0).$currency;
+            }
+            if (isset($group['minimum_price'], $group['maximum_price'])) {
+                $line .= '، النطاق '.number_format((float) $group['minimum_price'], 0).'–'.number_format((float) $group['maximum_price'], 0).$currency;
+            }
+            $lines[] = $line;
+        }
+
+        $lines[] = 'هذه أسعار عروض وليست أسعار صفقات منفذة أو تقييمًا رسميًا، ولا تضمن عائدًا استثماريًا.';
+        return implode("\\n", $lines);
     }
 
     /** رد "عقار مشابه لهذا العقار" — التفاصيل تعرضها البطاقات التفاعلية. */
