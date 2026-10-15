@@ -566,11 +566,17 @@ class _MarketInsightsCard extends StatelessWidget {
             ),
             const Divider(height: 18),
             ...groups.map((group) {
-              final title = [
-                group['city'],
-                group['property_type_name'] ?? group['property_type'],
-                group['transaction_type'] == 'rent' ? 'للإيجار' : 'للبيع',
-              ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
+              final title =
+                  [
+                    group['city'],
+                    group['property_type_name'] ?? group['property_type'],
+                    group['transaction_type'] == 'rent'
+                        ? 'للإيجار'
+                        : 'للبيع',
+                  ]
+                      .whereType<String>()
+                      .where((value) => value.isNotEmpty)
+                      .join(' · ');
               final currency = (group['currency'] ?? '').toString();
               final average = group['average_price'];
               final averageText = average is num
